@@ -1,0 +1,69 @@
+{% extends "base/base.html" %}
+
+{% block title %}Reports{% endblock %}
+{% block page_title %}Reports & Analytics{% endblock %}
+
+{% block content %}
+<div class="two-col">
+  <div class="card">
+    <div class="card-header"><span class="card-title">Department-wise Leave Usage</span></div>
+    <div class="table-responsive">
+      <table>
+        <thead><tr><th>Department</th><th>Employees</th><th>Total Days</th><th>Avg per Person</th></tr></thead>
+        <tbody>
+          {% for d in department_usage %}
+            <tr>
+              <td>{{ d.name }}</td>
+              <td>{{ d.employees }}</td>
+              <td>{{ d.total_days|floatformat:"-1" }}</td>
+              <td>{{ d.avg_per_person }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4" class="empty-state">No department data available.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><span class="card-title">Leave Type Breakdown</span></div>
+    <div class="table-responsive">
+      <table>
+        <thead><tr><th>Leave Type</th><th>Requests</th><th>Days Taken</th><th>Pending</th></tr></thead>
+        <tbody>
+          {% for lt in leave_type_breakdown %}
+            <tr>
+              <td>{{ lt.name }}</td>
+              <td>{{ lt.requests }}</td>
+              <td>{{ lt.days_taken|floatformat:"-1" }}</td>
+              <td>{{ lt.pending }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4" class="empty-state">No leave type data available.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">Monthly Leave Trend — {% now "Y" %}</span>
+  </div>
+  <div class="card-body">
+    <div class="trend-chart">
+      {% for m in monthly_trend %}
+        <div class="trend-col">
+          <div class="trend-bar {% if m.is_current %}current{% elif m.is_future %}future{% endif %}"
+               style="height:{{ m.bar_height }}%;"
+               title="{{ m.label }}: {{ m.days|floatformat:'-1' }} days"></div>
+          <div class="trend-label {% if m.is_current %}current{% endif %}">{{ m.label }}</div>
+        </div>
+      {% endfor %}
+    </div>
+    <div class="trend-note">Days of leave taken per month across the team</div>
+  </div>
+</div>
+{% endblock %}

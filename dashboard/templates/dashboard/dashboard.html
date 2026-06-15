@@ -1,0 +1,95 @@
+{% extends "base/base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="stat-grid">
+  <div class="stat-card blue">
+    <div class="stat-label">Annual Balance</div>
+    <div class="stat-value">{{ annual_balance|floatformat:"-1" }}</div>
+    <div class="stat-sub">of {{ annual_total|floatformat:"-1" }} days remaining</div>
+  </div>
+  <div class="stat-card green">
+    <div class="stat-label">Sick Leave</div>
+    <div class="stat-value">{{ sick_balance|floatformat:"-1" }}</div>
+    <div class="stat-sub">of {{ sick_total|floatformat:"-1" }} days remaining</div>
+  </div>
+  <div class="stat-card orange">
+    <div class="stat-label">Pending Requests</div>
+    <div class="stat-value">{{ own_pending_count }}</div>
+    <div class="stat-sub">awaiting approval</div>
+  </div>
+  <div class="stat-card red">
+    <div class="stat-label">Days Taken</div>
+    <div class="stat-value">{{ days_taken|floatformat:"-1" }}</div>
+    <div class="stat-sub">this fiscal year</div>
+  </div>
+</div>
+
+<div class="two-col">
+  <div class="card">
+    <div class="card-header"><span class="card-title">Leave Balances</span></div>
+    {% for b in leave_balances %}
+      <div class="balance-row">
+        <span class="bal-label">{{ b.name }}</span>
+        <div class="bar-wrap"><div class="bar-fill" style="width:{{ b.percent }}%;background:{{ b.color }};"></div></div>
+        <span class="bal-nums">{{ b.used|floatformat:"-1" }} / {{ b.total|floatformat:"-1" }}</span>
+      </div>
+    {% empty %}
+      <div class="empty-state">No leave balances set up yet.</div>
+    {% endfor %}
+  </div>
+
+  <div class="card">
+    <div class="card-header"><span class="card-title">Recent Requests</span></div>
+    <div class="table-responsive">
+      <table>
+        <thead><tr><th>Type</th><th>Dates</th><th>Days</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for l in recent_leaves %}
+            <tr>
+              <td>{{ l.type }}</td>
+              <td>{{ l.date_range }}</td>
+              <td>{{ l.days|floatformat:"-1" }}</td>
+              <td>
+                {% if l.status == "Approved" %}<span class="badge approved">Approved</span>
+                {% elif l.status == "Pending" %}<span class="badge pending">Pending</span>
+                {% elif l.status == "Rejected" %}<span class="badge rejected">Rejected</span>
+                {% else %}<span class="badge cancelled">{{ l.status }}</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4" class="empty-state">No leave requests yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% if team_on_leave_today %}
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">Team on Leave Today</span>
+    <span class="card-meta">{{ team_on_leave_today|length }} member{{ team_on_leave_today|length|pluralize }} absent</span>
+  </div>
+  <div class="table-responsive">
+    <table>
+      <thead><tr><th>Employee</th><th>Department</th><th>Leave Type</th><th>Return Date</th></tr></thead>
+      <tbody>
+        {% for t in team_on_leave_today %}
+          <tr>
+            <td>{{ t.name }}</td>
+            <td>{{ t.department }}</td>
+            <td>{{ t.leave_type }}</td>
+            <td>{{ t.return_date }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

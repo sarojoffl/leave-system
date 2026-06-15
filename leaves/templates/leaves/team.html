@@ -1,0 +1,37 @@
+{% extends "base/base.html" %}
+
+{% block title %}Team{% endblock %}
+{% block page_title %}Team Overview{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">Team Leave Summary</span>
+    <span class="card-meta">{{ team_summary|length }} employee{{ team_summary|length|pluralize }}</span>
+  </div>
+  <div class="table-responsive">
+    <table>
+      <thead><tr><th>Employee</th><th>Department</th><th>Annual Used</th><th>Sick Used</th><th>Casual Used</th><th>Total Taken</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for emp in team_summary %}
+          <tr>
+            <td>{{ emp.name }}</td>
+            <td>{{ emp.department }}</td>
+            <td>{{ emp.annual_used|floatformat:"-1" }}</td>
+            <td>{{ emp.sick_used|floatformat:"-1" }}</td>
+            <td>{{ emp.casual_used|floatformat:"-1" }}</td>
+            <td>{{ emp.total_taken|floatformat:"-1" }}</td>
+            <td>
+              {% if emp.status == "On Leave" %}<span class="badge on-leave">On Leave</span>
+              {% else %}<span class="badge active-emp">Active</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="7" class="empty-state">No team members found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

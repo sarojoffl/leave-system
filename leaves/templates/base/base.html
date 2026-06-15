@@ -1,0 +1,104 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}Leave Management System{% endblock %}</title>
+<link rel="stylesheet" href="{% static 'css/style.css' %}">
+{% block extra_css %}{% endblock %}
+</head>
+<body>
+
+<div class="app">
+  <!-- Mobile overlay -->
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      Leave Management
+      <button class="sidebar-close" id="sidebar-close" aria-label="Close menu">×</button>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="{% url 'dashboard' %}" class="nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Dashboard
+      </a>
+      <a href="{% url 'apply_leave' %}" class="nav-item {% if request.resolver_match.url_name == 'apply_leave' %}active{% endif %}">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+        Apply Leave
+      </a>
+      <a href="{% url 'my_leaves' %}" class="nav-item {% if request.resolver_match.url_name == 'my_leaves' %}active{% endif %}">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="m9 12 2 2 4-4"/></svg>
+        My Leaves
+      </a>
+      <a href="{% url 'calendar' %}" class="nav-item {% if request.resolver_match.url_name == 'calendar' %}active{% endif %}">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Calendar
+      </a>
+      {% if request.user.role in 'manager,hr' %}
+      <a href="{% url 'approvals' %}" class="nav-item {% if request.resolver_match.url_name == 'approvals' %}active{% endif %}">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        Approvals
+        {% if pending_approvals_count %}<span class="nav-badge">{{ pending_approvals_count }}</span>{% endif %}
+      </a>
+      <a href="{% url 'team' %}" class="nav-item {% if request.resolver_match.url_name == 'team' %}active{% endif %}">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Team
+      </a>
+      <a href="{% url 'reports' %}" class="nav-item {% if request.resolver_match.url_name == 'reports' %}active{% endif %}">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Reports
+      </a>
+      {% endif %}
+    </nav>
+    <div class="sidebar-footer">
+      <div class="avatar">{{ request.user.initials }}</div>
+      <div style="flex:1">
+        <div class="sidebar-footer-name">{{ request.user.get_full_name|default:request.user.username }}</div>
+        <div class="sidebar-footer-role">{{ request.user.get_role_display|default:"Employee" }}</div>
+      </div>
+      <a href="{% url 'logout' %}" title="Sign out" style="color:var(--text-muted);line-height:1;">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="18" height="18">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <polyline points="16 17 21 12 16 7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+      </a>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <button class="hamburger" id="hamburger" aria-label="Open menu">
+          <span></span><span></span><span></span>
+        </button>
+        <h1 id="page-title">{% block page_title %}Dashboard{% endblock %}</h1>
+      </div>
+      <div class="topbar-right">
+        {% if request.user.role %}<span class="role-badge">{{ request.user.get_role_display }} View</span>{% endif %}
+        {% if current_fiscal_year %}<span class="topbar-date">FY {{ current_fiscal_year }}</span>{% endif %}
+        <span class="topbar-date">{% now "l, j F Y" %}</span>
+      </div>
+    </div>
+
+    <div class="content">
+      {% if messages %}
+        <div class="messages">
+          {% for message in messages %}
+            <div class="notice {% if message.tags == 'error' %}warn{% endif %}">{{ message }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      {% block content %}{% endblock %}
+    </div>
+  </div>
+</div>
+
+<script src="{% static 'js/main.js' %}"></script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

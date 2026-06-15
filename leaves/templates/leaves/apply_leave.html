@@ -1,0 +1,61 @@
+{% extends "base/base.html" %}
+
+{% block title %}Apply Leave{% endblock %}
+{% block page_title %}Apply Leave{% endblock %}
+
+{% block content %}
+<div class="notice">Submit a new leave request. Your manager will receive an email notification automatically.</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-title">New Leave Application</span></div>
+  <form method="post" class="card-body">
+    {% csrf_token %}
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="leave-type">Leave Type *</label>
+        <select id="leave-type" name="leave_type">
+          <option value="">— Select type —</option>
+          {% for lt in leave_types %}
+            <option value="{{ lt.id }}">{{ lt.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="duration">Duration</label>
+        <select id="duration" name="duration">
+          <option value="full">Full Day(s)</option>
+          <option value="am">Half Day – Morning</option>
+          <option value="pm">Half Day – Afternoon</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="from-date">From Date *</label>
+        <input type="date" id="from-date" name="from_date">
+      </div>
+      <div class="form-group">
+        <label for="to-date">To Date *</label>
+        <input type="date" id="to-date" name="to_date">
+      </div>
+      <div class="form-group full">
+        <label for="reason">Reason *</label>
+        <textarea id="reason" name="reason" placeholder="Please briefly describe your reason for leave…"></textarea>
+      </div>
+      <div class="form-group">
+        <label for="handover">Handover / Acting Person</label>
+        <input type="text" id="handover" name="handover" placeholder="Who will cover your duties?">
+      </div>
+      <div class="form-group">
+        <label for="calc-days">Calculated Days</label>
+        <input type="text" id="calc-days" readonly placeholder="Select dates first" style="background:#f7fafc;color:#2b6cb0;font-weight:600;">
+      </div>
+    </div>
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        Submit Request
+      </button>
+      <button type="reset" class="btn btn-outline" onclick="document.getElementById('calc-days').value=''">Clear Form</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

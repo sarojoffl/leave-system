@@ -1,0 +1,87 @@
+{% extends "base/base.html" %}
+
+{% block title %}My Leaves{% endblock %}
+{% block page_title %}My Leaves{% endblock %}
+
+{% block content %}
+<div class="tabs">
+  <div class="tab active" data-filter="all">All Requests</div>
+  <div class="tab" data-filter="pending">Pending</div>
+  <div class="tab" data-filter="approved">Approved</div>
+  <div class="tab" data-filter="rejected">Rejected / Cancelled</div>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table>
+      <thead>
+        <tr><th>#</th><th>Leave Type</th><th>From</th><th>To</th><th>Days</th><th>Reason</th><th>Applied On</th><th>Status</th><th>Note</th><th>Action</th></tr>
+      </thead>
+      <tbody id="my-leaves-body">
+        {% for l in leaves %}
+          <tr data-status="{% if l.status == 'approved' %}approved{% elif l.status == 'pending' %}pending{% else %}rejected{% endif %}">
+            <td>{{ l.id|stringformat:"03d" }}</td>
+            <td>{{ l.leave_type.name }}</td>
+            <td>{{ l.start_date|date:"M d" }}</td>
+            <td>{{ l.end_date|date:"M d" }}</td>
+            <td>{{ l.days|floatformat:"-1" }}</td>
+            <td>{{ l.reason|truncatechars:40 }}</td>
+            <td>{{ l.created_at|date:"M d" }}</td>
+            <td>
+              {% if l.status == "approved" %}<span class="badge approved">Approved</span>
+              {% elif l.status == "pending" %}<span class="badge pending">Pending</span>
+              {% elif l.status == "rejected" %}<span class="badge rejected">Rejected</span>
+              {% else %}<span class="badge cancelled">Cancelled</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if l.decision_note %}
+                {% if l.status == "rejected" %}
+                  <span style="color:#dc2626;font-size:0.85rem;">{{ l.decision_note }}</span>
+                {% else %}
+                  <span style="color:var(--text-muted);font-size:0.85rem;">{{ l.decision_note }}</span>
+                {% endif %}
+              {% else %}
+                —
+              {% endif %}
+            </td>
+            <td>
+              {% if l.status == "pending" %}
+                <form method="post" action="{% url 'cancel_leave' l.id %}" class="confirm-cancel">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-danger btn-sm">Cancel</button>
+                </form>
+              {% else %}—{% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="9" class="empty-state">You haven't submitted any leave requests yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Success Modal: shown when a leave request was just submitted -->
+<div class="modal-bg {% if show_success_modal %}open{% endif %}" id="modal-bg">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">✅ Leave Request Submitted</span>
+      <button class="modal-close" id="modal-close-btn">×</button>
+    </div>
+    <div class="modal-body">
+      <p class="success-text">Your leave request has been submitted successfully.</p>
+      <p class="muted">Your manager has been notified. You can track the request status under <strong>My Leaves</strong>.</p>
+      {% if modal_summary %}
+        <div class="modal-summary">
+          <strong>Type:</strong> {{ modal_summary.type }}<br>
+          <strong>Dates:</strong> {{ modal_summary.from_date }} to {{ modal_summary.to_date }} ({{ modal_summary.days|floatformat:"-1" }} day{{ modal_summary.days|pluralize }})
+        </div>
+      {% endif %}
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" id="modal-done-btn">Done</button>
+    </div>
+  </div>
+</div>
+{% endblock %}

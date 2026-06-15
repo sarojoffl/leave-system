@@ -1,0 +1,23 @@
+<div class="modal-bg" id="modal-bg" data-show="{% if show_success_modal %}true{% else %}false{% endif %}">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Leave Request Submitted</span>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-success-text">Your leave request has been submitted successfully.</p>
+      <p class="modal-success-note">Your manager has been notified. You can track the request status under <strong>My Leaves</strong>.</p>
+
+      {% if modal_summary %}
+      <div id="modal-summary" class="modal-summary">
+        <strong>{{ modal_summary.type }}</strong> · {{ modal_summary.from_date }} – {{ modal_summary.to_date }}
+        ({{ modal_summary.days }} day{{ modal_summary.days|pluralize }})
+      </div>
+      {% endif %}
+    </div>
+    <div class="modal-footer">
+      <a href="{% url 'my_leaves' %}" class="btn btn-outline">View My Leaves</a>
+      <button class="btn btn-primary" onclick="closeModal()">Done</button>
+    </div>
+  </div>
+</div>
