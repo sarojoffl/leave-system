@@ -55,7 +55,7 @@
   <div class="card-header"><span class="card-title">Recently Processed</span></div>
   <div class="table-responsive">
     <table>
-      <thead><tr><th>Employee</th><th>Type</th><th>Dates</th><th>Decision</th><th>Note</th></tr></thead>
+      <thead><tr><th>Employee</th><th>Type</th><th>Dates</th><th>Decision</th><th>Note</th><th>Action</th></tr></thead>
       <tbody>
         {% for r in recently_processed %}
           <tr>
@@ -69,9 +69,17 @@
               {% endif %}
             </td>
             <td>{{ r.note|default:"—" }}</td>
+            <td>
+              {% if r.decision == "Approved" and r.id %}
+                <form method="post" action="{% url 'reject_leave' r.id %}" style="display:inline;" class="confirm-revoke">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-danger btn-sm" style="padding:0.25rem 0.5rem;font-size:0.75rem;border-radius:6px;">Revoke</button>
+                </form>
+              {% else %}—{% endif %}
+            </td>
           </tr>
         {% empty %}
-          <tr><td colspan="5" class="empty-state">Nothing processed recently.</td></tr>
+          <tr><td colspan="6" class="empty-state">Nothing processed recently.</td></tr>
         {% endfor %}
       </tbody>
     </table>

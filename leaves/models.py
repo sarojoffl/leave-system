@@ -48,9 +48,27 @@ class LeaveRequest(models.Model):
 
     @property
     def days(self):
+        import datetime
+        from django.apps import apps
+        PublicHolidayModel = apps.get_model('leaves', 'PublicHoliday')
+        
+        holidays = set(
+            PublicHolidayModel.objects.filter(
+                date__range=(self.start_date, self.end_date)
+            ).values_list('date', flat=True)
+        )
+        
+        current = self.start_date
+        working_days = 0
+        while current <= self.end_date:
+            if current.weekday() != 5 and current not in holidays:
+                working_days += 1
+            current += datetime.timedelta(days=1)
+            
         if self.duration in ('am', 'pm'):
-            return 0.5
-        return max((self.end_date - self.start_date).days + 1, 0)
+            return 0.5 if working_days > 0 else 0.0
+            
+        return working_days
 
     @property
     def date_range(self):

@@ -46,7 +46,7 @@
               {% endif %}
             </td>
             <td>
-              {% if l.status == "pending" %}
+              {% if l.status == "pending" or l.status == "approved" %}
                 <form method="post" action="{% url 'cancel_leave' l.id %}" class="confirm-cancel">
                   {% csrf_token %}
                   <button type="submit" class="btn btn-danger btn-sm">Cancel</button>

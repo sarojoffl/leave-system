@@ -10,6 +10,75 @@ from django.views.decorators.http import require_POST
 from .models import LeaveRequest, LeaveType, LeaveBalance, PublicHoliday
 from .permissions import manager_required
 
+from django.core.mail import send_mail
+from django.contrib.auth import get_user_model
+
+def send_leave_notification_email(leave_request, action_type):
+    User = get_user_model()
+    subject = ""
+    message = ""
+    recipient_list = []
+    
+    employee_name = leave_request.employee.get_full_name() or leave_request.employee.username
+    
+    if action_type == 'requested':
+        subject = f"New Leave Request from {employee_name}"
+        message = (
+            f"Dear Manager/HR,\n\n"
+            f"{employee_name} has submitted a new leave request:\n"
+            f"- Leave Type: {leave_request.leave_type.name}\n"
+            f"- Dates: {leave_request.start_date} to {leave_request.end_date} ({leave_request.days} day(s))\n"
+            f"- Reason: {leave_request.reason}\n\n"
+            f"Please log in to the portal to review and decide on this request."
+        )
+        recipient_list = list(User.objects.filter(role__in=['manager', 'hr']).exclude(id=leave_request.employee.id).values_list('email', flat=True))
+        
+    elif action_type in ('approved', 'rejected'):
+        status_label = "approved" if action_type == 'approved' else "rejected"
+        subject = f"Leave Request {status_label.capitalize()}"
+        message = (
+            f"Dear {employee_name},\n\n"
+            f"Your request for {leave_request.leave_type.name} leave from {leave_request.start_date} to {leave_request.end_date} has been {status_label}.\n"
+            f"Manager Note: {leave_request.decision_note or 'No additional note'}\n\n"
+            f"Thank you."
+        )
+        recipient_list = [leave_request.employee.email] if leave_request.employee.email else []
+        
+    elif action_type == 'cancelled':
+        subject = f"Leave Request Cancelled by {employee_name}"
+        message = (
+            f"Dear Manager/HR,\n\n"
+            f"{employee_name} has cancelled their leave request:\n"
+            f"- Leave Type: {leave_request.leave_type.name}\n"
+            f"- Dates: {leave_request.start_date} to {leave_request.end_date} ({leave_request.days} day(s))\n\n"
+            f"The leave status has been updated to Cancelled and any used balance has been refunded."
+        )
+        recipient_list = list(User.objects.filter(role__in=['manager', 'hr']).exclude(id=leave_request.employee.id).values_list('email', flat=True))
+
+    elif action_type == 'revoked':
+        subject = f"Approved Leave Request Revoked"
+        message = (
+            f"Dear {employee_name},\n\n"
+            f"Your approved request for {leave_request.leave_type.name} leave from {leave_request.start_date} to {leave_request.end_date} has been revoked/rejected by a manager.\n"
+            f"Manager Note: {leave_request.decision_note or 'No additional note'}\n\n"
+            f"Your leave balance has been refunded."
+        )
+        recipient_list = [leave_request.employee.email] if leave_request.employee.email else []
+        
+    recipient_list = [email for email in recipient_list if email]
+    
+    if recipient_list:
+        try:
+            send_mail(
+                subject=subject,
+                message=message,
+                from_email=None,
+                recipient_list=recipient_list,
+                fail_silently=True
+            )
+        except Exception:
+            pass
+
 
 @login_required
 def apply_leave(request):
@@ -53,6 +122,53 @@ def apply_leave(request):
         if not reason:
             errors.append("Please provide a reason for leave.")
 
+        # Check overlapping leaves
+        if from_date and to_date and not errors:
+            overlapping = LeaveRequest.objects.filter(
+                employee=request.user,
+                start_date__lte=to_date,
+                end_date__gte=from_date
+            ).exclude(status__in=['cancelled', 'rejected'])
+            if overlapping.exists():
+                errors.append("You have an overlapping leave request for these dates.")
+
+        # Check balance validation
+        if leave_type_id and from_date and to_date and not errors:
+            try:
+                leave_type = LeaveType.objects.get(id=leave_type_id)
+                balance = LeaveBalance.objects.filter(
+                    employee=request.user,
+                    leave_type=leave_type
+                ).first()
+                
+                temp_request = LeaveRequest(
+                    employee=request.user,
+                    leave_type=leave_type,
+                    start_date=from_date,
+                    end_date=to_date,
+                    duration=duration
+                )
+                requested_days = temp_request.days
+                
+                if requested_days <= 0:
+                    errors.append("The requested period does not contain any working days.")
+                else:
+                    remaining = balance.remaining if balance else leave_type.total_days
+                    
+                    pending_days = sum(
+                        r.days for r in LeaveRequest.objects.filter(
+                            employee=request.user,
+                            leave_type=leave_type,
+                            status='pending'
+                        )
+                    )
+                    
+                    available = remaining - pending_days
+                    if requested_days > available:
+                        errors.append(f"Insufficient balance. You requested {requested_days} day(s), but only have {available} day(s) available (accounting for pending requests).")
+            except LeaveType.DoesNotExist:
+                errors.append("Invalid leave type selected.")
+
         if errors:
             for e in errors:
                 messages.error(request, e)
@@ -66,6 +182,9 @@ def apply_leave(request):
                 reason=reason,
                 handover_to=handover,
             )
+
+            # Trigger email notification
+            send_leave_notification_email(leave, 'requested')
 
             request.session["show_success_modal"] = True
             request.session["modal_summary"] = {
@@ -114,6 +233,24 @@ def cancel_leave(request, id):
     if leave.status == "pending":
         leave.status = "cancelled"
         leave.save(update_fields=["status"])
+        messages.success(request, "Leave request cancelled.")
+        send_leave_notification_email(leave, 'cancelled')
+    elif leave.status == "approved":
+        leave.status = "cancelled"
+        leave.save(update_fields=["status"])
+        
+        balance, _ = LeaveBalance.objects.get_or_create(
+            employee=leave.employee,
+            leave_type=leave.leave_type,
+            defaults={"total": leave.leave_type.total_days},
+        )
+        balance.used = max(balance.used - leave.days, 0)
+        balance.save(update_fields=["used"])
+        
+        messages.success(request, "Approved leave request cancelled. Balance refunded.")
+        send_leave_notification_email(leave, 'cancelled')
+    else:
+        messages.error(request, "Cannot cancel this request.")
     return redirect("my_leaves")
 
 
@@ -145,6 +282,7 @@ def approvals(request):
     } for l in pending]
 
     recently_processed = [{
+        "id": l.id,
         "employee_name": l.employee.get_full_name() or l.employee.username,
         "type": l.leave_type.name,
         "dates": l.date_range,
@@ -162,18 +300,28 @@ def approvals(request):
 @require_POST
 def approve_leave(request, id):
     leave = get_object_or_404(LeaveRequest, id=id, status="pending")
-    leave.status       = "approved"
-    leave.decided_at   = timezone.now()
-    leave.decision_note = request.POST.get("note", "").strip()
-    leave.save(update_fields=["status", "decided_at", "decision_note"])
-
+    
+    # Enforce balance validation before approval
     balance, _ = LeaveBalance.objects.get_or_create(
         employee=leave.employee,
         leave_type=leave.leave_type,
         defaults={"total": leave.leave_type.total_days},
     )
+    
+    if balance.remaining < leave.days:
+        messages.error(request, f"Insufficient balance. Employee has only {balance.remaining} days remaining, but requested {leave.days} days.")
+        return redirect("approvals")
+        
+    leave.status       = "approved"
+    leave.decided_at   = timezone.now()
+    leave.decision_note = request.POST.get("note", "").strip()
+    leave.save(update_fields=["status", "decided_at", "decision_note"])
+
     balance.used += leave.days
     balance.save(update_fields=["used"])
+
+    messages.success(request, f"Leave request for {leave.employee.get_full_name() or leave.employee.username} approved.")
+    send_leave_notification_email(leave, 'approved')
 
     return redirect("approvals")
 
@@ -181,11 +329,36 @@ def approve_leave(request, id):
 @manager_required
 @require_POST
 def reject_leave(request, id):
-    leave = get_object_or_404(LeaveRequest, id=id, status="pending")
-    leave.status = "rejected"
-    leave.decided_at = timezone.now()
-    leave.decision_note = request.POST.get("note", "")
-    leave.save(update_fields=["status", "decided_at", "decision_note"])
+    leave = get_object_or_404(LeaveRequest, id=id)
+    if leave.status == "pending":
+        leave.status = "rejected"
+        leave.decided_at = timezone.now()
+        leave.decision_note = request.POST.get("note", "").strip()
+        leave.save(update_fields=["status", "decided_at", "decision_note"])
+        
+        messages.success(request, f"Leave request for {leave.employee.get_full_name() or leave.employee.username} rejected.")
+        send_leave_notification_email(leave, 'rejected')
+        
+    elif leave.status == "approved":
+        leave.status = "rejected"
+        leave.decided_at = timezone.now()
+        leave.decision_note = request.POST.get("note", "").strip()
+        leave.save(update_fields=["status", "decided_at", "decision_note"])
+        
+        # Refund balance
+        balance, _ = LeaveBalance.objects.get_or_create(
+            employee=leave.employee,
+            leave_type=leave.leave_type,
+            defaults={"total": leave.leave_type.total_days},
+        )
+        balance.used = max(balance.used - leave.days, 0)
+        balance.save(update_fields=["used"])
+        
+        messages.success(request, f"Approved leave request for {leave.employee.get_full_name() or leave.employee.username} has been revoked.")
+        send_leave_notification_email(leave, 'revoked')
+    else:
+        messages.error(request, "Cannot reject/revoke this request.")
+        
     return redirect("approvals")
 
 
@@ -206,7 +379,7 @@ def calendar(request):
             classes = []
             title = None
 
-            if day_date.weekday() in (5, 6):
+            if day_date.weekday() == 5:
                 classes.append("weekend")
             if day_date == today:
                 classes.append("today")
