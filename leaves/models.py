@@ -4,8 +4,6 @@ from django.conf import settings
 
 class LeaveType(models.Model):
     name = models.CharField(max_length=50)
-    total_days = models.IntegerField()
-    color = models.CharField(max_length=7, default="#4299e1", help_text="Hex color for balance bar")
 
     def __str__(self):
         return self.name
@@ -19,20 +17,12 @@ class LeaveRequest(models.Model):
         ('cancelled', 'Cancelled'),
     ]
 
-    DURATION_CHOICES = [
-        ('full', 'Full Day(s)'),
-        ('am', 'Half Day – Morning'),
-        ('pm', 'Half Day – Afternoon'),
-    ]
-
     employee = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='leave_requests')
     leave_type = models.ForeignKey(LeaveType, on_delete=models.CASCADE)
 
     start_date = models.DateField()
     end_date = models.DateField()
-    duration = models.CharField(max_length=10, choices=DURATION_CHOICES, default='full')
     reason = models.TextField()
-    handover_to = models.CharField(max_length=150, blank=True)
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     decision_note = models.CharField(max_length=255, blank=True)
@@ -51,23 +41,20 @@ class LeaveRequest(models.Model):
         import datetime
         from django.apps import apps
         PublicHolidayModel = apps.get_model('leaves', 'PublicHoliday')
-        
+
         holidays = set(
             PublicHolidayModel.objects.filter(
                 date__range=(self.start_date, self.end_date)
             ).values_list('date', flat=True)
         )
-        
+
         current = self.start_date
         working_days = 0
         while current <= self.end_date:
             if current.weekday() != 5 and current not in holidays:
                 working_days += 1
             current += datetime.timedelta(days=1)
-            
-        if self.duration in ('am', 'pm'):
-            return 0.5 if working_days > 0 else 0.0
-            
+
         return working_days
 
     @property
@@ -80,17 +67,13 @@ class LeaveRequest(models.Model):
 
 
 class LeaveBalance(models.Model):
-    employee = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='leave_balances')
-    leave_type = models.ForeignKey(LeaveType, on_delete=models.CASCADE)
+    employee = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='leave_balance')
 
-    total = models.FloatField(default=0)
+    total = models.FloatField(default=12)
     used = models.FloatField(default=0)
 
-    class Meta:
-        unique_together = ('employee', 'leave_type')
-
     def __str__(self):
-        return f"{self.employee} – {self.leave_type}: {self.used}/{self.total}"
+        return f"{self.employee} – {self.used}/{self.total}"
 
     @property
     def remaining(self):
@@ -112,3 +95,36 @@ class PublicHoliday(models.Model):
 
     def __str__(self):
         return f"{self.date}: {self.name}"
+    
+class BaseDayRequest(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+
+    employee = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='%(class)s_requests'
+    )
+    date = models.DateField()
+    reason = models.TextField()
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    decision_note = models.CharField(max_length=255, blank=True)
+    decided_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        abstract = True
+        ordering = ['-created_at']
+
+
+class AttendanceRequest(BaseDayRequest):
+    def __str__(self):
+        return f"{self.employee.username} - Attendance {self.date}"
+
+
+class HolidayWorkRequest(BaseDayRequest):
+    def __str__(self):
+        return f"{self.employee.username} - Holiday Work {self.date}"

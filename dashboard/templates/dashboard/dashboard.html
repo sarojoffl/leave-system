@@ -6,14 +6,9 @@
 {% block content %}
 <div class="stat-grid">
   <div class="stat-card blue">
-    <div class="stat-label">Annual Balance</div>
-    <div class="stat-value">{{ annual_balance|floatformat:"-1" }}</div>
-    <div class="stat-sub">of {{ annual_total|floatformat:"-1" }} days remaining</div>
-  </div>
-  <div class="stat-card green">
-    <div class="stat-label">Sick Leave</div>
-    <div class="stat-value">{{ sick_balance|floatformat:"-1" }}</div>
-    <div class="stat-sub">of {{ sick_total|floatformat:"-1" }} days remaining</div>
+    <div class="stat-label">Leave Balance</div>
+    <div class="stat-value">{{ balance_remaining|floatformat:"-1" }}</div>
+    <div class="stat-sub">of {{ balance_total|floatformat:"-1" }} days remaining</div>
   </div>
   <div class="stat-card orange">
     <div class="stat-label">Pending Requests</div>
@@ -29,16 +24,16 @@
 
 <div class="two-col">
   <div class="card">
-    <div class="card-header"><span class="card-title">Leave Balances</span></div>
-    {% for b in leave_balances %}
+    <div class="card-header"><span class="card-title">Leave Balance</span></div>
+    {% if balance_total %}
       <div class="balance-row">
-        <span class="bal-label">{{ b.name }}</span>
-        <div class="bar-wrap"><div class="bar-fill" style="width:{{ b.percent }}%;background:{{ b.color }};"></div></div>
-        <span class="bal-nums">{{ b.used|floatformat:"-1" }} / {{ b.total|floatformat:"-1" }}</span>
+        <span class="bal-label">Total Leave</span>
+        <div class="bar-wrap"><div class="bar-fill" style="width:{{ balance_percent }}%;background:#4299e1;"></div></div>
+        <span class="bal-nums">{{ balance_used|floatformat:"-1" }} / {{ balance_total|floatformat:"-1" }}</span>
       </div>
-    {% empty %}
-      <div class="empty-state">No leave balances set up yet.</div>
-    {% endfor %}
+    {% else %}
+      <div class="empty-state">No leave balance set up yet.</div>
+    {% endif %}
   </div>
 
   <div class="card">

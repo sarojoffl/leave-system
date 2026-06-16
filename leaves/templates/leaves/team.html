@@ -11,16 +11,15 @@
   </div>
   <div class="table-responsive">
     <table>
-      <thead><tr><th>Employee</th><th>Department</th><th>Annual Used</th><th>Sick Used</th><th>Casual Used</th><th>Total Taken</th><th>Status</th></tr></thead>
+      <thead><tr><th>Employee</th><th>Department</th><th>Position</th><th>Leave Used</th><th>Remaining</th><th>Status</th></tr></thead>
       <tbody>
         {% for emp in team_summary %}
           <tr>
             <td>{{ emp.name }}</td>
             <td>{{ emp.department }}</td>
-            <td>{{ emp.annual_used|floatformat:"-1" }}</td>
-            <td>{{ emp.sick_used|floatformat:"-1" }}</td>
-            <td>{{ emp.casual_used|floatformat:"-1" }}</td>
-            <td>{{ emp.total_taken|floatformat:"-1" }}</td>
+            <td>{{ emp.position }}</td>
+            <td>{{ emp.leave_used|floatformat:"-1" }} / {{ emp.leave_total|floatformat:"-1" }}</td>
+            <td>{{ emp.leave_remaining|floatformat:"-1" }}</td>
             <td>
               {% if emp.status == "On Leave" %}<span class="badge on-leave">On Leave</span>
               {% else %}<span class="badge active-emp">Active</span>
@@ -28,7 +27,7 @@
             </td>
           </tr>
         {% empty %}
-          <tr><td colspan="7" class="empty-state">No team members found.</td></tr>
+          <tr><td colspan="5" class="empty-state">No team members found.</td></tr>
         {% endfor %}
       </tbody>
     </table>

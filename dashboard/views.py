@@ -3,7 +3,7 @@ from datetime import date, timedelta
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 
-from leaves.models import LeaveRequest, LeaveBalance
+from leaves.models import LeaveRequest, LeaveBalance, AttendanceRequest, HolidayWorkRequest
 
 
 @login_required
@@ -11,18 +11,7 @@ def dashboard(request):
     user = request.user
     today = date.today()
 
-    balances = list(LeaveBalance.objects.filter(employee=user).select_related("leave_type"))
-
-    leave_balances = [{
-        "name": b.leave_type.name,
-        "used": b.used,
-        "total": b.total,
-        "percent": b.percent,
-        "color": b.leave_type.color,
-    } for b in balances]
-
-    annual = next((b for b in balances if b.leave_type.name.lower().startswith("annual")), None)
-    sick = next((b for b in balances if b.leave_type.name.lower().startswith("sick")), None)
+    balance = LeaveBalance.objects.filter(employee=user).first()
 
     recent_leaves = [{
         "type": l.leave_type.name,
@@ -52,18 +41,17 @@ def dashboard(request):
         } for l in team_leaves]
 
     own_pending_count = (
-        LeaveRequest.objects
-        .filter(employee=user, status="pending")
-        .count()
+        LeaveRequest.objects.filter(employee=user, status="pending").count()
+        + AttendanceRequest.objects.filter(employee=user, status="pending").count()
+        + HolidayWorkRequest.objects.filter(employee=user, status="pending").count()
     )
 
     context = {
-        "annual_balance": annual.remaining if annual else 0,
-        "annual_total": annual.total if annual else 0,
-        "sick_balance": sick.remaining if sick else 0,
-        "sick_total": sick.total if sick else 0,
+        "balance_used": balance.used if balance else 0,
+        "balance_total": balance.total if balance else 12,
+        "balance_remaining": balance.remaining if balance else 12,
+        "balance_percent": balance.percent if balance else 0,
         "days_taken": days_taken,
-        "leave_balances": leave_balances,
         "recent_leaves": recent_leaves,
         "team_on_leave_today": team_today,
         "own_pending_count": own_pending_count,

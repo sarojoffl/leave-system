@@ -4,6 +4,10 @@
 {% block page_title %}Reports & Analytics{% endblock %}
 
 {% block content %}
+<div class="flex-actions" style="justify-content: flex-end; margin-bottom: 16px;">
+  <a href="{% url 'export_reports' %}" class="btn btn-outline btn-sm">⬇ Export CSV</a>
+</div>
+
 <div class="two-col">
   <div class="card">
     <div class="card-header"><span class="card-title">Department-wise Leave Usage</span></div>

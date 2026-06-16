@@ -10,7 +10,14 @@ urlpatterns = [
     path('approve/<int:id>/', views.approve_leave, name='approve_leave'),
     path('reject/<int:id>/', views.reject_leave, name='reject_leave'),
 
+    path('approve/<str:request_type>/<int:id>/', views.decide_day_request, {'decision': 'approved'}, name='approve_day_request'),
+    path('reject/<str:request_type>/<int:id>/', views.decide_day_request, {'decision': 'rejected'}, name='reject_day_request'),
+
+    path('apply/attendance/', views.apply_attendance_request, name='apply_attendance_request'),
+    path('apply/holiday-work/', views.apply_holiday_work, name='apply_holiday_work'),
+
     path('calendar/', views.calendar, name='calendar'),
     path('team/', views.team, name='team'),
     path('reports/', views.reports, name='reports'),
+    path('reports/export/', views.export_reports_csv, name='export_reports'),
 ]

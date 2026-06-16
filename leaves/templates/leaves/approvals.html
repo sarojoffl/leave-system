@@ -12,81 +12,211 @@
 
 {% block content %}
 {% if pending_approvals %}
-  <div class="notice warn"><strong>{{ pending_approvals|length }} request{{ pending_approvals|length|pluralize }}</strong> {{ pending_approvals|length|pluralize:"is,are" }} waiting for your approval.</div>
+  <div class="notice warn"><strong>{{ pending_approvals|length }} leave request{{ pending_approvals|length|pluralize }}</strong> {{ pending_approvals|length|pluralize:"is,are" }} waiting for your approval.</div>
 {% endif %}
 
-<div class="card">
-  <div class="card-header"><span class="card-title">Pending Approvals</span></div>
-  <div class="table-responsive">
-    <table>
-      <thead><tr><th>Employee</th><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Reason</th><th>Applied</th><th>Actions</th></tr></thead>
-      <tbody id="approvals-body">
-        {% for a in pending_approvals %}
-          <tr>
-            <td><span class="avatar avatar-sm">{{ a.employee_initials }}</span>{{ a.employee_name }}</td>
-            <td>{{ a.type }}</td>
-            <td>{{ a.from_date }}</td>
-            <td>{{ a.to_date }}</td>
-            <td>{{ a.days|floatformat:"-1" }}</td>
-            <td>{{ a.reason|truncatechars:40 }}</td>
-            <td>{{ a.applied_on }}</td>
-            <td>
-              <div class="flex-actions">
-                <button class="btn btn-success btn-sm"
-                  onclick="openModal('approve', {{ a.id }}, '{{ a.employee_name }}', '{{ a.type }}')">
-                  ✓ Approve
-                </button>
-                <button class="btn btn-danger btn-sm"
-                  onclick="openModal('reject', {{ a.id }}, '{{ a.employee_name }}', '{{ a.type }}')">
-                  ✗ Reject
-                </button>
-              </div>
-            </td>
-          </tr>
-        {% empty %}
-          <tr><td colspan="8" class="empty-state">No pending approvals. You're all caught up!</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+<div class="tabs" id="approval-tabs">
+  <span class="tab active" data-tab="leave">Leave Requests</span>
+  <span class="tab" data-tab="attendance">Attendance Requests{% if pending_attendance %} ({{ pending_attendance|length }}){% endif %}</span>
+  <span class="tab" data-tab="holiday">Holiday Work{% if pending_holiday_work %} ({{ pending_holiday_work|length }}){% endif %}</span>
+</div>
+
+<div class="tab-panel" data-panel="leave">
+  <div class="card">
+    <div class="card-header"><span class="card-title">Pending Approvals</span></div>
+    <div class="table-responsive">
+      <table>
+        <thead><tr><th>Employee</th><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Reason</th><th>Applied</th><th>Actions</th></tr></thead>
+        <tbody id="approvals-body">
+          {% for a in pending_approvals %}
+            <tr>
+              <td><span class="avatar avatar-sm">{{ a.employee_initials }}</span>{{ a.employee_name }}</td>
+              <td>{{ a.type }}</td>
+              <td>{{ a.from_date }}</td>
+              <td>{{ a.to_date }}</td>
+              <td>{{ a.days|floatformat:"-1" }}</td>
+              <td>{{ a.reason|truncatechars:40 }}</td>
+              <td>{{ a.applied_on }}</td>
+              <td>
+                <div class="flex-actions">
+                  <button class="btn btn-success btn-sm"
+                    onclick="openModal('approve', 'leave', {{ a.id }}, '{{ a.employee_name|escapejs }}', '{{ a.type|escapejs }}', 'leave')">
+                    ✓ Approve
+                  </button>
+                  <button class="btn btn-danger btn-sm"
+                    onclick="openModal('reject', 'leave', {{ a.id }}, '{{ a.employee_name|escapejs }}', '{{ a.type|escapejs }}', 'leave')">
+                    ✗ Reject
+                  </button>
+                </div>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="8" class="empty-state">No pending approvals. You're all caught up!</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><span class="card-title">Recently Processed</span></div>
+    <div class="table-responsive">
+      <table>
+        <thead><tr><th>Employee</th><th>Type</th><th>Dates</th><th>Decision</th><th>Note</th><th>Action</th></tr></thead>
+        <tbody>
+          {% for r in recently_processed %}
+            <tr>
+              <td>{{ r.employee_name }}</td>
+              <td>{{ r.type }}</td>
+              <td>{{ r.dates }}</td>
+              <td>
+                {% if r.decision == "Approved" %}<span class="badge approved">Approved</span>
+                {% elif r.decision == "Rejected" %}<span class="badge rejected">Rejected</span>
+                {% else %}<span class="badge cancelled">{{ r.decision }}</span>
+                {% endif %}
+              </td>
+              <td>{{ r.note|default:"—" }}</td>
+              <td>
+                {% if r.decision == "Approved" and r.id %}
+                  <button class="btn btn-danger btn-sm" style="padding:0.25rem 0.5rem;font-size:0.75rem;border-radius:6px;"
+                    onclick="openModal('reject', 'leave', {{ r.id }}, '{{ r.employee_name|escapejs }}', '{{ r.type|escapejs }}', 'leave')">
+                    Revoke
+                  </button>
+                {% else %}—{% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6" class="empty-state">Nothing processed recently.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
 
-<div class="card">
-  <div class="card-header"><span class="card-title">Recently Processed</span></div>
-  <div class="table-responsive">
-    <table>
-      <thead><tr><th>Employee</th><th>Type</th><th>Dates</th><th>Decision</th><th>Note</th><th>Action</th></tr></thead>
-      <tbody>
-        {% for r in recently_processed %}
-          <tr>
-            <td>{{ r.employee_name }}</td>
-            <td>{{ r.type }}</td>
-            <td>{{ r.dates }}</td>
-            <td>
-              {% if r.decision == "Approved" %}<span class="badge approved">Approved</span>
-              {% elif r.decision == "Rejected" %}<span class="badge rejected">Rejected</span>
-              {% else %}<span class="badge cancelled">{{ r.decision }}</span>
-              {% endif %}
-            </td>
-            <td>{{ r.note|default:"—" }}</td>
-            <td>
-              {% if r.decision == "Approved" and r.id %}
-                <form method="post" action="{% url 'reject_leave' r.id %}" style="display:inline;" class="confirm-revoke">
-                  {% csrf_token %}
-                  <button type="submit" class="btn btn-danger btn-sm" style="padding:0.25rem 0.5rem;font-size:0.75rem;border-radius:6px;">Revoke</button>
-                </form>
-              {% else %}—{% endif %}
-            </td>
-          </tr>
-        {% empty %}
-          <tr><td colspan="6" class="empty-state">Nothing processed recently.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+<div class="tab-panel" data-panel="attendance" style="display:none;">
+  <div class="card">
+    <div class="card-header"><span class="card-title">Pending Attendance Requests</span></div>
+    <div class="table-responsive">
+      <table>
+        <thead><tr><th>Employee</th><th>Date</th><th>Reason</th><th>Applied</th><th>Actions</th></tr></thead>
+        <tbody>
+          {% for a in pending_attendance %}
+            <tr>
+              <td><span class="avatar avatar-sm">{{ a.employee_initials }}</span>{{ a.employee_name }}</td>
+              <td>{{ a.date }}</td>
+              <td>{{ a.reason|truncatechars:50 }}</td>
+              <td>{{ a.applied_on }}</td>
+              <td>
+                <div class="flex-actions">
+                  <button class="btn btn-success btn-sm"
+                    onclick="openModal('approve', 'attendance', {{ a.id }}, '{{ a.employee_name|escapejs }}', 'Attendance Request', 'attendance')">
+                    ✓ Approve
+                  </button>
+                  <button class="btn btn-danger btn-sm"
+                    onclick="openModal('reject', 'attendance', {{ a.id }}, '{{ a.employee_name|escapejs }}', 'Attendance Request', 'attendance')">
+                    ✗ Reject
+                  </button>
+                </div>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="5" class="empty-state">No pending attendance requests.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><span class="card-title">Recently Processed</span></div>
+    <div class="table-responsive">
+      <table>
+        <thead><tr><th>Employee</th><th>Date</th><th>Decision</th><th>Note</th></tr></thead>
+        <tbody>
+          {% for r in recently_processed_attendance %}
+            <tr>
+              <td>{{ r.employee_name }}</td>
+              <td>{{ r.date }}</td>
+              <td>
+                {% if r.decision == "Approved" %}<span class="badge approved">Approved</span>
+                {% elif r.decision == "Rejected" %}<span class="badge rejected">Rejected</span>
+                {% else %}<span class="badge cancelled">{{ r.decision }}</span>
+                {% endif %}
+              </td>
+              <td>{{ r.note|default:"—" }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4" class="empty-state">Nothing processed recently.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
 
-<!-- Decision Modal -->
+<div class="tab-panel" data-panel="holiday" style="display:none;">
+  <div class="card">
+    <div class="card-header"><span class="card-title">Pending Holiday Work Requests</span></div>
+    <div class="table-responsive">
+      <table>
+        <thead><tr><th>Employee</th><th>Date</th><th>Reason</th><th>Applied</th><th>Actions</th></tr></thead>
+        <tbody>
+          {% for h in pending_holiday_work %}
+            <tr>
+              <td><span class="avatar avatar-sm">{{ h.employee_initials }}</span>{{ h.employee_name }}</td>
+              <td>{{ h.date }}</td>
+              <td>{{ h.reason|truncatechars:50 }}</td>
+              <td>{{ h.applied_on }}</td>
+              <td>
+                <div class="flex-actions">
+                  <button class="btn btn-success btn-sm"
+                    onclick="openModal('approve', 'holiday_work', {{ h.id }}, '{{ h.employee_name|escapejs }}', 'Holiday Work', 'holiday')">
+                    ✓ Approve
+                  </button>
+                  <button class="btn btn-danger btn-sm"
+                    onclick="openModal('reject', 'holiday_work', {{ h.id }}, '{{ h.employee_name|escapejs }}', 'Holiday Work', 'holiday')">
+                    ✗ Reject
+                  </button>
+                </div>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="5" class="empty-state">No pending holiday work requests.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><span class="card-title">Recently Processed</span></div>
+    <div class="table-responsive">
+      <table>
+        <thead><tr><th>Employee</th><th>Date</th><th>Decision</th><th>Note</th></tr></thead>
+        <tbody>
+          {% for r in recently_processed_holiday_work %}
+            <tr>
+              <td>{{ r.employee_name }}</td>
+              <td>{{ r.date }}</td>
+              <td>
+                {% if r.decision == "Approved" %}<span class="badge approved">Approved</span>
+                {% elif r.decision == "Rejected" %}<span class="badge rejected">Rejected</span>
+                {% else %}<span class="badge cancelled">{{ r.decision }}</span>
+                {% endif %}
+              </td>
+              <td>{{ r.note|default:"—" }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4" class="empty-state">Nothing processed recently.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Decision Modal (shared by all three request types) -->
 <div id="decision-modal" style="position:fixed;inset:0;z-index:9999;
   background:rgba(0,0,0,0.75);align-items:center;justify-content:center;">
   <div style="background:#ffffff;border-radius:12px;padding:1.75rem;
@@ -100,6 +230,7 @@
 
     <form method="post" id="modal-form">
       {% csrf_token %}
+      <input type="hidden" name="tab" id="modal-tab" value="leave">
       <label style="display:block;font-size:0.78rem;font-weight:600;
         color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;
         margin-bottom:0.4rem;">
@@ -139,24 +270,38 @@
   const modalSub    = document.getElementById('modal-sub');
   const modalNote   = document.getElementById('modal-note');
   const modalSubmit = document.getElementById('modal-submit');
+  const modalTab    = document.getElementById('modal-tab');
 
-  const urls = {
-    approve: (id) => `/leaves/approve/${id}/`,
-    reject:  (id) => `/leaves/reject/${id}/`,
-  };
+  function buildActionUrl(action, type, id) {
+    // Leave requests keep their original short URL; attendance/holiday work use the type-prefixed one.
+    if (type === 'leave') {
+      return `/leaves/${action}/${id}/`;
+    }
+    return `/leaves/${action}/${type}/${id}/`;
+  }
 
-  function openModal(action, id, employee, type) {
+  function activateTab(tabKey) {
+    const target = document.querySelector(`#approval-tabs .tab[data-tab="${tabKey}"]`);
+    if (!target) return;
+    document.querySelectorAll('#approval-tabs .tab').forEach(t => t.classList.remove('active'));
+    target.classList.add('active');
+    document.querySelectorAll('.tab-panel').forEach(p => p.style.display = 'none');
+    document.querySelector(`.tab-panel[data-panel="${tabKey}"]`).style.display = '';
+  }
+
+  function openModal(action, type, id, employee, typeLabel, tabKey) {
     const isApprove = action === 'approve';
 
-    modalTitle.textContent               = isApprove ? 'Approve Leave Request' : 'Reject Leave Request';
-    modalSub.textContent                 = `${employee} — ${type}`;
-    modalSubmit.textContent              = isApprove ? '✓ Approve' : '✗ Reject';
-    modalSubmit.style.background         = isApprove ? '#16a34a' : '#dc2626';
-    modalForm.action                     = urls[action](id);
-    modalNote.value                      = '';
-    modalNote.placeholder                = isApprove
+    modalTitle.textContent       = isApprove ? 'Approve Request' : 'Reject Request';
+    modalSub.textContent         = `${employee} — ${typeLabel}`;
+    modalSubmit.textContent      = isApprove ? '✓ Approve' : '✗ Reject';
+    modalSubmit.style.background = isApprove ? '#16a34a' : '#dc2626';
+    modalForm.action             = buildActionUrl(action, type, id);
+    modalNote.value              = '';
+    modalNote.placeholder        = isApprove
       ? 'Add a note for the employee...'
       : 'Reason for rejection...';
+    modalTab.value               = tabKey || 'leave';
 
     modal.classList.add('open');
     setTimeout(() => modalNote.focus(), 50);
@@ -166,14 +311,28 @@
     modal.classList.remove('open');
   }
 
-  // Close on backdrop click
   modal.addEventListener('click', (e) => {
     if (e.target === modal) closeModal();
   });
 
-  // Close on Escape
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeModal();
+  });
+
+  // Tab switching
+  document.querySelectorAll('#approval-tabs .tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      activateTab(tab.dataset.tab);
+    });
+  });
+
+  // Restore the active tab after a redirect (e.g. after approving/rejecting
+  // an attendance or holiday work request, so the page doesn't reset to "leave")
+  document.addEventListener('DOMContentLoaded', () => {
+    const tabParam = new URLSearchParams(window.location.search).get('tab');
+    if (tabParam) {
+      activateTab(tabParam);
+    }
   });
 </script>
 {% endblock %}

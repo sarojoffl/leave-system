@@ -2,32 +2,49 @@ from django.apps import apps
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
-from leaves.models import LeaveType, LeaveBalance
+from leaves.models import LeaveBalance
 
 
 class Command(BaseCommand):
-    help = "Create missing LeaveBalance rows for every user/leave-type combination."
+    help = "Create missing LeaveBalance rows and optionally reset all balances for a new fiscal year."
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--reset',
+            action='store_true',
+            help='Reset used=0 and total=12 for ALL employees (run at fiscal year start).',
+        )
+        parser.add_argument(
+            '--total',
+            type=float,
+            default=12,
+            help='Annual leave total to set when resetting (default: 12).',
+        )
 
     def handle(self, *args, **options):
         UserModel = apps.get_model(settings.AUTH_USER_MODEL)
 
-        users = list(UserModel.objects.all())
-        leave_types = list(LeaveType.objects.all())
+        # ── Reset existing balances if --reset flag passed ──
+        if options['reset']:
+            updated = LeaveBalance.objects.update(used=0, total=options['total'])
+            self.stdout.write(self.style.SUCCESS(
+                f"✓ Reset {updated} balance(s) → used=0, total={options['total']}."
+            ))
 
-        existing = set(
-            LeaveBalance.objects.values_list("employee_id", "leave_type_id")
-        )
+        # ── Create missing rows for new employees ──
+        users    = list(UserModel.objects.all())
+        existing = set(LeaveBalance.objects.values_list("employee_id", flat=True))
 
-        to_create = []
-        for user in users:
-            for lt in leave_types:
-                if (user.id, lt.id) not in existing:
-                    to_create.append(
-                        LeaveBalance(employee=user, leave_type=lt, total=lt.total_days, used=0)
-                    )
+        to_create = [
+            LeaveBalance(employee=user, total=options['total'], used=0)
+            for user in users
+            if user.id not in existing
+        ]
 
         if to_create:
             LeaveBalance.objects.bulk_create(to_create)
-            self.stdout.write(self.style.SUCCESS(f"Created {len(to_create)} leave balance row(s)."))
+            self.stdout.write(self.style.SUCCESS(
+                f"✓ Created {len(to_create)} missing balance row(s)."
+            ))
         else:
-            self.stdout.write("Nothing to do — all balances already exist.")
+            self.stdout.write("Nothing to create — all balances already exist.")

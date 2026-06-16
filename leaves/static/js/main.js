@@ -34,7 +34,6 @@ function initMobileNav() {
   overlay.addEventListener('click', closeSidebar);
   if (closeBtn) closeBtn.addEventListener('click', closeSidebar);
 
-  // Close sidebar when a nav link is tapped (mobile)
   sidebar.querySelectorAll('.nav-item').forEach((link) => {
     link.addEventListener('click', () => {
       if (window.innerWidth <= 768) closeSidebar();
@@ -44,61 +43,65 @@ function initMobileNav() {
 
 /* ------------------------------------------
    Apply Leave: live "calculated days" field
+   Excludes Saturdays. Public holidays are
+   excluded server-side and may reduce the
+   final count further.
 ------------------------------------------- */
 function initDayCalculator() {
   const fromInput = document.getElementById('from-date');
-  const toInput = document.getElementById('to-date');
-  const durationSelect = document.getElementById('duration');
-  const output = document.getElementById('calc-days');
+  const toInput   = document.getElementById('to-date');
+  const output    = document.getElementById('calc-days');
 
   if (!fromInput || !toInput || !output) return;
 
+  function parseLocalDate(str) {
+    const [y, m, d] = str.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
+
+  function countWorkingDays(from, to) {
+    let count = 0;
+    const cur = new Date(from);
+    while (cur <= to) {
+      if (cur.getDay() !== 6) count++;  // exclude Saturday
+      cur.setDate(cur.getDate() + 1);
+    }
+    return count;
+  }
+
   const calc = () => {
     const from = fromInput.value;
-    const to = toInput.value;
-    const duration = durationSelect ? durationSelect.value : 'full';
+    const to   = toInput.value;
 
-    if (!from || !to) {
-      output.value = '';
-      return;
-    }
+    if (!from || !to) { output.value = ''; return; }
 
-    if (duration === 'am' || duration === 'pm') {
-      output.value = '0.5 day';
-      return;
-    }
+    const fromDate = parseLocalDate(from);
+    const toDate   = parseLocalDate(to);
 
-    const f = new Date(from);
-    const t = new Date(to);
-    const diff = Math.round((t - f) / 86400000) + 1;
+    if (toDate < fromDate) { output.value = 'Invalid range'; return; }
 
-    output.value = diff > 0
-      ? `${diff} ${diff === 1 ? 'day' : 'days'}`
-      : 'Invalid range';
+    const days = countWorkingDays(fromDate, toDate);
+    output.value = days + (days === 1 ? ' day' : ' days');
   };
 
   fromInput.addEventListener('change', calc);
   toInput.addEventListener('change', calc);
-  if (durationSelect) durationSelect.addEventListener('change', calc);
 }
 
 /* ------------------------------------------
    Success modal (after leave submission)
-   Server renders #modal-bg with .open class
-   and #modal-summary content when
-   show_success_modal is set in session.
 ------------------------------------------- */
 function initSuccessModal() {
   const modalBg = document.getElementById('modal-bg');
   const closeBtn = document.getElementById('modal-close-btn');
-  const doneBtn = document.getElementById('modal-done-btn');
+  const doneBtn  = document.getElementById('modal-done-btn');
 
   if (!modalBg) return;
 
   const close = () => modalBg.classList.remove('open');
 
   if (closeBtn) closeBtn.addEventListener('click', close);
-  if (doneBtn) doneBtn.addEventListener('click', close);
+  if (doneBtn)  doneBtn.addEventListener('click', close);
 
   modalBg.addEventListener('click', (e) => {
     if (e.target === modalBg) close();
@@ -107,8 +110,6 @@ function initSuccessModal() {
 
 /* ------------------------------------------
    My Leaves: client-side status tabs
-   Tabs filter rows by data-status attribute
-   without a page reload.
 ------------------------------------------- */
 function initLeaveTabs() {
   const tabs = document.querySelectorAll('.tab[data-filter]');
@@ -122,13 +123,8 @@ function initLeaveTabs() {
       tab.classList.add('active');
 
       const filter = tab.dataset.filter;
-
       rows.forEach((row) => {
-        if (filter === 'all' || row.dataset.status === filter) {
-          row.style.display = '';
-        } else {
-          row.style.display = 'none';
-        }
+        row.style.display = (filter === 'all' || row.dataset.status === filter) ? '' : 'none';
       });
     });
   });
@@ -136,13 +132,10 @@ function initLeaveTabs() {
 
 /* ------------------------------------------
    Confirm before destructive actions
-   (cancel leave, reject leave forms)
 ------------------------------------------- */
 document.addEventListener('submit', (e) => {
   const form = e.target;
   if (form.matches('.confirm-cancel')) {
-    if (!confirm('Cancel this leave request?')) {
-      e.preventDefault();
-    }
+    if (!confirm('Cancel this leave request?')) e.preventDefault();
   }
 });
