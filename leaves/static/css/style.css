@@ -170,6 +170,19 @@ body {
   margin-right: 6px;
 }
 
+td a {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+td a:hover {
+  text-decoration: underline;
+  color: var(--color-primary-dark);
+}
+
 .sidebar-overlay {
   display: none;
   position: fixed;

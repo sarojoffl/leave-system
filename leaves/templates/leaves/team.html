@@ -15,11 +15,18 @@
       <tbody>
         {% for emp in team_summary %}
           <tr>
-            <td><span class="avatar avatar-sm">{{ emp.initials }}</span>{{ emp.name }}</td>
+            <td><a href="{% url 'employee_detail' emp.id %}"><span class="avatar avatar-sm">{{ emp.initials }}</span>{{ emp.name }}</a></td>
             <td>{{ emp.department }}</td>
             <td>{{ emp.position }}</td>
             <td>{{ emp.leave_used|floatformat:"-1" }} / {{ emp.leave_total|floatformat:"-1" }}</td>
-            <td>{{ emp.leave_remaining|floatformat:"-1" }}</td>
+            <td>
+              {% if emp.leave_remaining <= 3 %}
+                <span style="color: var(--color-danger-dark); font-weight: 700;">{{ emp.leave_remaining|floatformat:"-1" }}</span>
+                <span class="badge rejected" style="margin-left: 4px;">Low</span>
+              {% else %}
+                {{ emp.leave_remaining|floatformat:"-1" }}
+              {% endif %}
+            </td>
             <td>{% if emp.pending_count %}<span class="badge pending">{{ emp.pending_count }}</span>{% else %}—{% endif %}</td>
             <td>
               {% if emp.status == "On Leave" %}<span class="badge on-leave">On Leave{% if emp.current_leave_type %} · {{ emp.current_leave_type }}{% endif %}</span>

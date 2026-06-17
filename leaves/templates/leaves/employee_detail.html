@@ -1,0 +1,135 @@
+{% extends "base/base.html" %}
+
+{% block title %}{{ employee.get_full_name|default:employee.username }}{% endblock %}
+{% block page_title %}Employee History{% endblock %}
+
+{% block content %}
+<div class="flex-actions" style="margin-bottom:16px;">
+  <a href="{% url 'team' %}" class="btn btn-outline btn-sm">← Back to Team</a>
+</div>
+
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="stat-label">{{ employee.get_full_name|default:employee.username }}</div>
+    <div class="stat-value" style="font-size:1.1rem;">{{ employee.department|default:"—" }}</div>
+    <div class="stat-sub">{{ employee.position|default:"—" }}</div>
+  </div>
+  <div class="stat-card blue">
+    <div class="stat-label">Leave Balance</div>
+    <div class="stat-value">{{ balance.remaining|floatformat:"-1"|default:12 }}</div>
+    <div class="stat-sub">of {{ balance.total|floatformat:"-1"|default:12 }} days remaining</div>
+  </div>
+  <div class="stat-card orange">
+    <div class="stat-label">Current Status</div>
+    <div class="stat-value" style="font-size:1.1rem;">
+      {% if current_leave %}On Leave{% else %}Active{% endif %}
+    </div>
+    <div class="stat-sub">{% if current_leave %}{{ current_leave.leave_type.name }}{% else %}—{% endif %}</div>
+  </div>
+  <div class="stat-card red">
+    <div class="stat-label">Rejected / Cancelled</div>
+    <div class="stat-value">{{ rejected_count }} / {{ cancelled_count }}</div>
+    <div class="stat-sub">leave requests, all time</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-title">This Fiscal Year — By Leave Type</span></div>
+  <div class="table-responsive">
+    <table>
+      <thead><tr><th>Type</th><th>Days Taken</th></tr></thead>
+      <tbody>
+        {% for type_name, days in type_breakdown.items %}
+          <tr><td>{{ type_name }}</td><td>{{ days|floatformat:"-1" }}</td></tr>
+        {% empty %}
+          <tr><td colspan="2" class="empty-state">No approved leave this fiscal year.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-title">Leave Request History</span></div>
+  <div class="table-responsive">
+    <table>
+      <thead><tr><th>Type</th><th>Dates</th><th>Days</th><th>Reason</th><th>Applied</th><th>Status</th><th>Note</th></tr></thead>
+      <tbody>
+        {% for l in leave_history %}
+          <tr>
+            <td>{{ l.leave_type.name }}</td>
+            <td>{{ l.date_range }}</td>
+            <td>{{ l.days|floatformat:"-1" }}</td>
+            <td>{{ l.reason|truncatechars:40 }}</td>
+            <td>{{ l.created_at|date:"M d, Y" }}</td>
+            <td>
+              {% if l.status == "approved" %}<span class="badge approved">Approved</span>
+              {% elif l.status == "pending" %}<span class="badge pending">Pending</span>
+              {% elif l.status == "rejected" %}<span class="badge rejected">Rejected</span>
+              {% else %}<span class="badge cancelled">{{ l.get_status_display }}</span>
+              {% endif %}
+            </td>
+            <td>{{ l.decision_note|default:"—" }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="7" class="empty-state">No leave requests on record.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="two-col">
+  <div class="card">
+    <div class="card-header"><span class="card-title">Attendance Request History</span></div>
+    <div class="table-responsive">
+      <table>
+        <thead><tr><th>Date</th><th>Reason</th><th>Applied</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for a in attendance_history %}
+            <tr>
+              <td>{{ a.date }}</td>
+              <td>{{ a.reason|truncatechars:40 }}</td>
+              <td>{{ a.created_at|date:"M d, Y" }}</td>
+              <td>
+                {% if a.status == "approved" %}<span class="badge approved">Approved</span>
+                {% elif a.status == "pending" %}<span class="badge pending">Pending</span>
+                {% else %}<span class="badge rejected">{{ a.get_status_display }}</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4" class="empty-state">None on record.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><span class="card-title">Holiday Work History</span></div>
+    <div class="table-responsive">
+      <table>
+        <thead><tr><th>Date</th><th>Reason</th><th>Applied</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for h in holiday_work_history %}
+            <tr>
+              <td>{{ h.date }}</td>
+              <td>{{ h.reason|truncatechars:40 }}</td>
+                <td>{{ h.created_at|date:"M d, Y" }}</td>
+              <td>
+                {% if h.status == "approved" %}<span class="badge approved">Approved</span>
+                {% elif h.status == "pending" %}<span class="badge pending">Pending</span>
+                {% else %}<span class="badge rejected">{{ h.get_status_display }}</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="3" class="empty-state">None on record.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

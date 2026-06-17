@@ -539,6 +539,7 @@ def team(request):
         ).order_by("-end_date").select_related("leave_type").first()
 
         summary.append({
+            "id": emp.id,
             "name": emp.get_full_name() or emp.username,
             "initials": emp.initials,
             "department": emp.department or "—",
@@ -747,3 +748,49 @@ def decide_day_request(request, request_type, id, decision):
     send_day_request_notification_email(obj, decision, label)
 
     return redirect(f"{reverse('approvals')}?tab={tab}")
+
+
+@manager_required
+def employee_detail(request, employee_id):
+    from accounts.models import User
+
+    employee = get_object_or_404(User, id=employee_id)
+    today = date.today()
+
+    balance = LeaveBalance.objects.filter(employee=employee).first()
+
+    leave_history = LeaveRequest.objects.filter(
+        employee=employee
+    ).select_related("leave_type").order_by("-start_date")
+
+    attendance_history = AttendanceRequest.objects.filter(
+        employee=employee
+    ).order_by("-date")
+
+    holiday_work_history = HolidayWorkRequest.objects.filter(
+        employee=employee
+    ).order_by("-date")
+
+    current_leave = leave_history.filter(
+        status="approved", start_date__lte=today, end_date__gte=today,
+    ).first()
+
+    fiscal_start = date(today.year if today.month >= 7 else today.year - 1, 7, 17)
+    fy_leaves = leave_history.filter(status="approved", start_date__gte=fiscal_start)
+    type_breakdown = {}
+    for l in fy_leaves:
+        type_breakdown[l.leave_type.name] = type_breakdown.get(l.leave_type.name, 0) + l.days
+
+    context = {
+        "employee": employee,
+        "balance": balance,
+        "current_leave": current_leave,
+        "leave_history": leave_history,
+        "attendance_history": attendance_history,
+        "holiday_work_history": holiday_work_history,
+        "type_breakdown": type_breakdown,
+        "rejected_count": leave_history.filter(status="rejected").count(),
+        "cancelled_count": leave_history.filter(status="cancelled").count(),
+    }
+
+    return render(request, "leaves/employee_detail.html", context)
