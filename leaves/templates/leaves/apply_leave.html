@@ -26,14 +26,14 @@
               <option value="{{ lt.id }}">{{ lt.name }}</option>
             {% endfor %}
           </select>
-        </div>
+        </div></br>
         <div class="form-group">
           <label for="from-date">From Date *</label>
-          <input type="date" id="from-date" name="from_date">
+          <input type="date" id="from-date" name="from_date" min="{% now 'Y-m-d' %}">
         </div>
         <div class="form-group">
           <label for="to-date">To Date *</label>
-          <input type="date" id="to-date" name="to_date">
+          <input type="date" id="to-date" name="to_date" min="{% now 'Y-m-d' %}">
         </div>
         <div class="form-group full">
           <label for="reason">Reason *</label>
@@ -64,7 +64,7 @@
       <div class="form-grid">
         <div class="form-group">
           <label for="att-date">Date *</label>
-          <input type="date" id="att-date" name="date">
+          <input type="date" id="att-date" name="date" max="{% now 'Y-m-d' %}">
         </div>
         <div class="form-group full">
           <label for="att-reason">Reason *</label>
@@ -87,7 +87,7 @@
       <div class="form-grid">
         <div class="form-group">
           <label for="hw-date">Date *</label>
-          <input type="date" id="hw-date" name="date">
+          <input type="date" id="hw-date" name="date" max="{% now 'Y-m-d' %}">
         </div>
         <div class="form-group full">
           <label for="hw-reason">Reason / Work Description *</label>
@@ -105,6 +105,14 @@
 
 {% block extra_js %}
 <script>
+  document.querySelectorAll('input[type="date"]').forEach(input => {
+    input.addEventListener('click', () => {
+      if (input.showPicker) {
+        try { input.showPicker(); } catch (e) {}
+      }
+    });
+  });
+
   document.querySelectorAll('#apply-tabs .tab').forEach(tab => {
     tab.addEventListener('click', () => {
       document.querySelectorAll('#apply-tabs .tab').forEach(t => t.classList.remove('active'));

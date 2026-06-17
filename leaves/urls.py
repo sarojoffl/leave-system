@@ -16,7 +16,6 @@ urlpatterns = [
     path('apply/attendance/', views.apply_attendance_request, name='apply_attendance_request'),
     path('apply/holiday-work/', views.apply_holiday_work, name='apply_holiday_work'),
 
-    path('calendar/', views.calendar, name='calendar'),
     path('team/', views.team, name='team'),
     path('reports/', views.reports, name='reports'),
     path('reports/export/', views.export_reports_csv, name='export_reports'),

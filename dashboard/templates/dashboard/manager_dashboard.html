@@ -1,0 +1,140 @@
+{% extends "base/base.html" %}
+
+{% block title %}Manager Dashboard{% endblock %}
+{% block page_title %}Manager Dashboard{% endblock %}
+
+{% block content %}
+{% if total_pending %}
+  <div class="notice warn">
+    <span class="notice-text"><strong>{{ total_pending }} request{{ total_pending|pluralize }}</strong> {{ total_pending|pluralize:"is,are" }} waiting for your decision —
+    <a href="{% url 'approvals' %}">review approvals</a>.</span>
+  </div>
+{% endif %}
+
+<div class="stat-grid">
+  <div class="stat-card blue">
+    <div class="stat-label">Team Size</div>
+    <div class="stat-value">{{ employee_count }}</div>
+    <div class="stat-sub">active employee{{ employee_count|pluralize }}</div>
+  </div>
+  <div class="stat-card red">
+    <div class="stat-label">On Leave Today</div>
+    <div class="stat-value">{{ on_leave_today_count }}</div>
+    <div class="stat-sub">out of {{ employee_count }}</div>
+  </div>
+  <div class="stat-card orange">
+    <div class="stat-label">Pending Approvals</div>
+    <div class="stat-value">{{ total_pending }}</div>
+    <div class="stat-sub">{{ pending_leave_count }} leave · {{ pending_attendance_count }} attendance · {{ pending_holiday_count }} holiday work</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Days Taken (Team)</div>
+    <div class="stat-value">{{ days_taken_this_fy|floatformat:"-1" }}</div>
+    <div class="stat-sub">this fiscal year</div>
+  </div>
+</div>
+
+<div class="two-col">
+  <div class="card">
+    <div class="card-header"><span class="card-title">On Leave Today</span></div>
+    <div class="table-responsive">
+      <table>
+        <thead><tr><th>Employee</th><th>Type</th><th>Returns</th></tr></thead>
+        <tbody>
+          {% for o in on_leave_today %}
+            <tr><td>{{ o.name }}</td><td>{{ o.type }}</td><td>{{ o.returns|date:"M d" }}</td></tr>
+          {% empty %}
+            <tr><td colspan="3" class="empty-state">Everyone's in today.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><span class="card-title">Needs Your Attention</span></div>
+    <div class="table-responsive">
+      <table>
+        <thead><tr><th>Employee</th><th>Pending Requests</th></tr></thead>
+        <tbody>
+          {% for n in needs_attention %}
+            <tr><td><span class="avatar avatar-sm">{{ n.initials }}</span>{{ n.name }}</td><td><span class="badge pending">{{ n.count }}</span></td></tr>
+          {% empty %}
+            <tr><td colspan="2" class="empty-state">No one's waiting on you right now.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="two-col">
+  <div class="card">
+    <div class="cal-wrap">
+      <div class="cal-month-header">
+        <span class="cal-month-title">{{ calendar_month_label }}</span>
+      </div>
+      <div class="cal-grid">
+        <div class="cal-day-name">Sun</div>
+        <div class="cal-day-name">Mon</div>
+        <div class="cal-day-name">Tue</div>
+        <div class="cal-day-name">Wed</div>
+        <div class="cal-day-name">Thu</div>
+        <div class="cal-day-name">Fri</div>
+        <div class="cal-day-name">Sat</div>
+
+        {% for week in calendar_weeks %}
+          {% for day in week %}
+            {% if day.day_number %}
+              <div class="cal-day {{ day.classes }}" {% if day.title %}title="{{ day.title }}"{% endif %}>
+                {{ day.day_number }}
+                {% if day.leave_count %}
+                  <span style="display:block;font-size:0.6rem;font-weight:700;color:#2b6cb0;line-height:1;">{{ day.leave_count }} away</span>
+                {% endif %}
+              </div>
+            {% else %}
+              <div class="cal-day other"></div>
+            {% endif %}
+          {% endfor %}
+        {% endfor %}
+      </div>
+      <div class="cal-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#2b6cb0;"></div>Today</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#c6f6d5;border:1px solid #48bb78;"></div>Team member on leave</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#fed7d7;border:1px solid #fc8181;"></div>Public Holiday</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><span class="card-title">Upcoming Leave (Next 30 Days)</span></div>
+    <div class="table-responsive">
+      <table>
+        <thead><tr><th>Employee</th><th>Type</th><th>Dates</th><th>Days</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for u in upcoming_leaves %}
+            <tr>
+              <td>{{ u.employee_name }}</td>
+              <td>{{ u.type }}</td>
+              <td>{{ u.dates }}{% if u.starts_in == 0 %} <span class="badge pending">Today</span>{% endif %}</td>
+              <td>{{ u.days|floatformat:"-1" }}</td>
+              <td>
+                {% if u.status == "Approved" %}<span class="badge approved">Approved</span>
+                {% else %}<span class="badge pending">Pending</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="5" class="empty-state">No upcoming leave scheduled.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="flex-actions" style="justify-content:flex-end;gap:0.5rem;margin-top:8px;">
+  <a href="{% url 'team' %}" class="btn btn-outline btn-sm">View Full Staff Directory →</a>
+  <a href="{% url 'reports' %}" class="btn btn-outline btn-sm">View Full Reports →</a>
+</div>
+{% endblock %}

@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from calendar import Calendar, month_name
+from calendar import month_name
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -10,7 +10,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .models import LeaveRequest, LeaveType, LeaveBalance, PublicHoliday, AttendanceRequest, HolidayWorkRequest
+from .models import LeaveRequest, LeaveType, LeaveBalance, AttendanceRequest, HolidayWorkRequest
 from .permissions import manager_required
 
 from django.core.mail import send_mail
@@ -139,12 +139,13 @@ def send_day_request_notification_email(day_request, action_type, label):
 
 @login_required
 def apply_leave(request):
+    today = date.today()
+
     if request.method == "POST":
         leave_type_id = request.POST.get("leave_type")
         from_date_str = request.POST.get("from_date")
         to_date_str = request.POST.get("to_date")
         reason = request.POST.get("reason", "").strip()
-        handover = request.POST.get("handover", "").strip()
 
         errors = []
 
@@ -162,7 +163,9 @@ def apply_leave(request):
                 from_date = datetime.strptime(from_date_str, "%Y-%m-%d").date()
                 to_date = datetime.strptime(to_date_str, "%Y-%m-%d").date()
 
-                if to_date < from_date:
+                if from_date < today:
+                    errors.append("You cannot request leave for a date in the past.")
+                elif to_date < from_date:
                     errors.append("To date cannot be before from date.")
 
             except ValueError:
@@ -280,6 +283,7 @@ def my_leaves(request):
         "leaves": leaves,
         "attendance_requests": attendance_requests,
         "holiday_work_requests": holiday_work_requests,
+        "today": date.today(),
     }
 
     if request.session.pop("show_success_modal", False):
@@ -303,6 +307,14 @@ def cancel_leave(request, id):
             messages.success(request, "Leave request cancelled.")
             send_leave_notification_email(leave, 'cancelled')
         elif leave.status == "approved":
+            if leave.start_date <= date.today():
+                messages.error(
+                    request,
+                    "This leave has already started or finished and can no longer be "
+                    "cancelled. Please contact your manager if changes are needed."
+                )
+                return redirect("my_leaves")
+
             leave.status = "cancelled"
             leave.save(update_fields=["status"])
 
@@ -354,6 +366,7 @@ def approvals(request):
         "dates": l.date_range,
         "decision": l.get_status_display(),
         "note": l.decision_note,
+        "end_date": l.end_date,
     } for l in recent]
 
     def _serialize_day_requests(qs):
@@ -382,6 +395,17 @@ def approvals(request):
         HolidayWorkRequest.objects.filter(status="pending").exclude(employee=request.user).select_related("employee")
     )
 
+    breakdown_parts = []
+    if pending_approvals:
+        breakdown_parts.append(f"{len(pending_approvals)} leave")
+    if pending_attendance:
+        breakdown_parts.append(f"{len(pending_attendance)} attendance")
+    if pending_holiday_work:
+        breakdown_parts.append(f"{len(pending_holiday_work)} holiday work")
+
+    total_pending_count = len(pending_approvals) + len(pending_attendance) + len(pending_holiday_work)
+    pending_breakdown_text = ", ".join(breakdown_parts)
+
     recently_processed_attendance = _serialize_processed_day_requests(
         AttendanceRequest.objects.filter(status__in=["approved", "rejected"])
         .exclude(employee=request.user)
@@ -402,6 +426,9 @@ def approvals(request):
         "pending_holiday_work": pending_holiday_work,
         "recently_processed_attendance": recently_processed_attendance,
         "recently_processed_holiday_work": recently_processed_holiday_work,
+        "total_pending_count": total_pending_count,
+        "pending_breakdown_text": pending_breakdown_text,
+        "today": date.today(),
     })
 
 
@@ -459,6 +486,13 @@ def reject_leave(request, id):
             send_leave_notification_email(leave, 'rejected')
 
         elif leave.status == "approved":
+            if leave.end_date < date.today():
+                messages.error(
+                    request,
+                    "This leave has already finished and can no longer be revoked."
+                )
+                return redirect(f"{reverse('approvals')}?tab={tab}")
+
             leave.status = "rejected"
             leave.decided_at = timezone.now()
             leave.decision_note = request.POST.get("note", "").strip()
@@ -479,89 +513,6 @@ def reject_leave(request, id):
     return redirect(f"{reverse('approvals')}?tab={tab}")
 
 
-@login_required
-def calendar(request):
-    today = date.today()
-    cal = Calendar(firstweekday=6)
-
-    weeks = []
-    for week in cal.monthdayscalendar(today.year, today.month):
-        week_data = []
-        for day_num in week:
-            if day_num == 0:
-                week_data.append({})
-                continue
-
-            day_date = date(today.year, today.month, day_num)
-            classes = []
-            title = None
-
-            if day_date.weekday() == 5:
-                classes.append("weekend")
-                week_data.append({
-                    "day_number": day_num,
-                    "classes": " ".join(classes),
-                    "title": None,
-                })
-                continue
-
-            if day_date == today:
-                classes.append("today")
-
-            holiday = PublicHoliday.objects.filter(date=day_date).first()
-            if holiday:
-                classes.append("holiday")
-                title = holiday.name
-            else:
-                leave_today = LeaveRequest.objects.filter(
-                    employee=request.user,
-                    start_date__lte=day_date,
-                    end_date__gte=day_date,
-                    status__in=["approved", "pending"],
-                ).first()
-                if leave_today:
-                    if leave_today.status == "approved":
-                        classes.append("leave-approved")
-                        title = f"{leave_today.leave_type.name} – Approved"
-                    else:
-                        classes.append("leave-pending")
-                        title = f"{leave_today.leave_type.name} – Pending"
-
-            week_data.append({
-                "day_number": day_num,
-                "classes": " ".join(classes),
-                "title": title,
-            })
-        weeks.append(week_data)
-
-    public_holidays = PublicHoliday.objects.filter(
-        date__year=today.year, date__month=today.month
-    )
-
-    team_leaves = (
-        LeaveRequest.objects.filter(
-            status="approved",
-            start_date__year=today.year,
-            start_date__month=today.month,
-        )
-        .exclude(employee=request.user)
-        .select_related("employee", "leave_type")
-    )
-
-    team_on_leave = [{
-        "name": l.employee.get_full_name() or l.employee.username,
-        "dates": l.date_range,
-        "type": l.leave_type.name,
-    } for l in team_leaves]
-
-    return render(request, "leaves/calendar.html", {
-        "calendar_month_label": f"{month_name[today.month]} {today.year}",
-        "calendar_weeks": weeks,
-        "public_holidays": public_holidays,
-        "team_on_leave_this_month": team_on_leave,
-    })
-
-
 @manager_required
 def team(request):
     from accounts.models import User
@@ -573,20 +524,38 @@ def team(request):
     for emp in employees:
         balance = LeaveBalance.objects.filter(employee=emp).first()
 
-        on_leave_today = LeaveRequest.objects.filter(
+        current_leave = LeaveRequest.objects.filter(
+            employee=emp, status="approved", start_date__lte=today, end_date__gte=today,
+        ).select_related("leave_type").first()
+
+        pending_count = (
+            LeaveRequest.objects.filter(employee=emp, status="pending").count()
+            + AttendanceRequest.objects.filter(employee=emp, status="pending").count()
+            + HolidayWorkRequest.objects.filter(employee=emp, status="pending").count()
+        )
+
+        last_leave = LeaveRequest.objects.filter(
             employee=emp, status="approved",
-            start_date__lte=today, end_date__gte=today,
-        ).exists()
+        ).order_by("-end_date").select_related("leave_type").first()
 
         summary.append({
             "name": emp.get_full_name() or emp.username,
+            "initials": emp.initials,
             "department": emp.department or "—",
             "position": emp.position or "—",
             "leave_used": balance.used if balance else 0,
             "leave_total": balance.total if balance else 12,
             "leave_remaining": balance.remaining if balance else 12,
-            "status": "On Leave" if on_leave_today else "Active",
+            "pending_count": pending_count,
+            "status": "On Leave" if current_leave else "Active",
+            "current_leave_type": current_leave.leave_type.name if current_leave else None,
+            "last_leave": (
+                f"{last_leave.leave_type.name} · {last_leave.date_range}"
+                if last_leave else "—"
+            ),
         })
+
+    summary.sort(key=lambda s: (-s["pending_count"], s["name"]))
 
     return render(request, "leaves/team.html", {"team_summary": summary})
 

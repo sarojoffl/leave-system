@@ -11,23 +11,25 @@
   </div>
   <div class="table-responsive">
     <table>
-      <thead><tr><th>Employee</th><th>Department</th><th>Position</th><th>Leave Used</th><th>Remaining</th><th>Status</th></tr></thead>
+      <thead><tr><th>Employee</th><th>Department</th><th>Position</th><th>Leave Used</th><th>Remaining</th><th>Pending</th><th>Status</th><th>Last Leave</th></tr></thead>
       <tbody>
         {% for emp in team_summary %}
           <tr>
-            <td>{{ emp.name }}</td>
+            <td><span class="avatar avatar-sm">{{ emp.initials }}</span>{{ emp.name }}</td>
             <td>{{ emp.department }}</td>
             <td>{{ emp.position }}</td>
             <td>{{ emp.leave_used|floatformat:"-1" }} / {{ emp.leave_total|floatformat:"-1" }}</td>
             <td>{{ emp.leave_remaining|floatformat:"-1" }}</td>
+            <td>{% if emp.pending_count %}<span class="badge pending">{{ emp.pending_count }}</span>{% else %}—{% endif %}</td>
             <td>
-              {% if emp.status == "On Leave" %}<span class="badge on-leave">On Leave</span>
+              {% if emp.status == "On Leave" %}<span class="badge on-leave">On Leave{% if emp.current_leave_type %} · {{ emp.current_leave_type }}{% endif %}</span>
               {% else %}<span class="badge active-emp">Active</span>
               {% endif %}
             </td>
+            <td>{{ emp.last_leave }}</td>
           </tr>
         {% empty %}
-          <tr><td colspan="5" class="empty-state">No team members found.</td></tr>
+          <tr><td colspan="8" class="empty-state">No team members found.</td></tr>
         {% endfor %}
       </tbody>
     </table>

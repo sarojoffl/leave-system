@@ -64,27 +64,74 @@
   </div>
 </div>
 
-{% if team_on_leave_today %}
-<div class="card">
-  <div class="card-header">
-    <span class="card-title">Team on Leave Today</span>
-    <span class="card-meta">{{ team_on_leave_today|length }} member{{ team_on_leave_today|length|pluralize }} absent</span>
-  </div>
-  <div class="table-responsive">
-    <table>
-      <thead><tr><th>Employee</th><th>Department</th><th>Leave Type</th><th>Return Date</th></tr></thead>
-      <tbody>
-        {% for t in team_on_leave_today %}
-          <tr>
-            <td>{{ t.name }}</td>
-            <td>{{ t.department }}</td>
-            <td>{{ t.leave_type }}</td>
-            <td>{{ t.return_date }}</td>
-          </tr>
+<div class="two-col">
+  <div class="card">
+    <div class="cal-wrap">
+      <div class="cal-month-header">
+        <span class="cal-month-title">{{ calendar_month_label }}</span>
+      </div>
+      <div class="cal-grid">
+        <div class="cal-day-name">Sun</div>
+        <div class="cal-day-name">Mon</div>
+        <div class="cal-day-name">Tue</div>
+        <div class="cal-day-name">Wed</div>
+        <div class="cal-day-name">Thu</div>
+        <div class="cal-day-name">Fri</div>
+        <div class="cal-day-name">Sat</div>
+
+        {% for week in calendar_weeks %}
+          {% for day in week %}
+            {% if day.day_number %}
+              <div class="cal-day {{ day.classes }}" {% if day.title %}title="{{ day.title }}"{% endif %}>{{ day.day_number }}</div>
+            {% else %}
+              <div class="cal-day other"></div>
+            {% endif %}
+          {% endfor %}
         {% endfor %}
-      </tbody>
-    </table>
+      </div>
+      <div class="cal-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#2b6cb0;"></div>Today</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#c6f6d5;border:1px solid #48bb78;"></div>Leave (Approved)</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#fefcbf;border:1px solid #ed8936;"></div>Leave (Pending)</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#fed7d7;border:1px solid #fc8181;"></div>Public Holiday</div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">Public Holidays — {{ calendar_month_label }}</span></div>
+      <div class="table-responsive">
+        <table>
+          <thead><tr><th>Date</th><th>Holiday</th></tr></thead>
+          <tbody>
+            {% for h in public_holidays %}
+              <tr><td>{{ h.date|date:"M d" }}</td><td>{{ h.name }}</td></tr>
+            {% empty %}
+              <tr><td colspan="2" class="empty-state">No public holidays this month.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Team on Leave This Month</span>
+        <span class="card-meta">{{ team_on_leave_this_month|length }} member{{ team_on_leave_this_month|length|pluralize }}</span>
+      </div>
+      <div class="table-responsive">
+        <table>
+          <thead><tr><th>Name</th><th>Dates</th><th>Type</th></tr></thead>
+          <tbody>
+            {% for t in team_on_leave_this_month %}
+              <tr><td>{{ t.name }}</td><td>{{ t.dates }}</td><td>{{ t.type }}</td></tr>
+            {% empty %}
+              <tr><td colspan="3" class="empty-state">No team leaves scheduled this month.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </div>
-{% endif %}
 {% endblock %}

@@ -148,26 +148,6 @@ body {
   margin-left: auto;
 }
 
-.sidebar-footer {
-  padding: 16px 20px;
-  border-top: 1px solid #2d527a;
-  font-size: 0.8rem;
-  color: #7fb3d3;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.sidebar-footer-name {
-  color: #fff;
-  font-weight: 600;
-  font-size: 0.82rem;
-}
-
-.sidebar-footer-role {
-  font-size: 0.73rem;
-}
-
 .avatar {
   width: 30px;
   height: 30px;
@@ -250,6 +230,51 @@ body {
   font-size: 0.8rem;
   color: var(--color-text-muted);
   white-space: nowrap;
+}
+ 
+.topbar-user-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: var(--color-text);
+  padding: 4px 8px 4px 4px;
+  border-radius: 99px;
+  transition: background-color 0.15s;
+  max-width: 160px;
+  min-width: 0;
+}
+ 
+.topbar-user-link:hover,
+.topbar-user-link:focus-visible {
+  background-color: var(--color-border-light);
+}
+ 
+.topbar-user-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+ 
+.topbar-logout-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  color: var(--color-text-muted);
+  border-radius: 8px;
+  transition: color 0.15s, background-color 0.15s;
+  flex-shrink: 0;
+}
+ 
+.topbar-logout-link:hover,
+.topbar-logout-link:focus-visible {
+  color: var(--color-danger-dark);
+  background-color: var(--color-border-light);
 }
 
 .role-badge {
@@ -624,12 +649,32 @@ textarea {
   font-size: 0.84rem;
   color: #2c5282;
   margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .notice.warn {
   background: #fffbeb;
   border-color: #fcd34d;
   color: #92400e;
+}
+
+.notice-close {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  color: inherit;
+  opacity: 0.55;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+
+.notice-close:hover {
+  opacity: 1;
 }
 
 /* ============================================
@@ -675,6 +720,7 @@ textarea {
   font-size: 0.82rem;
   min-height: 34px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
 }
@@ -683,6 +729,7 @@ textarea {
 .cal-day.today { background: var(--color-primary); color: #fff; font-weight: 700; }
 .cal-day.leave-approved { background: var(--color-success-bg); color: var(--color-success-text); font-weight: 600; }
 .cal-day.leave-pending { background: var(--color-pending-bg); color: var(--color-pending-text); font-weight: 600; }
+.cal-day.has-leave { background: var(--color-success-bg); color: var(--color-success-text); font-weight: 600; }
 .cal-day.holiday { background: var(--color-rejected-bg); color: var(--color-rejected-text); font-weight: 600; }
 .cal-day.weekend { color: var(--color-danger); }
 
@@ -984,5 +1031,16 @@ textarea {
 
   .bal-nums {
     width: auto;
+  }
+}
+
+@media (max-width: 900px) {
+  .topbar-user-name {
+    display: none;
+  }
+ 
+  .topbar-user-link {
+    max-width: none;
+    padding: 4px;
   }
 }

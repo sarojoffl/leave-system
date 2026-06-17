@@ -5,9 +5,13 @@ from django.contrib import messages
 from django.shortcuts import render, redirect
 
 
+def _post_login_redirect_name(user):
+    return 'manager_dashboard' if user.role in ('manager', 'hr') else 'dashboard'
+
+
 def login_view(request):
     if request.user.is_authenticated:
-        return redirect("dashboard")
+        return redirect(_post_login_redirect_name(request.user))
 
     error = None
     if request.method == "POST":
@@ -16,7 +20,8 @@ def login_view(request):
         user = authenticate(request, username=username, password=password)
         if user is not None:
             login(request, user)
-            return redirect(request.GET.get("next", "dashboard"))
+            next_url = request.GET.get("next")
+            return redirect(next_url or _post_login_redirect_name(user))
         else:
             error = "Invalid username or password."
 
@@ -36,7 +41,7 @@ def change_password_view(request):
             user = form.save()
             update_session_auth_hash(request, user)
             messages.success(request, 'Your password was successfully updated!')
-            return redirect('dashboard')
+            return redirect(_post_login_redirect_name(request.user))
         else:
             messages.error(request, 'Please correct the errors below.')
     else:

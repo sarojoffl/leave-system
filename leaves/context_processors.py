@@ -1,5 +1,5 @@
 from datetime import date
-from .models import LeaveRequest
+from .models import LeaveRequest, AttendanceRequest, HolidayWorkRequest
 from .bs_convert import ad_to_bs, bs_fiscal_year   # adjust import path as needed
 
 
@@ -18,10 +18,9 @@ def sidebar_context(request):
     pending_count = None
     if user.role in ('manager', 'hr'):
         pending_count = (
-            LeaveRequest.objects
-            .filter(status='pending')
-            .exclude(employee=user)
-            .count()
+            LeaveRequest.objects.filter(status='pending').exclude(employee=user).count()
+            + AttendanceRequest.objects.filter(status='pending').exclude(employee=user).count()
+            + HolidayWorkRequest.objects.filter(status='pending').exclude(employee=user).count()
         )
 
     return {
