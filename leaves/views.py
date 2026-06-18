@@ -794,3 +794,70 @@ def employee_detail(request, employee_id):
     }
 
     return render(request, "leaves/employee_detail.html", context)
+
+
+@manager_required
+def export_employee_csv(request, employee_id):
+    from accounts.models import User
+    today = date.today()
+
+    employee = get_object_or_404(User, id=employee_id)
+    leave_history = LeaveRequest.objects.filter(
+        employee=employee
+    ).select_related("leave_type").order_by("-start_date")
+
+    attendance_history = AttendanceRequest.objects.filter(
+        employee=employee
+    ).order_by("-date")
+
+    holiday_work_history = HolidayWorkRequest.objects.filter(
+        employee=employee
+    ).order_by("-date")
+
+    filename = f"leave_history_{employee.username}_{today.isoformat()}.csv"
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+
+    writer = csv.writer(response)
+
+    writer.writerow([f"Leave History — {employee.get_full_name() or employee.username}"])
+    writer.writerow([f"Exported on {today}"])
+    writer.writerow([])
+
+    writer.writerow(["Leave Requests"])
+    writer.writerow(["Type", "From", "To", "Days", "Status", "Reason", "Decision Note", "Applied On"])
+    for l in leave_history:
+        writer.writerow([
+            l.leave_type.name,
+            l.start_date,
+            l.end_date,
+            l.days,
+            l.get_status_display(),
+            l.reason,
+            l.decision_note or "",
+            l.created_at.strftime("%Y-%m-%d"),
+        ])
+
+    writer.writerow([])
+    writer.writerow(["Attendance Requests"])
+    writer.writerow(["Date", "Status", "Reason", "Decision Note"])
+    for a in attendance_history:
+        writer.writerow([
+            a.date,
+            a.get_status_display(),
+            a.reason,
+            a.decision_note or "",
+        ])
+
+    writer.writerow([])
+    writer.writerow(["Holiday Work Requests"])
+    writer.writerow(["Date", "Status", "Reason", "Decision Note"])
+    for h in holiday_work_history:
+        writer.writerow([
+            h.date,
+            h.get_status_display(),
+            h.reason,
+            h.decision_note or "",
+        ])
+
+    return response

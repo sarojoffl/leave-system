@@ -8,6 +8,10 @@
   <a href="{% url 'team' %}" class="btn btn-outline btn-sm">← Back to Team</a>
 </div>
 
+<div class="flex-actions" style="justify-content: flex-end; margin-bottom: 16px;">
+  <a href="{% url 'export_employee_csv' employee.id %}" class="btn btn-outline btn-sm">⬇ Export CSV</a>
+</div>
+
 <div class="stat-grid">
   <div class="stat-card">
     <div class="stat-label">{{ employee.get_full_name|default:employee.username }}</div>
