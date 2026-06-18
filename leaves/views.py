@@ -517,7 +517,7 @@ def reject_leave(request, id):
 def team(request):
     from accounts.models import User
 
-    employees = User.objects.exclude(id=request.user.id)
+    employees = User.objects.filter(is_active=True).exclude(id=request.user.id).exclude(role__in=['manager', 'hr'])
     today = date.today()
 
     summary = []

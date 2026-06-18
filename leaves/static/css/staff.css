@@ -1,0 +1,190 @@
+/* ============================================
+   Staff Management
+   ============================================ */
+
+/* Page header */
+.staff-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.staff-page-sub {
+  font-size: 0.84rem;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+/* Summary chips */
+.staff-chips {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.staff-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 99px;
+  padding: 4px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  box-shadow: var(--shadow);
+}
+
+.staff-chip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Filters bar */
+.staff-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.staff-search-input {
+  flex: 1;
+  min-width: 200px;
+  max-width: 320px;
+  padding: 8px 12px;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.84rem;
+  color: var(--color-text);
+  font-family: inherit;
+  transition: border var(--transition);
+}
+
+.staff-search-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
+}
+
+.staff-filters select {
+  width: auto;
+  min-width: 120px;
+}
+
+/* Inactive row dimming */
+.staff-row-inactive td {
+  opacity: 0.6;
+}
+
+/* Leave mini-bar in table */
+.staff-leave-mini {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.staff-leave-bar-wrap {
+  flex: 1;
+  min-width: 60px;
+  max-width: 80px;
+  height: 6px;
+  background: var(--color-border-light);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.staff-leave-bar-fill {
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: 99px;
+  transition: width 0.4s ease;
+}
+
+.staff-leave-nums {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+/* Role badges */
+.badge.staff-badge-manager {
+  background: #e9d8fd;
+  color: #553c9a;
+}
+
+.badge.staff-badge-hr {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.badge.staff-badge-inactive {
+  background: var(--color-border);
+  color: #4a5568;
+}
+
+/* Deactivate button — danger-ish outline */
+.btn.staff-btn-deactivate {
+  border-color: var(--color-danger);
+  color: var(--color-danger-dark);
+}
+
+.btn.staff-btn-deactivate:hover {
+  background: var(--color-rejected-bg);
+  opacity: 1;
+}
+
+/* Edit page */
+.staff-edit-header {
+  margin-bottom: 20px;
+}
+
+.staff-edit-avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--color-border-light);
+  margin-bottom: 4px;
+}
+
+/* Inactive card tint */
+.staff-card-inactive {
+  border-left: 4px solid var(--color-text-light);
+}
+
+/* ============================================
+   Sidebar nav entry for Staff (added globally)
+   ============================================ */
+
+/* no extra CSS needed — uses existing .nav-item */
+
+/* ============================================
+   Responsive
+   ============================================ */
+
+@media (max-width: 768px) {
+  .staff-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .staff-search-input {
+    max-width: 100%;
+  }
+
+  .staff-filters select {
+    width: 100%;
+  }
+
+  .staff-leave-bar-wrap {
+    display: none;
+  }
+}

@@ -1,0 +1,163 @@
+{% extends "base/base.html" %}
+{% block title %}{{ employee.get_full_name|default:employee.username }} — Edit{% endblock %}
+{% block page_title %}Edit Employee{% endblock %}
+
+{% block content %}
+
+<div class="staff-edit-header">
+  <a href="{% url 'staff_list' %}" class="btn btn-outline btn-sm">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="14" height="14"><polyline points="15 18 9 12 15 6"/></svg>
+    Back to Staff
+  </a>
+</div>
+
+<div class="two-col" style="align-items:start">
+
+  <!-- Left: Profile card -->
+  <div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Profile</span>
+        {% if not employee.is_active %}<span class="badge staff-badge-inactive">Inactive</span>{% endif %}
+      </div>
+      <div class="card-body">
+        <div class="staff-edit-avatar-row">
+          <div class="avatar" style="width:52px;height:52px;font-size:1.1rem;{% if not employee.is_active %}opacity:0.45{% endif %}">
+            {{ employee.initials }}
+          </div>
+          <div>
+            <div style="font-weight:700;font-size:1rem">{{ employee.get_full_name|default:employee.username }}</div>
+            <div style="font-size:0.8rem;color:var(--color-text-muted)">@{{ employee.username }}</div>
+          </div>
+        </div>
+
+        <form method="post" action="{% url 'staff_edit' employee.id %}">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="edit">
+          <div class="form-grid" style="margin-top:20px">
+            <div class="form-group">
+              <label>First Name *</label>
+              <input type="text" name="first_name" value="{{ employee.first_name }}" required>
+            </div>
+            <div class="form-group">
+              <label>Last Name *</label>
+              <input type="text" name="last_name" value="{{ employee.last_name }}" required>
+            </div>
+            <div class="form-group">
+              <label>Username *</label>
+              <input type="text" name="username" value="{{ employee.username }}" required>
+            </div>
+            <div class="form-group">
+              <label>Email</label>
+              <input type="text" name="email" value="{{ employee.email }}">
+            </div>
+            <div class="form-group">
+              <label>Department</label>
+              <input type="text" name="department" value="{{ employee.department|default:'' }}">
+            </div>
+            <div class="form-group">
+              <label>Position</label>
+              <input type="text" name="position" value="{{ employee.position|default:'' }}">
+            </div>
+            <div class="form-group">
+              <label>Role *</label>
+              <select name="role">
+                <option value="employee" {% if employee.role == "employee" %}selected{% endif %}>Employee</option>
+                <option value="manager" {% if employee.role == "manager" %}selected{% endif %}>Manager</option>
+                <option value="hr" {% if employee.role == "hr" %}selected{% endif %}>HR</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Annual Leave Days</label>
+              <input type="text" name="leave_total" value="{{ balance.total|default:12 }}">
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Save Changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Leave summary + password reset + account status -->
+  <div>
+
+    <!-- Leave balance summary -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Leave Balance</span>
+      </div>
+      {% if balance %}
+      <div class="balance-row">
+        <span class="bal-label">Used</span>
+        <div class="bar-wrap"><div class="bar-fill" style="width:{% widthratio balance.used balance.total 100 %}%;background:var(--color-warning)"></div></div>
+        <span class="bal-nums">{{ balance.used }} / {{ balance.total }}d</span>
+      </div>
+      <div class="balance-row">
+        <span class="bal-label">Remaining</span>
+        <div class="bar-wrap"><div class="bar-fill" style="width:{% widthratio balance.remaining balance.total 100 %}%;background:var(--color-success)"></div></div>
+        <span class="bal-nums">{{ balance.remaining }}d left</span>
+      </div>
+      {% else %}
+      <div class="card-body"><p style="font-size:0.84rem;color:var(--color-text-muted)">No balance record yet.</p></div>
+      {% endif %}
+    </div>
+
+    <!-- Reset password -->
+    <div class="card">
+      <div class="card-header"><span class="card-title">Reset Password</span></div>
+      <div class="card-body">
+        <p style="font-size:0.82rem;color:var(--color-text-muted);margin-bottom:14px">
+          Set a new temporary password. The employee should change it after their next login.
+        </p>
+        <form method="post" action="{% url 'staff_edit' employee.id %}">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="reset_password">
+          <div class="form-group" style="margin-bottom:14px">
+            <label>New Password</label>
+            <input type="text" name="new_password" placeholder="Min. 6 characters">
+          </div>
+          <button type="submit" class="btn btn-outline btn-sm">Update Password</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Account status -->
+    <div class="card {% if not employee.is_active %}staff-card-inactive{% endif %}">
+      <div class="card-header">
+        <span class="card-title">Account Status</span>
+        {% if employee.is_active %}
+          <span class="badge active-emp">Active</span>
+        {% else %}
+          <span class="badge staff-badge-inactive">Inactive</span>
+        {% endif %}
+      </div>
+      <div class="card-body">
+        {% if employee.is_active %}
+          <p style="font-size:0.82rem;color:var(--color-text-muted);margin-bottom:14px">
+            Deactivating this account will immediately prevent the employee from logging in. Their leave history and data are preserved.
+          </p>
+          <form method="post" action="{% url 'staff_toggle_active' employee.id %}"
+            onsubmit="return confirm('Deactivate {{ employee.get_full_name|default:employee.username }}? They will not be able to log in.')">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="staff_edit">
+            <button type="submit" class="btn btn-sm btn-outline staff-btn-deactivate">Deactivate Account</button>
+          </form>
+        {% else %}
+          <p style="font-size:0.82rem;color:var(--color-text-muted);margin-bottom:14px">
+            This account is currently inactive. Reactivating it will restore the employee's access.
+          </p>
+          <form method="post" action="{% url 'staff_toggle_active' employee.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="staff_edit">
+            <button type="submit" class="btn btn-sm btn-success">Reactivate Account</button>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}

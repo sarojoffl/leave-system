@@ -1,0 +1,210 @@
+{% extends "base/base.html" %}
+{% block title %}Staff Management{% endblock %}
+{% block page_title %}Staff Management{% endblock %}
+
+{% block content %}
+
+<!-- Header row -->
+<div class="staff-page-header">
+  <div>
+    <p class="staff-page-sub">Manage employee accounts, roles, and leave allocations.</p>
+  </div>
+  <button class="btn btn-primary" onclick="document.getElementById('modal-create').classList.add('open')">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" width="15" height="15"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    Add Employee
+  </button>
+</div>
+
+<!-- Summary chips -->
+<div class="staff-chips">
+  <span class="staff-chip">
+    <span class="staff-chip-dot" style="background:var(--color-accent)"></span>
+    {{ total_count }} total
+  </span>
+  <span class="staff-chip">
+    <span class="staff-chip-dot" style="background:var(--color-success)"></span>
+    {{ active_count }} active
+  </span>
+  {% if inactive_count %}
+  <span class="staff-chip">
+    <span class="staff-chip-dot" style="background:var(--color-text-light)"></span>
+    {{ inactive_count }} inactive
+  </span>
+  {% endif %}
+</div>
+
+<!-- Filters -->
+<div class="card" style="margin-bottom:20px">
+  <div class="card-body" style="padding:16px 20px">
+    <form method="get" class="staff-filters">
+      <input type="text" name="q" value="{{ q }}" placeholder="Search name, email, department…" class="staff-search-input">
+      <select name="role">
+        <option value="">All roles</option>
+        <option value="employee" {% if filter_role == "employee" %}selected{% endif %}>Employee</option>
+        <option value="manager" {% if filter_role == "manager" %}selected{% endif %}>Manager</option>
+        <option value="hr" {% if filter_role == "hr" %}selected{% endif %}>HR</option>
+      </select>
+      <select name="status">
+        <option value="">All statuses</option>
+        <option value="active" {% if filter_status == "active" %}selected{% endif %}>Active</option>
+        <option value="inactive" {% if filter_status == "inactive" %}selected{% endif %}>Inactive</option>
+      </select>
+      <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+      {% if q or filter_role or filter_status %}
+        <a href="{% url 'staff_list' %}" class="btn btn-outline btn-sm">Clear</a>
+      {% endif %}
+    </form>
+  </div>
+</div>
+
+<!-- Staff table -->
+<div class="card">
+  <div class="table-responsive">
+    {% if staff %}
+    <table>
+      <thead>
+        <tr>
+          <th>Employee</th>
+          <th>Department / Position</th>
+          <th>Role</th>
+          <th>Leave</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in staff %}
+        <tr class="{% if not s.is_active %}staff-row-inactive{% endif %}">
+          <td>
+            <div style="display:flex;align-items:center;gap:10px">
+              <div class="avatar avatar-sm" style="{% if not s.is_active %}opacity:0.45{% endif %}">{{ s.initials }}</div>
+              <div>
+                <div style="font-weight:600;color:var(--color-text){% if not s.is_active %};opacity:0.6{% endif %}">{{ s.name }}</div>
+                <div style="font-size:0.75rem;color:var(--color-text-muted)">{{ s.email }}</div>
+              </div>
+            </div>
+          </td>
+          <td>
+            <div style="font-size:0.84rem">{{ s.department }}</div>
+            <div style="font-size:0.75rem;color:var(--color-text-muted)">{{ s.position }}</div>
+          </td>
+          <td>
+            <span class="badge {% if s.role_key == 'manager' %}staff-badge-manager{% elif s.role_key == 'hr' %}staff-badge-hr{% else %}active-emp{% endif %}">
+              {{ s.role }}
+            </span>
+          </td>
+          <td>
+            <div class="staff-leave-mini">
+              <div class="staff-leave-bar-wrap">
+                <div class="staff-leave-bar-fill" style="width:{% widthratio s.leave_used s.leave_total 100 %}%"></div>
+              </div>
+              <span class="staff-leave-nums">{{ s.leave_used }}/{{ s.leave_total }}d</span>
+            </div>
+          </td>
+          <td>
+            {% if s.is_active %}
+              <span class="badge active-emp">Active</span>
+            {% else %}
+              <span class="badge staff-badge-inactive">Inactive</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="flex-actions">
+              <a href="{% url 'staff_edit' s.id %}" class="btn btn-outline btn-sm">Edit</a>
+              <form method="post" action="{% url 'staff_toggle_active' s.id %}" style="display:inline"
+                onsubmit="return confirm('{% if s.is_active %}Deactivate this account? The employee will not be able to log in.{% else %}Reactivate this account?{% endif %}')">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="staff_list">
+                <button type="submit" class="btn btn-sm {% if s.is_active %}btn-outline staff-btn-deactivate{% else %}btn-success{% endif %}">
+                  {% if s.is_active %}Deactivate{% else %}Reactivate{% endif %}
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+      {% if q or filter_role or filter_status %}No staff matched your filters.{% else %}No staff accounts yet.{% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── Create Account Modal ── -->
+<div class="modal-bg" id="modal-create">
+  <div class="modal" style="width:520px">
+    <div class="modal-header">
+      <span class="modal-title">Add New Employee</span>
+      <button class="modal-close" onclick="document.getElementById('modal-create').classList.remove('open')">&times;</button>
+    </div>
+    <form method="post" action="{% url 'staff_list' %}">
+      {% csrf_token %}
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="first_name">First Name *</label>
+            <input type="text" id="first_name" name="first_name" required placeholder="Jane">
+          </div>
+          <div class="form-group">
+            <label for="last_name">Last Name *</label>
+            <input type="text" id="last_name" name="last_name" required placeholder="Smith">
+          </div>
+          <div class="form-group">
+            <label for="username">Username *</label>
+            <input type="text" id="username" name="username" required placeholder="jsmith">
+          </div>
+          <div class="form-group">
+            <label for="email">Email</label>
+            <input type="text" id="email" name="email" placeholder="jane@company.com">
+          </div>
+          <div class="form-group">
+            <label for="department">Department</label>
+            <input type="text" id="department" name="department" placeholder="Engineering">
+          </div>
+          <div class="form-group">
+            <label for="position">Position</label>
+            <input type="text" id="position" name="position" placeholder="Software Engineer">
+          </div>
+          <div class="form-group">
+            <label for="role">Role *</label>
+            <select id="role" name="role">
+              <option value="employee">Employee</option>
+              <option value="manager">Manager</option>
+              <option value="hr">HR</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="leave_total">Annual Leave Days</label>
+            <input type="text" id="leave_total" name="leave_total" placeholder="12">
+          </div>
+          <div class="form-group full">
+            <label for="password">Temporary Password *</label>
+            <input type="text" id="password" name="password" placeholder="Min. 6 characters — employee should change this after first login">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-create').classList.remove('open')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Create Account</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Re-open modal on validation error so the user doesn't lose their input
+  {% if messages %}
+    {% for message in messages %}
+      {% if message.tags == 'error' %}
+        document.getElementById('modal-create').classList.add('open');
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+</script>
+{% endblock %}
