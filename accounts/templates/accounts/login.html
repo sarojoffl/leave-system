@@ -6,27 +6,28 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sign In — Leave Management System</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{% static 'css/style.css' %}">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --primary:      #4F6FE8;
-      --primary-dark: #3A57C7;
-      --primary-glow: rgba(79,111,232,0.18);
-      --success:      #22C55E;
-      --error:        #EF4444;
-      --error-bg:     #FEF2F2;
-      --bg:           #F0F4FF;
-      --surface:      #FFFFFF;
-      --border:       #DDE3F0;
-      --text:         #1A202C;
-      --text-muted:   #64748B;
-      --shadow-sm:    0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-      --shadow-lg:    0 20px 60px rgba(79,111,232,0.12), 0 4px 16px rgba(0,0,0,0.06);
-      --radius:       14px;
-      --font:         'Inter', system-ui, sans-serif;
+      --primary:      #00e5ff; /* neon cyan */
+      --primary-dark: #0088ff; /* neon blue */
+      --primary-glow: rgba(0, 229, 255, 0.18);
+      --success:      #00e676;
+      --error:        #ff1744;
+      --error-bg:     rgba(255, 23, 68, 0.08);
+      --bg:           #07090e;
+      --surface:      rgba(16, 24, 45, 0.65);
+      --border:       rgba(255, 255, 255, 0.08);
+      --text:         #f8fafc;
+      --text-muted:   #94a3b8;
+      --shadow-sm:    0 2px 8px rgba(0, 0, 0, 0.5);
+      --shadow-lg:    0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(0, 229, 255, 0.05);
+      --radius:       16px;
+      --font:         'Plus Jakarta Sans', system-ui, sans-serif;
     }
 
     body {
@@ -38,6 +39,7 @@
       padding: 1.5rem;
       position: relative;
       overflow: hidden;
+      color: var(--text);
     }
 
     /* Subtle geometric background */
@@ -46,8 +48,8 @@
       position: fixed;
       inset: 0;
       background:
-        radial-gradient(ellipse 60% 50% at 10% 15%, rgba(79,111,232,0.09) 0%, transparent 70%),
-        radial-gradient(ellipse 50% 40% at 90% 80%, rgba(79,111,232,0.07) 0%, transparent 70%);
+        radial-gradient(ellipse 60% 50% at 10% 15%, rgba(0, 229, 255, 0.06) 0%, transparent 70%),
+        radial-gradient(ellipse 50% 40% at 90% 80%, rgba(185, 102, 255, 0.05) 0%, transparent 70%);
       pointer-events: none;
     }
 
@@ -55,20 +57,20 @@
     .orb {
       position: fixed;
       border-radius: 50%;
-      filter: blur(60px);
-      opacity: 0.45;
+      filter: blur(80px);
+      opacity: 0.35;
       pointer-events: none;
     }
     .orb-1 {
-      width: 320px; height: 320px;
-      background: radial-gradient(circle, #c7d6ff 0%, transparent 70%);
-      top: -80px; left: -60px;
+      width: 350px; height: 350px;
+      background: radial-gradient(circle, rgba(0, 229, 255, 0.2) 0%, transparent 70%);
+      top: -100px; left: -80px;
       animation: drift 14s ease-in-out infinite alternate;
     }
     .orb-2 {
-      width: 240px; height: 240px;
-      background: radial-gradient(circle, #ddeaff 0%, transparent 70%);
-      bottom: -60px; right: -40px;
+      width: 300px; height: 300px;
+      background: radial-gradient(circle, rgba(185, 102, 255, 0.15) 0%, transparent 70%);
+      bottom: -80px; right: -60px;
       animation: drift 18s ease-in-out infinite alternate-reverse;
     }
     @keyframes drift {
@@ -80,6 +82,7 @@
     .login-card {
       position: relative;
       background: var(--surface);
+      backdrop-filter: blur(20px);
       border: 1px solid var(--border);
       border-radius: var(--radius);
       padding: 2.75rem 2.5rem 2.25rem;
@@ -102,17 +105,18 @@
     }
     .brand-icon {
       width: 36px; height: 36px;
-      background: var(--primary);
+      background: linear-gradient(135deg, var(--primary-dark), var(--primary));
       border-radius: 10px;
       display: grid;
       place-items: center;
       flex-shrink: 0;
+      box-shadow: 0 0 10px rgba(0, 229, 255, 0.3);
     }
     .brand-icon svg { width: 18px; height: 18px; }
     .brand-name {
       font-size: 1.05rem;
-      font-weight: 700;
-      color: var(--text);
+      font-weight: 800;
+      color: #fff;
       letter-spacing: -0.02em;
     }
     .login-tagline {
@@ -120,6 +124,7 @@
       color: var(--text-muted);
       margin-bottom: 2rem;
       padding-left: 0.1rem;
+      font-weight: 500;
     }
 
     /* Divider */
@@ -134,8 +139,8 @@
 
     .field label {
       display: block;
-      font-size: 0.78rem;
-      font-weight: 600;
+      font-size: 0.76rem;
+      font-weight: 700;
       color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: 0.07em;
@@ -160,8 +165,8 @@
       padding: 0.72rem 0.9rem 0.72rem 2.65rem;
       border: 1.5px solid var(--border);
       border-radius: 10px;
-      background: #FAFBFF;
-      color: var(--text);
+      background: rgba(7, 9, 14, 0.6);
+      color: #fff;
       font-family: var(--font);
       font-size: 0.93rem;
       transition: border-color 0.18s, box-shadow 0.18s, background 0.18s;
@@ -169,7 +174,7 @@
     .input-wrap input:focus {
       outline: none;
       border-color: var(--primary);
-      background: var(--surface);
+      background: rgba(7, 9, 14, 0.8);
       box-shadow: 0 0 0 3.5px var(--primary-glow);
     }
     .input-wrap:focus-within .input-icon { color: var(--primary); }
@@ -200,7 +205,7 @@
       font-size: 0.8rem;
       color: var(--primary);
       text-decoration: none;
-      font-weight: 500;
+      font-weight: 600;
       transition: opacity 0.15s;
     }
     .forgot-link:hover { opacity: 0.75; }
@@ -209,15 +214,15 @@
     .login-btn {
       width: 100%;
       padding: 0.78rem;
-      background: var(--primary);
-      color: #fff;
+      background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+      color: #07090e;
       border: none;
       border-radius: 10px;
       font-family: var(--font);
       font-size: 0.93rem;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
-      letter-spacing: 0.01em;
+      letter-spacing: 0.02em;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -225,7 +230,7 @@
       position: relative;
       overflow: hidden;
       transition: background 0.18s, transform 0.12s, box-shadow 0.18s;
-      box-shadow: 0 2px 8px rgba(79,111,232,0.28);
+      box-shadow: 0 4px 15px rgba(0, 229, 255, 0.25);
     }
     .login-btn::after {
       content: '';
@@ -234,13 +239,12 @@
       background: linear-gradient(180deg, rgba(255,255,255,0.1) 0%, transparent 100%);
     }
     .login-btn:hover:not(:disabled) {
-      background: var(--primary-dark);
-      box-shadow: 0 4px 16px rgba(79,111,232,0.38);
+      box-shadow: 0 6px 20px rgba(0, 229, 255, 0.4);
       transform: translateY(-1px);
     }
     .login-btn:active:not(:disabled) {
       transform: translateY(0);
-      box-shadow: 0 2px 8px rgba(79,111,232,0.22);
+      box-shadow: 0 4px 15px rgba(0, 229, 255, 0.25);
     }
     .login-btn:disabled {
       opacity: 0.65;
@@ -264,8 +268,8 @@
       align-items: flex-start;
       gap: 0.6rem;
       background: var(--error-bg);
-      border: 1.5px solid #FECACA;
-      color: #B91C1C;
+      border: 1.5px solid rgba(255, 23, 68, 0.2);
+      color: var(--error);
       border-radius: 10px;
       padding: 0.7rem 0.9rem;
       font-size: 0.85rem;
@@ -283,13 +287,14 @@
     /* Input error state */
     .input-wrap.error input {
       border-color: var(--error);
-      background: #FFF9F9;
+      background: rgba(255, 23, 68, 0.05);
     }
     .field-error {
       font-size: 0.76rem;
       color: var(--error);
       margin-top: 0.3rem;
       display: none;
+      font-weight: 600;
     }
     .field-error.show { display: block; }
 

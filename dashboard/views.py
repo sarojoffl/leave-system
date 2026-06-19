@@ -257,15 +257,26 @@ def manager_dashboard(request):
 
             leave_count = 0
             if not is_weekend and not is_holiday:
-                names_on_leave = sorted({
-                    l.employee.get_full_name() or l.employee.username
-                    for l in month_leaves
-                    if l.start_date <= day_date <= l.end_date
-                })
-                if names_on_leave:
-                    classes.append("has-leave")
-                    title_bits.append(", ".join(names_on_leave))
-                    leave_count = len(names_on_leave)
+                leaves_today = [l for l in month_leaves if l.start_date <= day_date <= l.end_date]
+                if leaves_today:
+                    has_approved = any(l.status == 'approved' for l in leaves_today)
+                    
+                    approved_names = sorted({l.employee.get_full_name() or l.employee.username for l in leaves_today if l.status == 'approved'})
+                    pending_names = sorted({l.employee.get_full_name() or l.employee.username for l in leaves_today if l.status == 'pending'})
+                    
+                    title_parts = []
+                    if approved_names:
+                        title_parts.append(f"Approved: {', '.join(approved_names)}")
+                    if pending_names:
+                        title_parts.append(f"Pending: {', '.join(pending_names)}")
+                    
+                    title_bits.append(" | ".join(title_parts))
+                    leave_count = len(leaves_today)
+                    
+                    if has_approved:
+                        classes.append("leave-approved")
+                    else:
+                        classes.append("leave-pending")
 
             week_data.append({
                 "day_number": day_num,

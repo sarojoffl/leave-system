@@ -219,44 +219,26 @@
 </div>
 
 <!-- Decision Modal (shared by all three request types) -->
-<div id="decision-modal" style="position:fixed;inset:0;z-index:9999;
-  background:rgba(0,0,0,0.75);align-items:center;justify-content:center;">
-  <div style="background:#ffffff;border-radius:12px;padding:1.75rem;
-      width:100%;max-width:420px;margin:1rem;
-      box-shadow:0 8px 32px rgba(0,0,0,0.3);">
-
-    <div style="font-size:1rem;font-weight:600;color:var(--text);margin-bottom:0.35rem;"
-      id="modal-title"></div>
-    <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1.25rem;"
-      id="modal-sub"></div>
-
-    <form method="post" id="modal-form">
+<div id="decision-modal" class="modal-bg">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-title">Confirm Action</span>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <form method="post" id="modal-form" class="modal-body" style="display: flex; flex-direction: column; gap: 1rem;">
       {% csrf_token %}
       <input type="hidden" name="tab" id="modal-tab" value="leave">
-      <label style="display:block;font-size:0.78rem;font-weight:600;
-        color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;
-        margin-bottom:0.4rem;">
-        Note <span style="font-weight:400;text-transform:none;">(optional)</span>
-      </label>
-      <textarea name="note" id="modal-note" rows="3"
-        style="width:100%;padding:0.65rem 0.8rem;border:1.5px solid var(--border);
-          border-radius:8px;background:#f4f6fb;color:#1e2d3d;
-          font-size:0.9rem;resize:vertical;box-sizing:border-box;
-          font-family:inherit;margin-bottom:1.25rem;
-          transition:border-color 0.15s;">
-      </textarea>
-      <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
-        <button type="button" onclick="closeModal()"
-          style="padding:0.6rem 1.1rem;border:1.5px solid var(--border);
-            border-radius:8px;background:none;color:var(--text);
-            font-size:0.875rem;cursor:pointer;">
-          Cancel
-        </button>
-        <button type="submit" id="modal-submit"
-          style="padding:0.6rem 1.25rem;border:none;border-radius:8px;
-            color:#fff;font-size:0.875rem;font-weight:600;cursor:pointer;">
-          Confirm
-        </button>
+      
+      <div id="modal-sub" style="font-size: 0.85rem; color: var(--color-text-muted); margin-bottom: 0.5rem; font-weight: 600;"></div>
+      
+      <div class="form-group">
+        <label for="modal-note">Note <span style="font-weight:400; text-transform:none;">(optional)</span></label>
+        <textarea name="note" id="modal-note" rows="3" placeholder="Add a note..."></textarea>
+      </div>
+      
+      <div class="modal-footer" style="padding: 1rem 0 0 0; border-top: 1px solid var(--color-border); margin-top: 0.5rem; display: flex; gap: 10px; justify-content: flex-end; background: none;">
+        <button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
+        <button type="submit" id="modal-submit" class="btn btn-primary">Confirm</button>
       </div>
     </form>
   </div>
@@ -297,7 +279,15 @@
     modalTitle.textContent       = isApprove ? 'Approve Request' : 'Reject Request';
     modalSub.textContent         = `${employee} — ${typeLabel}`;
     modalSubmit.textContent      = isApprove ? '✓ Approve' : '✗ Reject';
-    modalSubmit.style.background = isApprove ? '#16a34a' : '#dc2626';
+    
+    // Assign classes dynamically based on the approval action
+    if (isApprove) {
+      modalSubmit.className = 'btn btn-primary';
+    } else {
+      modalSubmit.className = 'btn btn-danger';
+    }
+    modalSubmit.style.background = ''; // Clear hardcoded style so CSS class applies
+    
     modalForm.action             = buildActionUrl(action, type, id);
     modalNote.value              = '';
     modalNote.placeholder        = isApprove
