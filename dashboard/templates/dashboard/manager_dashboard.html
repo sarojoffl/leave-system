@@ -1,7 +1,7 @@
 {% extends "base/base.html" %}
 
 {% block title %}Manager Dashboard{% endblock %}
-{% block page_title %}Manager Dashboard{% endblock %}
+{% block page_title %}Hello, {{ user.first_name|default:user.username }}!{% endblock %}
 
 {% block content %}
 {% if total_pending %}

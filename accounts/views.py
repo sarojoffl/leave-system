@@ -1,3 +1,5 @@
+from urllib import request
+
 from django.contrib.auth import authenticate, get_user_model, login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
@@ -59,6 +61,8 @@ def change_password_view(request):
         form = PasswordChangeForm(request.user, request.POST)
         if form.is_valid():
             user = form.save()
+            user.must_change_password = False
+            user.save(update_fields=["must_change_password"])
             update_session_auth_hash(request, user)
             messages.success(request, 'Your password was successfully updated!')
             return redirect(_post_login_redirect_name(request.user))
@@ -138,6 +142,8 @@ def staff_list(request):
                 password=make_password(password),
                 is_active=True,
             )
+            user.must_change_password = True
+            user.save(update_fields=["must_change_password"])
             LeaveBalance.objects.get_or_create(employee=user, defaults={"total": leave_total_int})
             messages.success(request, f"Account created for {user.get_full_name() or user.username}.")
             return redirect("staff_list")
@@ -213,7 +219,8 @@ def staff_edit(request, user_id):
                 messages.error(request, "New password must be at least 6 characters.")
             else:
                 employee.set_password(new_pw)
-                employee.save(update_fields=["password"])
+                employee.must_change_password = True
+                employee.save(update_fields=["password", "must_change_password"])
                 messages.success(request, "Password updated.")
             return redirect("staff_edit", user_id=user_id)
  

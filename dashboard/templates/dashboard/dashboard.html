@@ -1,7 +1,7 @@
 {% extends "base/base.html" %}
 
 {% block title %}Dashboard{% endblock %}
-{% block page_title %}Dashboard{% endblock %}
+{% block page_title %}Hello, {{ user.first_name|default:user.username }}!{% endblock %}
 
 {% block content %}
 <div class="stat-grid">

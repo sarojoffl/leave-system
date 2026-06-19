@@ -12,6 +12,7 @@ class User(AbstractUser):
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='employee')
     department = models.CharField(max_length=100, blank=True, null=True)
     position = models.CharField(max_length=100, blank=True, null=True)
+    must_change_password = models.BooleanField(default=False)
 
     @property
     def initials(self):
