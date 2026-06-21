@@ -7,7 +7,34 @@ document.addEventListener('DOMContentLoaded', () => {
   initDayCalculator();
   initSuccessModal();
   initLeaveTabs();
+  initThemeToggle();
 });
+
+/* ------------------------------------------
+   Theme toggle (dark / light)
+   Preference persisted in localStorage so it
+   sticks across pages and visits. The actual
+   class is applied early via an inline script
+   in base.html's <head> to avoid a flash.
+------------------------------------------- */
+function initThemeToggle() {
+  const toggle = document.getElementById('theme-toggle');
+  if (!toggle) return;
+
+  const STORAGE_KEY = 'leavetrack-theme';
+  const root = document.documentElement;
+
+  toggle.addEventListener('click', () => {
+    const isLight = root.getAttribute('data-theme') === 'light';
+    if (isLight) {
+      root.removeAttribute('data-theme');
+      localStorage.setItem(STORAGE_KEY, 'dark');
+    } else {
+      root.setAttribute('data-theme', 'light');
+      localStorage.setItem(STORAGE_KEY, 'light');
+    }
+  });
+}
 
 /* ------------------------------------------
    Mobile sidebar / hamburger

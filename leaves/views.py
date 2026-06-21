@@ -861,3 +861,36 @@ def export_employee_csv(request, employee_id):
         ])
 
     return response
+
+
+@login_required
+def export_my_leaves_csv(request):
+    today = date.today()
+
+    leaves = LeaveRequest.objects.filter(
+        employee=request.user, status="approved"
+    ).select_related("leave_type").order_by("-start_date")
+
+    filename = f"my_approved_leaves_{request.user.username}_{today.isoformat()}.csv"
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+
+    writer = csv.writer(response)
+
+    writer.writerow([f"Approved Leaves — {request.user.get_full_name() or request.user.username}"])
+    writer.writerow([f"Exported on {today}"])
+    writer.writerow([])
+
+    writer.writerow(["Leave Type", "From", "To", "Days", "Reason", "Decision Note", "Approved On"])
+    for l in leaves:
+        writer.writerow([
+            l.leave_type.name,
+            l.start_date,
+            l.end_date,
+            l.days,
+            l.reason,
+            l.decision_note or "",
+            l.decided_at.strftime("%Y-%m-%d") if l.decided_at else "",
+        ])
+
+    return response

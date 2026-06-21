@@ -44,7 +44,7 @@
 }
 
 .staff-chip:hover {
-  border-color: rgba(255, 255, 255, 0.15);
+  border-color: var(--overlay-15);
   color: var(--color-text);
   transform: translateY(-1px);
 }
@@ -71,11 +71,11 @@
   min-width: 240px;
   max-width: 360px;
   padding: 10px 16px;
-  background: rgba(7, 9, 14, 0.6);
+  background: var(--input-bg);
   border: 1.5px solid var(--color-border);
   border-radius: var(--radius-sm);
   font-size: 0.88rem;
-  color: #fff;
+  color: var(--color-text);
   font-family: inherit;
   transition: var(--transition);
 }
@@ -83,7 +83,7 @@
 .staff-search-input:focus {
   outline: none;
   border-color: var(--color-primary);
-  background: rgba(7, 9, 14, 0.8);
+  background: var(--input-bg-focus);
   box-shadow: 0 0 0 3px var(--color-focus-glow), inset 0 0 10px rgba(0, 229, 255, 0.05);
 }
 
@@ -109,7 +109,7 @@
   min-width: 80px;
   max-width: 100px;
   height: 6px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--overlay-5);
   border-radius: 99px;
   overflow: hidden;
   position: relative;
@@ -146,7 +146,7 @@
 }
 
 .badge.staff-badge-inactive {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--overlay-5);
   color: var(--color-text-muted);
   border-color: var(--color-border);
 }

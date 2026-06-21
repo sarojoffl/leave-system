@@ -4,6 +4,7 @@ from datetime import date, timedelta
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
 
+from accounts.utils import get_view_mode
 from leaves.models import (
     LeaveRequest,
     LeaveBalance,
@@ -16,8 +17,8 @@ from leaves.permissions import manager_required
 
 @login_required
 def dashboard(request):
-    if request.user.role in ('manager', 'hr'):
-        return redirect('manager_dashboard')
+    if get_view_mode(request) == 'manager' and request.user.role in ('manager', 'hr'):
+        return manager_dashboard(request)
 
     user = request.user
     today = date.today()

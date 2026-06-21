@@ -4,13 +4,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{% block title %}Leave Management System{% endblock %}</title>
+<title>{% block title %}Global Link Technology — Leave System{% endblock %}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{% static 'css/style.css' %}">
 <link rel="stylesheet" href="{% static 'css/staff.css' %}">
 {% block extra_css %}{% endblock %}
+<script>
+  (function () {
+    var saved = localStorage.getItem('leavetrack-theme');
+    if (saved === 'light') {
+      document.documentElement.setAttribute('data-theme', 'light');
+    }
+  })();
+</script>
 </head>
 <body>
 
@@ -21,12 +29,12 @@
  <!-- Sidebar -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-logo">
-      Leave Management
+      <div class="logo-text"><span>Global Link</span> Tech</div>
       <button class="sidebar-close" id="sidebar-close" aria-label="Close menu">×</button>
     </div>
     <nav class="sidebar-nav">
-      
-      {% if request.user.role == 'manager' or request.user.role == 'hr' %}
+
+      {% if view_mode == 'manager' %}
       <a href="{% url 'manager_dashboard' %}" class="nav-item {% if request.resolver_match.url_name == 'manager_dashboard' %}active{% endif %}">
         <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
         Dashboard
@@ -79,9 +87,26 @@
         <h1 id="page-title">{% block page_title %}Dashboard{% endblock %}</h1>
       </div>
       <div class="topbar-right">
-        {% if request.user.role %}<span class="role-badge">{{ request.user.get_role_display }} View</span>{% endif %}
+        {% if request.user.role == 'manager' or request.user.role == 'hr' %}
+          <a href="{% url 'set_view_mode' %}?mode={% if view_mode == 'manager' %}employee{% else %}manager{% endif %}&next={{ request.path }}"
+            class="role-badge" title="Click to switch view">
+            {% if view_mode == 'manager' %}Manager{% else %}My Leave{% endif %} View
+          </a>
+        {% elif request.user.role %}
+          <span class="role-badge">{{ request.user.get_role_display }} View</span>
+        {% endif %}
         {% if current_fiscal_year %}<span class="topbar-date">FY {{ current_fiscal_year }}</span>{% endif %}
         <span class="topbar-date">{% now "l, j F Y" %}</span>
+        <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Toggle light and dark mode" title="Toggle light and dark mode">
+          <span class="theme-toggle-knob">
+            <span class="theme-toggle-icon-moon">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            </span>
+            <span class="theme-toggle-icon-sun">
+              <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </span>
+          </span>
+        </button>
         <a href="{% url 'change_password' %}" title="Change Password" class="topbar-user-link">
           <div class="avatar avatar-sm">{{ request.user.initials }}</div>
           <span class="topbar-user-name">{{ request.user.get_full_name|default:request.user.username }}</span>

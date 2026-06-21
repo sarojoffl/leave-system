@@ -4,6 +4,7 @@ from . import views
 urlpatterns = [
     path('apply/', views.apply_leave, name='apply_leave'),
     path('my/', views.my_leaves, name='my_leaves'),
+    path('my/export/', views.export_my_leaves_csv, name='export_my_leaves_csv'),
     path('cancel/<int:id>/', views.cancel_leave, name='cancel_leave'),
 
     path('approvals/', views.approvals, name='approvals'),

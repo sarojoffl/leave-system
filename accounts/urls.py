@@ -8,4 +8,5 @@ urlpatterns = [
     path("staff/", views.staff_list, name="staff_list"),
     path("staff/<int:user_id>/edit/", views.staff_edit, name="staff_edit"),
     path("staff/<int:user_id>/toggle/", views.staff_toggle_active, name="staff_toggle_active"),
+    path('set-view-mode/', views.set_view_mode, name='set_view_mode'),
 ]

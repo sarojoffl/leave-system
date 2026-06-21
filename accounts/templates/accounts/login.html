@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sign In — Leave Management System</title>
+  <title>Sign In — Global Link Technology</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -207,6 +207,7 @@
       text-decoration: none;
       font-weight: 600;
       transition: opacity 0.15s;
+      cursor: pointer;
     }
     .forgot-link:hover { opacity: 0.75; }
 
@@ -314,6 +315,72 @@
     @media (max-width: 480px) {
       .login-card { padding: 2rem 1.5rem 1.75rem; }
     }
+
+    /* Forgot password modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(7, 9, 14, 0.7);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 1.5rem;
+      animation: fadeIn 0.18s ease both;
+    }
+    .modal-overlay.show { display: flex; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .modal-box {
+      background: #0d111c;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.75rem;
+      max-width: 360px;
+      width: 100%;
+      box-shadow: var(--shadow-lg);
+      text-align: center;
+      animation: slideUp 0.3s cubic-bezier(0.22,1,0.36,1) both;
+    }
+    .modal-icon {
+      width: 44px; height: 44px;
+      margin: 0 auto 1rem;
+      border-radius: 50%;
+      background: var(--primary-glow);
+      display: grid;
+      place-items: center;
+    }
+    .modal-box h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 0.55rem;
+    }
+    .modal-box p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 1.5rem;
+    }
+    .modal-box p strong { color: var(--text); }
+    .modal-close-btn {
+      width: 100%;
+      padding: 0.65rem;
+      background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+      color: #07090e;
+      border: none;
+      border-radius: 10px;
+      font-family: var(--font);
+      font-size: 0.88rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.12s, box-shadow 0.18s;
+    }
+    .modal-close-btn:hover {
+      box-shadow: 0 6px 20px rgba(0, 229, 255, 0.4);
+      transform: translateY(-1px);
+    }
   </style>
 </head>
 <body>
@@ -329,7 +396,7 @@
           <path d="M7 6h6M7 10h6M7 14h3" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>
         </svg>
       </div>
-      <span class="brand-name">Leave Management</span>
+      <span class="brand-name">Global Link Technology</span>
     </div>
     <p class="login-tagline">Sign in to manage your leave requests</p>
 
@@ -394,7 +461,7 @@
       </div>
 
       <div class="forgot-row">
-        <a href="#" class="forgot-link">Forgot password?</a>
+        <span class="forgot-link" id="forgotPasswordLink">Forgot password?</span>
       </div>
 
       <button type="submit" class="login-btn" id="loginBtn">
@@ -404,9 +471,23 @@
     </form>
 
     <div class="card-footer">
-      Need access? Contact your <strong>HR administrator</strong>
+      Need access? Contact your <strong>administrator</strong>
     </div>
 
+  </div>
+
+  <div class="modal-overlay" id="forgotPasswordModal">
+    <div class="modal-box">
+      <div class="modal-icon">
+        <svg width="20" height="20" viewBox="0 0 16 16" fill="none">
+          <rect x="3" y="7" width="10" height="7" rx="1.5" stroke="var(--primary)" stroke-width="1.4"/>
+          <path d="M5 7V5a3 3 0 016 0v2" stroke="var(--primary)" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h3>Forgot your password?</h3>
+      <p>Password resets aren't automated yet. Please reach out to <strong>your system administrator</strong> directly and they'll get you sorted.</p>
+      <button type="button" class="modal-close-btn" id="modalCloseBtn">Got it</button>
+    </div>
   </div>
 
   <script>
@@ -424,6 +505,23 @@
       pwInput.type = shown ? 'text' : 'password';
       eyeIcon.innerHTML = shown ? eyeClosed : eyeOpen;
       pwToggle.setAttribute('aria-label', shown ? 'Hide password' : 'Show password');
+    });
+
+    // Forgot password modal
+    const forgotLink   = document.getElementById('forgotPasswordLink');
+    const fpModal       = document.getElementById('forgotPasswordModal');
+    const fpModalClose  = document.getElementById('modalCloseBtn');
+
+    function openModal() { fpModal.classList.add('show'); }
+    function closeModal() { fpModal.classList.remove('show'); }
+
+    forgotLink.addEventListener('click', openModal);
+    fpModalClose.addEventListener('click', closeModal);
+    fpModal.addEventListener('click', (e) => {
+      if (e.target === fpModal) closeModal(); // click outside the box
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeModal();
     });
 
     // Live validation

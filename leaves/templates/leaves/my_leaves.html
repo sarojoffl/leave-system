@@ -11,6 +11,10 @@
 </div>
 
 <div class="type-panel" data-panel="leave">
+  <div class="flex-actions" style="justify-content: flex-end; margin-bottom: 16px;">
+    <a href="{% url 'export_my_leaves_csv' %}" class="btn btn-outline btn-sm">⬇ Export CSV</a>
+  </div>
+
   <div class="tabs">
     <div class="tab active" data-filter="all">All Requests</div>
     <div class="tab" data-filter="pending">Pending</div>

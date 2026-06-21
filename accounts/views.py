@@ -306,3 +306,12 @@ def staff_toggle_active(request, user_id):
     if next_url == "staff_edit":
         return redirect("staff_edit", user_id=user_id)
     return redirect("staff_list")
+
+
+@login_required
+def set_view_mode(request):
+    mode = request.GET.get('mode')
+    if mode in ('manager', 'employee') and request.user.role in ('manager', 'hr'):
+        request.session['view_mode'] = mode
+    next_url = request.GET.get('next') or request.META.get('HTTP_REFERER') or 'dashboard'
+    return redirect(next_url)
