@@ -1,27 +1,39 @@
-from datetime import date, datetime
+import csv
+import logging
 from calendar import month_name
+from datetime import date, datetime
 
 from django.contrib import messages
+from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
+from django.core.mail import send_mail
 from django.db import transaction
-from django.db.models import F
-from django.shortcuts import render, redirect, get_object_or_404
+from django.db.models import F, Sum
+from django.http import HttpResponse
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .models import LeaveRequest, LeaveType, LeaveBalance, AttendanceRequest, HolidayWorkRequest
+from .models import AttendanceRequest, HolidayWorkRequest, LeaveBalance, LeaveRequest, LeaveType
 from .permissions import manager_required
 
-from django.core.mail import send_mail
-from django.contrib.auth import get_user_model
+logger = logging.getLogger(__name__)
 
-import csv
-from django.http import HttpResponse
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def get_fiscal_year_start(today=None):
+    """Return the start date of the current Nepali fiscal year (Shrawan 1 ≈ July 17)."""
+    today = today or date.today()
+    year = today.year if today.month >= 7 else today.year - 1
+    return date(year, 7, 17)
 
 
 def _ceo_recipients(exclude_user_id=None):
-    """Email addresses for CEO-role users, excluding one user if given."""
+    """Email addresses for CEO-role users, optionally excluding one user."""
     User = get_user_model()
     qs = User.objects.filter(role='ceo')
     if exclude_user_id is not None:
@@ -29,8 +41,12 @@ def _ceo_recipients(exclude_user_id=None):
     return list(qs.values_list('email', flat=True))
 
 
+
+# ---------------------------------------------------------------------------
+# Email notifications
+# ---------------------------------------------------------------------------
+
 def send_leave_notification_email(leave_request, action_type):
-    User = get_user_model()
     subject = ""
     message = ""
     recipient_list = []
@@ -54,7 +70,8 @@ def send_leave_notification_email(leave_request, action_type):
         subject = f"Leave Request {status_label.capitalize()}"
         message = (
             f"Dear {employee_name},\n\n"
-            f"Your request for {leave_request.leave_type.name} leave from {leave_request.start_date} to {leave_request.end_date} has been {status_label}.\n"
+            f"Your request for {leave_request.leave_type.name} leave "
+            f"from {leave_request.start_date} to {leave_request.end_date} has been {status_label}.\n"
             f"CEO Note: {leave_request.decision_note or 'No additional note'}\n\n"
             f"Thank you."
         )
@@ -72,37 +89,36 @@ def send_leave_notification_email(leave_request, action_type):
         recipient_list = _ceo_recipients(exclude_user_id=leave_request.employee.id)
 
     elif action_type == 'revoked':
-        subject = f"Approved Leave Request Revoked"
+        subject = "Approved Leave Request Revoked"
         message = (
             f"Dear {employee_name},\n\n"
-            f"Your approved request for {leave_request.leave_type.name} leave from {leave_request.start_date} to {leave_request.end_date} has been revoked/rejected by a CEO.\n"
+            f"Your approved request for {leave_request.leave_type.name} leave "
+            f"from {leave_request.start_date} to {leave_request.end_date} "
+            f"has been revoked/rejected by a CEO.\n"
             f"CEO Note: {leave_request.decision_note or 'No additional note'}\n\n"
             f"Your leave balance has been refunded."
         )
         recipient_list = [leave_request.employee.email] if leave_request.employee.email else []
 
-    recipient_list = [email for email in recipient_list if email]
+    recipient_list = [e for e in recipient_list if e]
+    if not recipient_list:
+        return
 
-    if recipient_list:
-        try:
-            send_mail(
-                subject=subject,
-                message=message,
-                from_email=None,
-                recipient_list=recipient_list,
-                fail_silently=True
-            )
-        except Exception:
-            pass
+    try:
+        send_mail(
+            subject=subject,
+            message=message,
+            from_email=None,
+            recipient_list=recipient_list,
+            fail_silently=False,
+        )
+    except Exception as exc:
+        logger.error("Failed to send leave notification email (action=%s, leave_id=%s): %s",
+                     action_type, leave_request.id, exc)
 
 
 def send_day_request_notification_email(day_request, action_type, label):
-    """
-    Notification email for AttendanceRequest / HolidayWorkRequest objects.
-    These models don't have leave_type/days like LeaveRequest, so they get
-    their own lightweight templates rather than overloading the leave one.
-    """
-    User = get_user_model()
+    """Notification email for AttendanceRequest / HolidayWorkRequest."""
     subject = ""
     message = ""
     recipient_list = []
@@ -131,20 +147,26 @@ def send_day_request_notification_email(day_request, action_type, label):
         )
         recipient_list = [day_request.employee.email] if day_request.employee.email else []
 
-    recipient_list = [email for email in recipient_list if email]
+    recipient_list = [e for e in recipient_list if e]
+    if not recipient_list:
+        return
 
-    if recipient_list:
-        try:
-            send_mail(
-                subject=subject,
-                message=message,
-                from_email=None,
-                recipient_list=recipient_list,
-                fail_silently=True
-            )
-        except Exception:
-            pass
+    try:
+        send_mail(
+            subject=subject,
+            message=message,
+            from_email=None,
+            recipient_list=recipient_list,
+            fail_silently=False,
+        )
+    except Exception as exc:
+        logger.error("Failed to send day-request notification email (action=%s, id=%s): %s",
+                     action_type, day_request.id, exc)
 
+
+# ---------------------------------------------------------------------------
+# Employee leave views
+# ---------------------------------------------------------------------------
 
 @login_required
 def apply_leave(request):
@@ -160,7 +182,6 @@ def apply_leave(request):
 
         if not leave_type_id:
             errors.append("Please select a leave type.")
-
         if not from_date_str or not to_date_str:
             errors.append("Please select the leave dates.")
 
@@ -176,7 +197,6 @@ def apply_leave(request):
                     errors.append("You cannot request leave for a date in the past.")
                 elif to_date < from_date:
                     errors.append("To date cannot be before from date.")
-
             except ValueError:
                 errors.append("Invalid date format.")
 
@@ -187,7 +207,7 @@ def apply_leave(request):
             overlapping = LeaveRequest.objects.filter(
                 employee=request.user,
                 start_date__lte=to_date,
-                end_date__gte=from_date
+                end_date__gte=from_date,
             ).exclude(status__in=['cancelled', 'rejected'])
             if overlapping.exists():
                 errors.append("You have an overlapping leave request for these dates.")
@@ -198,7 +218,6 @@ def apply_leave(request):
         if leave_type_id and from_date and to_date and not errors:
             try:
                 leave_type = LeaveType.objects.get(id=leave_type_id)
-
                 temp_request = LeaveRequest(
                     employee=request.user,
                     leave_type=leave_type,
@@ -206,7 +225,6 @@ def apply_leave(request):
                     end_date=to_date,
                 )
                 requested_days = temp_request.days
-
                 if requested_days <= 0:
                     errors.append("The requested period does not contain any working days.")
             except LeaveType.DoesNotExist:
@@ -216,9 +234,6 @@ def apply_leave(request):
             for e in errors:
                 messages.error(request, e)
         else:
-            # CRITICAL FIX: lock the balance row and re-check availability
-            # inside the same transaction as the create, so two concurrent
-            # submissions can't both pass the balance check and overdraw it.
             with transaction.atomic():
                 balance, _ = LeaveBalance.objects.select_for_update().get_or_create(
                     employee=request.user,
@@ -227,8 +242,7 @@ def apply_leave(request):
 
                 pending_days = sum(
                     r.days for r in LeaveRequest.objects.filter(
-                        employee=request.user,
-                        status='pending'
+                        employee=request.user, status='pending'
                     ).select_for_update()
                 )
 
@@ -236,7 +250,8 @@ def apply_leave(request):
                 if requested_days > available:
                     messages.error(
                         request,
-                        f"Insufficient balance. You requested {requested_days} day(s), but only have {available} day(s) available."
+                        f"Insufficient balance. You requested {requested_days} day(s), "
+                        f"but only have {available} day(s) available."
                     )
                     return render(
                         request,
@@ -261,15 +276,12 @@ def apply_leave(request):
                 "to_date": to_date.strftime("%b %d, %Y"),
                 "days": leave.days,
             }
-
             return redirect("my_leaves")
 
     return render(
         request,
         "leaves/apply_leave.html",
-        {
-            "leave_types": LeaveType.objects.all(),
-        },
+        {"leave_types": LeaveType.objects.all()},
     )
 
 
@@ -315,6 +327,7 @@ def cancel_leave(request, id):
             leave.save(update_fields=["status"])
             messages.success(request, "Leave request cancelled.")
             send_leave_notification_email(leave, 'cancelled')
+
         elif leave.status == "approved":
             if leave.start_date <= date.today():
                 messages.error(
@@ -327,20 +340,24 @@ def cancel_leave(request, id):
             leave.status = "cancelled"
             leave.save(update_fields=["status"])
 
-            balance, _ = LeaveBalance.objects.select_for_update().get_or_create(
-                employee=leave.employee,
-                defaults={"total": 12},
+            # FIX: use F() + clamp instead of read-modify-write
+            LeaveBalance.objects.filter(employee=leave.employee).update(
+                used=F('used') - leave.days
             )
-            balance.used = max(balance.used - leave.days, 0)
-            balance.save(update_fields=["used"])
+            LeaveBalance.objects.filter(employee=leave.employee, used__lt=0).update(used=0)
 
             messages.success(request, "Approved leave request cancelled. Balance refunded.")
             send_leave_notification_email(leave, 'cancelled')
+
         else:
             messages.error(request, "Cannot cancel this request.")
 
     return redirect("my_leaves")
 
+
+# ---------------------------------------------------------------------------
+# Manager approval views
+# ---------------------------------------------------------------------------
 
 @manager_required
 def approvals(request):
@@ -398,11 +415,17 @@ def approvals(request):
         } for r in qs]
 
     pending_attendance = _serialize_day_requests(
-        AttendanceRequest.objects.filter(status="pending").exclude(employee=request.user).select_related("employee")
+        AttendanceRequest.objects.filter(status="pending")
+        .exclude(employee=request.user)
+        .select_related("employee")
     )
     pending_holiday_work = _serialize_day_requests(
-        HolidayWorkRequest.objects.filter(status="pending").exclude(employee=request.user).select_related("employee")
+        HolidayWorkRequest.objects.filter(status="pending")
+        .exclude(employee=request.user)
+        .select_related("employee")
     )
+
+    total_pending_count = len(pending_approvals) + len(pending_attendance) + len(pending_holiday_work)
 
     breakdown_parts = []
     if pending_approvals:
@@ -411,8 +434,6 @@ def approvals(request):
         breakdown_parts.append(f"{len(pending_attendance)} attendance")
     if pending_holiday_work:
         breakdown_parts.append(f"{len(pending_holiday_work)} holiday work")
-
-    total_pending_count = len(pending_approvals) + len(pending_attendance) + len(pending_holiday_work)
     pending_breakdown_text = ", ".join(breakdown_parts)
 
     recently_processed_attendance = _serialize_processed_day_requests(
@@ -446,21 +467,21 @@ def approvals(request):
 def approve_leave(request, id):
     tab = request.POST.get("tab", "leave")
 
-    # CRITICAL FIX: lock both the leave request and the balance row for the
-    # duration of the check + update, so two concurrent approvals (or an
-    # approval racing a user cancellation) can't both succeed.
     with transaction.atomic():
         leave = get_object_or_404(
             LeaveRequest.objects.select_for_update(), id=id, status="pending"
         )
-
         balance, _ = LeaveBalance.objects.select_for_update().get_or_create(
             employee=leave.employee,
             defaults={"total": 12},
         )
 
         if balance.remaining < leave.days:
-            messages.error(request, f"Insufficient balance. Employee has only {balance.remaining} days remaining, but requested {leave.days} days.")
+            messages.error(
+                request,
+                f"Insufficient balance. Employee has only {balance.remaining} day(s) remaining, "
+                f"but requested {leave.days} day(s)."
+            )
             return redirect(f"{reverse('approvals')}?tab={tab}")
 
         leave.status = "approved"
@@ -468,12 +489,15 @@ def approve_leave(request, id):
         leave.decision_note = request.POST.get("note", "").strip()
         leave.save(update_fields=["status", "decided_at", "decision_note"])
 
+        # F() expression — no race condition
         balance.used = F("used") + leave.days
         balance.save(update_fields=["used"])
 
-    messages.success(request, f"Leave request for {leave.employee.get_full_name() or leave.employee.username} approved.")
+    messages.success(
+        request,
+        f"Leave request for {leave.employee.get_full_name() or leave.employee.username} approved."
+    )
     send_leave_notification_email(leave, 'approved')
-
     return redirect(f"{reverse('approvals')}?tab={tab}")
 
 
@@ -491,15 +515,15 @@ def reject_leave(request, id):
             leave.decision_note = request.POST.get("note", "").strip()
             leave.save(update_fields=["status", "decided_at", "decision_note"])
 
-            messages.success(request, f"Leave request for {leave.employee.get_full_name() or leave.employee.username} rejected.")
+            messages.success(
+                request,
+                f"Leave request for {leave.employee.get_full_name() or leave.employee.username} rejected."
+            )
             send_leave_notification_email(leave, 'rejected')
 
         elif leave.status == "approved":
             if leave.end_date < date.today():
-                messages.error(
-                    request,
-                    "This leave has already finished and can no longer be revoked."
-                )
+                messages.error(request, "This leave has already finished and can no longer be revoked.")
                 return redirect(f"{reverse('approvals')}?tab={tab}")
 
             leave.status = "rejected"
@@ -507,45 +531,108 @@ def reject_leave(request, id):
             leave.decision_note = request.POST.get("note", "").strip()
             leave.save(update_fields=["status", "decided_at", "decision_note"])
 
-            balance, _ = LeaveBalance.objects.select_for_update().get_or_create(
-                employee=leave.employee,
-                defaults={"total": 12},
+            # FIX: use F() + clamp instead of read-modify-write
+            LeaveBalance.objects.filter(employee=leave.employee).update(
+                used=F('used') - leave.days
             )
-            balance.used = max(balance.used - leave.days, 0)
-            balance.save(update_fields=["used"])
+            LeaveBalance.objects.filter(employee=leave.employee, used__lt=0).update(used=0)
 
-            messages.success(request, f"Approved leave request for {leave.employee.get_full_name() or leave.employee.username} has been revoked.")
+            messages.success(
+                request,
+                f"Approved leave request for "
+                f"{leave.employee.get_full_name() or leave.employee.username} has been revoked."
+            )
             send_leave_notification_email(leave, 'revoked')
+
         else:
             messages.error(request, "Cannot reject/revoke this request.")
 
     return redirect(f"{reverse('approvals')}?tab={tab}")
 
 
+# ---------------------------------------------------------------------------
+# Team view
+# ---------------------------------------------------------------------------
+
 @manager_required
 def team(request):
     from accounts.models import User
 
-    employees = User.objects.filter(is_active=True).exclude(role__in=['ceo'])
     today = date.today()
+    employees = list(
+        User.objects.filter(is_active=True)
+        .exclude(role__in=['ceo'])
+        .order_by('first_name', 'last_name')
+    )
+    emp_ids = [e.id for e in employees]
+
+    # Prefetch all balances in one query
+    balance_map = {
+        b.employee_id: b
+        for b in LeaveBalance.objects.filter(employee_id__in=emp_ids)
+    }
+
+    # Prefetch current leaves (on leave today) in one query
+    current_leave_map = {}
+    for l in (
+        LeaveRequest.objects.filter(
+            employee_id__in=emp_ids,
+            status="approved",
+            start_date__lte=today,
+            end_date__gte=today,
+        ).select_related("leave_type")
+    ):
+        current_leave_map.setdefault(l.employee_id, l)
+
+    # Prefetch pending counts in three queries (one per model) then merge
+    leave_pending = dict(
+        LeaveRequest.objects.filter(employee_id__in=emp_ids, status="pending")
+        .values('employee_id')
+        .annotate(cnt=Sum('id'))  # just counting rows
+        .values_list('employee_id', 'cnt')
+    )
+    # Use a proper Count instead
+    from django.db.models import Count
+    leave_pending = {
+        row['employee_id']: row['cnt']
+        for row in LeaveRequest.objects.filter(employee_id__in=emp_ids, status="pending")
+        .values('employee_id').annotate(cnt=Count('id'))
+    }
+    attendance_pending = {
+        row['employee_id']: row['cnt']
+        for row in AttendanceRequest.objects.filter(employee_id__in=emp_ids, status="pending")
+        .values('employee_id').annotate(cnt=Count('id'))
+    }
+    holiday_pending = {
+        row['employee_id']: row['cnt']
+        for row in HolidayWorkRequest.objects.filter(employee_id__in=emp_ids, status="pending")
+        .values('employee_id').annotate(cnt=Count('id'))
+    }
+
+    # Prefetch last approved leave per employee in one query
+    # We can't do "first per group" in one ORM call easily, so we fetch all
+    # approved and then pick the latest in Python.
+    approved_leaves = list(
+        LeaveRequest.objects.filter(employee_id__in=emp_ids, status="approved")
+        .select_related("leave_type")
+        .order_by('employee_id', '-end_date')
+    )
+    last_leave_map = {}
+    for l in approved_leaves:
+        if l.employee_id not in last_leave_map:
+            last_leave_map[l.employee_id] = l
 
     summary = []
     for emp in employees:
-        balance = LeaveBalance.objects.filter(employee=emp).first()
-
-        current_leave = LeaveRequest.objects.filter(
-            employee=emp, status="approved", start_date__lte=today, end_date__gte=today,
-        ).select_related("leave_type").first()
+        balance = balance_map.get(emp.id)
+        current_leave = current_leave_map.get(emp.id)
+        last_leave = last_leave_map.get(emp.id)
 
         pending_count = (
-            LeaveRequest.objects.filter(employee=emp, status="pending").count()
-            + AttendanceRequest.objects.filter(employee=emp, status="pending").count()
-            + HolidayWorkRequest.objects.filter(employee=emp, status="pending").count()
+            leave_pending.get(emp.id, 0)
+            + attendance_pending.get(emp.id, 0)
+            + holiday_pending.get(emp.id, 0)
         )
-
-        last_leave = LeaveRequest.objects.filter(
-            employee=emp, status="approved",
-        ).order_by("-end_date").select_related("leave_type").first()
 
         summary.append({
             "id": emp.id,
@@ -566,12 +653,17 @@ def team(request):
         })
 
     summary.sort(key=lambda s: (-s["pending_count"], s["name"]))
-
     return render(request, "leaves/team.html", {"team_summary": summary})
 
 
+# ---------------------------------------------------------------------------
+# Reports
+# ---------------------------------------------------------------------------
+
 def _get_reports_data(today=None):
     from accounts.models import User
+    from django.db.models import Count, Sum
+
     today = today or date.today()
 
     departments = (
@@ -581,13 +673,23 @@ def _get_reports_data(today=None):
         .distinct()
     )
 
+    # Pull per-department balance totals in one query
+    dept_balance_qs = (
+        LeaveBalance.objects.exclude(employee__department__isnull=True)
+        .exclude(employee__department="")
+        .values("employee__department")
+        .annotate(total_days=Sum("used"), emp_count=Count("employee"))
+    )
+    dept_balance_map = {
+        row["employee__department"]: row
+        for row in dept_balance_qs
+    }
+
     department_usage = []
     for dept in departments:
-        emps = User.objects.filter(department=dept)
-        emp_count = emps.count()
-        total_days = sum(
-            b.used for b in LeaveBalance.objects.filter(employee__in=emps)
-        )
+        row = dept_balance_map.get(dept, {})
+        emp_count = row.get("emp_count", 0)
+        total_days = row.get("total_days", 0) or 0
         department_usage.append({
             "name": dept,
             "employees": emp_count,
@@ -595,6 +697,7 @@ def _get_reports_data(today=None):
             "avg_per_person": round(total_days / emp_count, 1) if emp_count else 0,
         })
 
+    # Leave type breakdown — use DB aggregation
     leave_type_breakdown = []
     for lt in LeaveType.objects.all():
         qs = LeaveRequest.objects.filter(leave_type=lt)
@@ -606,14 +709,15 @@ def _get_reports_data(today=None):
             "pending": qs.filter(status="pending").count(),
         })
 
-    monthly_days = []
-    for m in range(1, 13):
-        days = sum(
-            l.days for l in LeaveRequest.objects.filter(
-                status="approved", start_date__year=today.year, start_date__month=m,
-            )
-        )
-        monthly_days.append(days)
+    # Monthly trend — one query, aggregate in Python
+    monthly_qs = LeaveRequest.objects.filter(
+        status="approved",
+        start_date__year=today.year,
+    ).only("start_date", "end_date")
+    monthly_days_map = {m: 0 for m in range(1, 13)}
+    for l in monthly_qs:
+        monthly_days_map[l.start_date.month] = monthly_days_map.get(l.start_date.month, 0) + l.days
+    monthly_days = [monthly_days_map[m] for m in range(1, 13)]
 
     max_days = max(monthly_days) or 1
     monthly_trend = [{
@@ -630,7 +734,6 @@ def _get_reports_data(today=None):
 @manager_required
 def reports(request):
     department_usage, leave_type_breakdown, monthly_trend = _get_reports_data()
-
     return render(request, "leaves/reports.html", {
         "department_usage": department_usage,
         "leave_type_breakdown": leave_type_breakdown,
@@ -645,7 +748,6 @@ def export_reports_csv(request):
 
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = f'attachment; filename="leave_reports_{today.isoformat()}.csv"'
-
     writer = csv.writer(response)
 
     writer.writerow([f"Leave Reports & Analytics — {today.year}"])
@@ -669,6 +771,11 @@ def export_reports_csv(request):
         writer.writerow([m["label"], m["days"]])
 
     return response
+
+
+# ---------------------------------------------------------------------------
+# Day requests (attendance / holiday work)
+# ---------------------------------------------------------------------------
 
 def _apply_day_request(request, model, success_msg, tab_key, label):
     if request.method == "POST":
@@ -719,11 +826,7 @@ _DAY_REQUEST_LABELS = {
     'holiday_work': "Holiday Work",
 }
 
-# CRITICAL FIX: whitelist of valid decisions. Previously `decision` was
-# taken straight from the URL and written to obj.status with no validation,
-# allowing arbitrary strings to be stored as the status.
 _VALID_DAY_REQUEST_DECISIONS = {'approved', 'rejected'}
-
 
 _DAY_REQUEST_TAB_KEYS = {
     'attendance': "attendance",
@@ -746,11 +849,13 @@ def decide_day_request(request, request_type, id, decision):
         messages.error(request, "Invalid decision.")
         return redirect(f"{reverse('approvals')}?tab={tab}")
 
-    obj = get_object_or_404(model, id=id, status="pending")
-    obj.status = decision
-    obj.decided_at = timezone.now()
-    obj.decision_note = request.POST.get("note", "").strip()
-    obj.save(update_fields=["status", "decided_at", "decision_note"])
+    # FIX: wrap in transaction + select_for_update to prevent double-decision
+    with transaction.atomic():
+        obj = get_object_or_404(model.objects.select_for_update(), id=id, status="pending")
+        obj.status = decision
+        obj.decided_at = timezone.now()
+        obj.decision_note = request.POST.get("note", "").strip()
+        obj.save(update_fields=["status", "decided_at", "decision_note"])
 
     label = _DAY_REQUEST_LABELS.get(request_type, request_type.replace('_', ' ').title())
     messages.success(request, f"{label} request {decision}.")
@@ -758,6 +863,10 @@ def decide_day_request(request, request_type, id, decision):
 
     return redirect(f"{reverse('approvals')}?tab={tab}")
 
+
+# ---------------------------------------------------------------------------
+# Employee detail & CSV exports
+# ---------------------------------------------------------------------------
 
 @manager_required
 def employee_detail(request, employee_id):
@@ -768,23 +877,19 @@ def employee_detail(request, employee_id):
 
     balance = LeaveBalance.objects.filter(employee=employee).first()
 
-    leave_history = LeaveRequest.objects.filter(
-        employee=employee
-    ).select_related("leave_type").order_by("-start_date")
-
-    attendance_history = AttendanceRequest.objects.filter(
-        employee=employee
-    ).order_by("-date")
-
-    holiday_work_history = HolidayWorkRequest.objects.filter(
-        employee=employee
-    ).order_by("-date")
+    leave_history = (
+        LeaveRequest.objects.filter(employee=employee)
+        .select_related("leave_type")
+        .order_by("-start_date")
+    )
+    attendance_history = AttendanceRequest.objects.filter(employee=employee).order_by("-date")
+    holiday_work_history = HolidayWorkRequest.objects.filter(employee=employee).order_by("-date")
 
     current_leave = leave_history.filter(
         status="approved", start_date__lte=today, end_date__gte=today,
     ).first()
 
-    fiscal_start = date(today.year if today.month >= 7 else today.year - 1, 7, 17)
+    fiscal_start = get_fiscal_year_start(today)
     fy_leaves = leave_history.filter(status="approved", start_date__gte=fiscal_start)
     type_breakdown = {}
     for l in fy_leaves:
@@ -801,32 +906,27 @@ def employee_detail(request, employee_id):
         "rejected_count": leave_history.filter(status="rejected").count(),
         "cancelled_count": leave_history.filter(status="cancelled").count(),
     }
-
     return render(request, "leaves/employee_detail.html", context)
 
 
 @manager_required
 def export_employee_csv(request, employee_id):
     from accounts.models import User
+
     today = date.today()
-
     employee = get_object_or_404(User, id=employee_id)
-    leave_history = LeaveRequest.objects.filter(
-        employee=employee
-    ).select_related("leave_type").order_by("-start_date")
 
-    attendance_history = AttendanceRequest.objects.filter(
-        employee=employee
-    ).order_by("-date")
-
-    holiday_work_history = HolidayWorkRequest.objects.filter(
-        employee=employee
-    ).order_by("-date")
+    leave_history = (
+        LeaveRequest.objects.filter(employee=employee)
+        .select_related("leave_type")
+        .order_by("-start_date")
+    )
+    attendance_history = AttendanceRequest.objects.filter(employee=employee).order_by("-date")
+    holiday_work_history = HolidayWorkRequest.objects.filter(employee=employee).order_by("-date")
 
     filename = f"leave_history_{employee.username}_{today.isoformat()}.csv"
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
-
     writer = csv.writer(response)
 
     writer.writerow([f"Leave History — {employee.get_full_name() or employee.username}"])
@@ -837,37 +937,22 @@ def export_employee_csv(request, employee_id):
     writer.writerow(["Type", "From", "To", "Days", "Status", "Reason", "Decision Note", "Applied On"])
     for l in leave_history:
         writer.writerow([
-            l.leave_type.name,
-            l.start_date,
-            l.end_date,
-            l.days,
-            l.get_status_display(),
-            l.reason,
-            l.decision_note or "",
-            l.created_at.strftime("%Y-%m-%d"),
+            l.leave_type.name, l.start_date, l.end_date, l.days,
+            l.get_status_display(), l.reason,
+            l.decision_note or "", l.created_at.strftime("%Y-%m-%d"),
         ])
 
     writer.writerow([])
     writer.writerow(["Attendance Requests"])
     writer.writerow(["Date", "Status", "Reason", "Decision Note"])
     for a in attendance_history:
-        writer.writerow([
-            a.date,
-            a.get_status_display(),
-            a.reason,
-            a.decision_note or "",
-        ])
+        writer.writerow([a.date, a.get_status_display(), a.reason, a.decision_note or ""])
 
     writer.writerow([])
     writer.writerow(["Holiday Work Requests"])
     writer.writerow(["Date", "Status", "Reason", "Decision Note"])
     for h in holiday_work_history:
-        writer.writerow([
-            h.date,
-            h.get_status_display(),
-            h.reason,
-            h.decision_note or "",
-        ])
+        writer.writerow([h.date, h.get_status_display(), h.reason, h.decision_note or ""])
 
     return response
 
@@ -875,15 +960,15 @@ def export_employee_csv(request, employee_id):
 @login_required
 def export_my_leaves_csv(request):
     today = date.today()
-
-    leaves = LeaveRequest.objects.filter(
-        employee=request.user, status="approved"
-    ).select_related("leave_type").order_by("-start_date")
+    leaves = (
+        LeaveRequest.objects.filter(employee=request.user, status="approved")
+        .select_related("leave_type")
+        .order_by("-start_date")
+    )
 
     filename = f"my_approved_leaves_{request.user.username}_{today.isoformat()}.csv"
     response = HttpResponse(content_type="text/csv")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
-
     writer = csv.writer(response)
 
     writer.writerow([f"Approved Leaves — {request.user.get_full_name() or request.user.username}"])
@@ -893,12 +978,8 @@ def export_my_leaves_csv(request):
     writer.writerow(["Leave Type", "From", "To", "Days", "Reason", "Decision Note", "Approved On"])
     for l in leaves:
         writer.writerow([
-            l.leave_type.name,
-            l.start_date,
-            l.end_date,
-            l.days,
-            l.reason,
-            l.decision_note or "",
+            l.leave_type.name, l.start_date, l.end_date, l.days,
+            l.reason, l.decision_note or "",
             l.decided_at.strftime("%Y-%m-%d") if l.decided_at else "",
         ])
 
