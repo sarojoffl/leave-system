@@ -62,10 +62,11 @@
             <div class="form-group">
               <label>Role *</label>
               <select name="role">
-                <option value="employee" {% if employee.role == "employee" %}selected{% endif %}>Employee</option>
-                <option value="manager" {% if employee.role == "manager" %}selected{% endif %}>Manager</option>
-                <option value="hr" {% if employee.role == "hr" %}selected{% endif %}>HR</option>
-              </select>
+                  <option value="employee" {% if employee.role == "employee" %}selected{% endif %}>Employee</option>
+                  <option value="manager" {% if employee.role == "manager" %}selected{% endif %}>Manager</option>
+                  <option value="system_admin" {% if employee.role == "system_admin" %}selected{% endif %}>System Administrator</option>
+                  {% if employee.role == "ceo" %}<option value="ceo" selected>CEO</option>{% endif %}
+                </select>
             </div>
             <div class="form-group">
               <label>Annual Leave Days</label>

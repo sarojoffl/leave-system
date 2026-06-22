@@ -19,7 +19,7 @@ User = get_user_model()
 
 
 def _post_login_redirect_name(user):
-    return 'manager_dashboard' if user.role in ('manager', 'hr') else 'dashboard'
+    return 'manager_dashboard' if user.has_management_access else 'dashboard'
 
 
 def login_view(request):
@@ -41,7 +41,7 @@ def login_view(request):
             try:
                 candidate = User.objects.get(username=username)
                 if not candidate.is_active:
-                    error = "This account has been deactivated. Please contact your manager or HR."
+                    error = "This account has been deactivated. Please contact your manager or system administrator."
                 else:
                     error = "Invalid username or password."
             except User.DoesNotExist:
@@ -92,7 +92,7 @@ def _user_form_data(post):
         errors.append("Last name is required.")
     if not data["username"]:
         errors.append("Username is required.")
-    if data["role"] not in ("employee", "manager", "hr"):
+    if data["role"] not in ("employee", "manager", "system_admin", "ceo"):
         errors.append("Invalid role selected.")
  
     return data, errors
@@ -149,7 +149,7 @@ def staff_list(request):
             return redirect("staff_list")
  
     # --- list / search ---
-    qs = User.objects.exclude(id=request.user.id).order_by("first_name", "last_name")
+    qs = User.objects.all().order_by("first_name", "last_name")
  
     q = request.GET.get("q", "").strip()
     filter_role = request.GET.get("role", "")
@@ -311,7 +311,9 @@ def staff_toggle_active(request, user_id):
 @login_required
 def set_view_mode(request):
     mode = request.GET.get('mode')
-    if mode in ('manager', 'employee') and request.user.role in ('manager', 'hr'):
+    if mode in ('manager', 'employee') and request.user.has_management_access:
         request.session['view_mode'] = mode
-    next_url = request.GET.get('next') or request.META.get('HTTP_REFERER') or 'dashboard'
-    return redirect(next_url)
+
+    if mode == 'manager':
+        return redirect('manager_dashboard')
+    return redirect('dashboard')

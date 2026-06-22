@@ -17,7 +17,7 @@ from leaves.permissions import manager_required
 
 @login_required
 def dashboard(request):
-    if get_view_mode(request) == 'manager' and request.user.role in ('manager', 'hr'):
+    if get_view_mode(request) == 'manager' and request.user.has_management_access:
         return manager_dashboard(request)
 
     user = request.user

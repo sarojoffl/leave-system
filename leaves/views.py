@@ -20,6 +20,15 @@ import csv
 from django.http import HttpResponse
 
 
+def _ceo_recipients(exclude_user_id=None):
+    """Email addresses for CEO-role users, excluding one user if given."""
+    User = get_user_model()
+    qs = User.objects.filter(role='ceo')
+    if exclude_user_id is not None:
+        qs = qs.exclude(id=exclude_user_id)
+    return list(qs.values_list('email', flat=True))
+
+
 def send_leave_notification_email(leave_request, action_type):
     User = get_user_model()
     subject = ""
@@ -31,14 +40,14 @@ def send_leave_notification_email(leave_request, action_type):
     if action_type == 'requested':
         subject = f"New Leave Request from {employee_name}"
         message = (
-            f"Dear Manager/HR,\n\n"
+            f"Dear CEO,\n\n"
             f"{employee_name} has submitted a new leave request:\n"
             f"- Leave Type: {leave_request.leave_type.name}\n"
             f"- Dates: {leave_request.start_date} to {leave_request.end_date} ({leave_request.days} day(s))\n"
             f"- Reason: {leave_request.reason}\n\n"
             f"Please log in to the portal to review and decide on this request."
         )
-        recipient_list = list(User.objects.filter(role__in=['manager', 'hr']).exclude(id=leave_request.employee.id).values_list('email', flat=True))
+        recipient_list = _ceo_recipients(exclude_user_id=leave_request.employee.id)
 
     elif action_type in ('approved', 'rejected'):
         status_label = "approved" if action_type == 'approved' else "rejected"
@@ -46,7 +55,7 @@ def send_leave_notification_email(leave_request, action_type):
         message = (
             f"Dear {employee_name},\n\n"
             f"Your request for {leave_request.leave_type.name} leave from {leave_request.start_date} to {leave_request.end_date} has been {status_label}.\n"
-            f"Manager Note: {leave_request.decision_note or 'No additional note'}\n\n"
+            f"CEO Note: {leave_request.decision_note or 'No additional note'}\n\n"
             f"Thank you."
         )
         recipient_list = [leave_request.employee.email] if leave_request.employee.email else []
@@ -54,20 +63,20 @@ def send_leave_notification_email(leave_request, action_type):
     elif action_type == 'cancelled':
         subject = f"Leave Request Cancelled by {employee_name}"
         message = (
-            f"Dear Manager/HR,\n\n"
+            f"Dear CEO,\n\n"
             f"{employee_name} has cancelled their leave request:\n"
             f"- Leave Type: {leave_request.leave_type.name}\n"
             f"- Dates: {leave_request.start_date} to {leave_request.end_date} ({leave_request.days} day(s))\n\n"
             f"The leave status has been updated to Cancelled and any used balance has been refunded."
         )
-        recipient_list = list(User.objects.filter(role__in=['manager', 'hr']).exclude(id=leave_request.employee.id).values_list('email', flat=True))
+        recipient_list = _ceo_recipients(exclude_user_id=leave_request.employee.id)
 
     elif action_type == 'revoked':
         subject = f"Approved Leave Request Revoked"
         message = (
             f"Dear {employee_name},\n\n"
-            f"Your approved request for {leave_request.leave_type.name} leave from {leave_request.start_date} to {leave_request.end_date} has been revoked/rejected by a manager.\n"
-            f"Manager Note: {leave_request.decision_note or 'No additional note'}\n\n"
+            f"Your approved request for {leave_request.leave_type.name} leave from {leave_request.start_date} to {leave_request.end_date} has been revoked/rejected by a CEO.\n"
+            f"CEO Note: {leave_request.decision_note or 'No additional note'}\n\n"
             f"Your leave balance has been refunded."
         )
         recipient_list = [leave_request.employee.email] if leave_request.employee.email else []
@@ -103,13 +112,13 @@ def send_day_request_notification_email(day_request, action_type, label):
     if action_type == 'requested':
         subject = f"New {label} Request from {employee_name}"
         message = (
-            f"Dear Manager/HR,\n\n"
+            f"Dear CEO,\n\n"
             f"{employee_name} has submitted a new {label.lower()} request:\n"
             f"- Date: {day_request.date}\n"
             f"- Reason: {day_request.reason}\n\n"
             f"Please log in to the portal to review and decide on this request."
         )
-        recipient_list = list(User.objects.filter(role__in=['manager', 'hr']).exclude(id=day_request.employee.id).values_list('email', flat=True))
+        recipient_list = _ceo_recipients(exclude_user_id=day_request.employee.id)
 
     elif action_type in ('approved', 'rejected'):
         status_label = "approved" if action_type == 'approved' else "rejected"
@@ -117,7 +126,7 @@ def send_day_request_notification_email(day_request, action_type, label):
         message = (
             f"Dear {employee_name},\n\n"
             f"Your {label.lower()} request for {day_request.date} has been {status_label}.\n"
-            f"Manager Note: {day_request.decision_note or 'No additional note'}\n\n"
+            f"CEO Note: {day_request.decision_note or 'No additional note'}\n\n"
             f"Thank you."
         )
         recipient_list = [day_request.employee.email] if day_request.employee.email else []
@@ -311,7 +320,7 @@ def cancel_leave(request, id):
                 messages.error(
                     request,
                     "This leave has already started or finished and can no longer be "
-                    "cancelled. Please contact your manager if changes are needed."
+                    "cancelled. Please contact your CEO if changes are needed."
                 )
                 return redirect("my_leaves")
 
@@ -517,7 +526,7 @@ def reject_leave(request, id):
 def team(request):
     from accounts.models import User
 
-    employees = User.objects.filter(is_active=True).exclude(id=request.user.id).exclude(role__in=['manager', 'hr'])
+    employees = User.objects.filter(is_active=True).exclude(role__in=['ceo'])
     today = date.today()
 
     summary = []

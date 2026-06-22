@@ -16,7 +16,7 @@ def sidebar_context(request):
     bs_y, bs_m, bs_d = ad_to_bs(today)          # full BS date if you need it elsewhere
 
     pending_count = None
-    if user.role in ('manager', 'hr'):
+    if user.has_management_access:
         pending_count = (
             LeaveRequest.objects.filter(status='pending').exclude(employee=user).count()
             + AttendanceRequest.objects.filter(status='pending').exclude(employee=user).count()

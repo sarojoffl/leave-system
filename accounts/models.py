@@ -6,7 +6,8 @@ class User(AbstractUser):
     ROLE_CHOICES = (
         ('employee', 'Employee'),
         ('manager', 'Manager'),
-        ('hr', 'HR'),
+        ('system_admin', 'System Administrator'),
+        ('ceo', 'CEO'),
     )
 
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='employee')
@@ -19,3 +20,7 @@ class User(AbstractUser):
         name = self.get_full_name() or self.username
         parts = name.split()[:2]
         return "".join(p[0] for p in parts).upper() or "U"
+
+    @property
+    def has_management_access(self):
+        return self.role in ('manager', 'system_admin', 'ceo')

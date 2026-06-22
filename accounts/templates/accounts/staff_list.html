@@ -38,19 +38,13 @@
   <div class="card-body" style="padding:16px 20px">
     <form method="get" class="staff-filters">
       <input type="text" name="q" value="{{ q }}" placeholder="Search name, email, department…" class="staff-search-input">
-      <select name="role">
-        <option value="">All roles</option>
-        <option value="employee" {% if filter_role == "employee" %}selected{% endif %}>Employee</option>
-        <option value="manager" {% if filter_role == "manager" %}selected{% endif %}>Manager</option>
-        <option value="hr" {% if filter_role == "hr" %}selected{% endif %}>HR</option>
-      </select>
       <select name="status">
         <option value="">All statuses</option>
         <option value="active" {% if filter_status == "active" %}selected{% endif %}>Active</option>
         <option value="inactive" {% if filter_status == "inactive" %}selected{% endif %}>Inactive</option>
       </select>
       <button type="submit" class="btn btn-primary btn-sm">Filter</button>
-      {% if q or filter_role or filter_status %}
+      {% if q or filter_status %}
         <a href="{% url 'staff_list' %}" class="btn btn-outline btn-sm">Clear</a>
       {% endif %}
     </form>
@@ -66,7 +60,6 @@
         <tr>
           <th>Employee</th>
           <th>Department / Position</th>
-          <th>Role</th>
           <th>Leave</th>
           <th>Status</th>
           <th></th>
@@ -87,11 +80,6 @@
           <td>
             <div style="font-size:0.84rem">{{ s.department }}</div>
             <div style="font-size:0.75rem;color:var(--color-text-muted)">{{ s.position }}</div>
-          </td>
-          <td>
-            <span class="badge {% if s.role_key == 'manager' %}staff-badge-manager{% elif s.role_key == 'hr' %}staff-badge-hr{% else %}active-emp{% endif %}">
-              {{ s.role }}
-            </span>
           </td>
           <td>
             <div class="staff-leave-mini">
@@ -127,7 +115,7 @@
     </table>
     {% else %}
     <div class="empty-state">
-      {% if q or filter_role or filter_status %}No staff matched your filters.{% else %}No staff accounts yet.{% endif %}
+      {% if q or filter_status %}No staff matched your filters.{% else %}No staff accounts yet.{% endif %}
     </div>
     {% endif %}
   </div>
@@ -173,7 +161,7 @@
             <select id="role" name="role">
               <option value="employee">Employee</option>
               <option value="manager">Manager</option>
-              <option value="hr">HR</option>
+              <option value="system_admin">System Administrator</option>
             </select>
           </div>
           <div class="form-group">

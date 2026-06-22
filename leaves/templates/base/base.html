@@ -29,7 +29,7 @@
  <!-- Sidebar -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-logo">
-      <div class="logo-text"><span>Global Link</span> Tech</div>
+      <div class="logo-text"><span>Global Link</span> Technology</div>
       <button class="sidebar-close" id="sidebar-close" aria-label="Close menu">×</button>
     </div>
     <nav class="sidebar-nav">
@@ -87,10 +87,10 @@
         <h1 id="page-title">{% block page_title %}Dashboard{% endblock %}</h1>
       </div>
       <div class="topbar-right">
-        {% if request.user.role == 'manager' or request.user.role == 'hr' %}
+        {% if request.user.role == 'manager' or request.user.role == 'system_admin' %}
           <a href="{% url 'set_view_mode' %}?mode={% if view_mode == 'manager' %}employee{% else %}manager{% endif %}&next={{ request.path }}"
             class="role-badge" title="Click to switch view">
-            {% if view_mode == 'manager' %}Manager{% else %}My Leave{% endif %} View
+            {% if view_mode == 'manager' %}Manager{% else %}Employee{% endif %} View
           </a>
         {% elif request.user.role %}
           <span class="role-badge">{{ request.user.get_role_display }} View</span>
