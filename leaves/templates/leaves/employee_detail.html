@@ -1,4 +1,5 @@
 {% extends "base/base.html" %}
+{% load bs_date %}
 
 {% block title %}{{ employee.get_full_name|default:employee.username }}{% endblock %}
 {% block page_title %}Employee History{% endblock %}
@@ -65,7 +66,7 @@
             <td>{{ l.date_range }}</td>
             <td>{{ l.days|floatformat:"-1" }}</td>
             <td>{{ l.reason|truncatechars:40 }}</td>
-            <td>{{ l.created_at|date:"M d, Y" }}</td>
+            <td>{{ l.created_at|to_bs }}</td>
             <td>
               {% if l.status == "approved" %}<span class="badge approved">Approved</span>
               {% elif l.status == "pending" %}<span class="badge pending">Pending</span>
@@ -92,7 +93,7 @@
         <tbody>
           {% for a in attendance_history %}
             <tr>
-              <td>{{ a.date }}</td>
+              <td>{{ a.date|to_bs_short }}</td>
               <td>{{ a.reason|truncatechars:40 }}</td>
               <td>{{ a.created_at|date:"M d, Y" }}</td>
               <td>
@@ -118,7 +119,7 @@
         <tbody>
           {% for h in holiday_work_history %}
             <tr>
-              <td>{{ h.date }}</td>
+              <td>{{ h.date|to_bs_short }}</td>
               <td>{{ h.reason|truncatechars:40 }}</td>
                 <td>{{ h.created_at|date:"M d, Y" }}</td>
               <td>

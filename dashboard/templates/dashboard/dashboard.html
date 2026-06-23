@@ -1,4 +1,5 @@
 {% extends "base/base.html" %}
+{% load bs_date %}
 
 {% block title %}Dashboard{% endblock %}
 {% block page_title %}Hello, {{ user.first_name|default:user.username }}!{% endblock %}
@@ -28,8 +29,7 @@
     {% if balance_total %}
       <div class="balance-row">
         <span class="bal-label">Leave Used</span>
-        <div class="bar-wrap" style="display:flex;overflow:hidden;border-radius:99px;">
-          {# Blue portion — always 100% when exceeded, otherwise normal percent #}
+        <div class="bar-wrap" style="display:flex;overflow:hidden;border-radius:99px;position:relative;">
           <div style="
             height:8px;
             width:{% if balance_remaining < 0 %}100{% else %}{{ balance_percent }}{% endif %}%;
@@ -40,7 +40,6 @@
             transition:width 0.8s;
             position:relative;
           ">
-            {# Red overflow layered on top of the right side #}
             {% if balance_remaining < 0 %}
             <div style="
               position:absolute;
@@ -116,7 +115,10 @@
   <div class="card">
     <div class="cal-wrap">
       <div class="cal-month-header">
-        <span class="cal-month-title">{{ calendar_month_label }}</span>
+        <div>
+          <span class="cal-month-title">{{ calendar_bs_month_label }}</span>
+          <span class="cal-month-sub">{{ calendar_ad_month_label }}</span>
+        </div>
       </div>
       <div class="cal-grid">
         <div class="cal-day-name">Sun</div>
@@ -130,7 +132,10 @@
         {% for week in calendar_weeks %}
           {% for day in week %}
             {% if day.day_number %}
-              <div class="cal-day {{ day.classes }}" {% if day.title %}title="{{ day.title }}"{% endif %}>{{ day.day_number }}</div>
+              <div class="cal-day {{ day.classes }}" {% if day.title %}title="{{ day.title }}"{% endif %}>
+                <span class="cal-bs-day">{{ day.bs_day }}</span>
+                <span class="cal-ad-day">{{ day.day_number }}</span>
+              </div>
             {% else %}
               <div class="cal-day other"></div>
             {% endif %}
@@ -148,15 +153,19 @@
 
   <div>
     <div class="card">
-      <div class="card-header"><span class="card-title">Public Holidays — {{ calendar_month_label }}</span></div>
+      <div class="card-header"><span class="card-title">Public Holidays — {{ calendar_bs_month_label }}</span></div>
       <div class="table-responsive">
         <table>
-          <thead><tr><th>Date</th><th>Holiday</th></tr></thead>
+          <thead><tr><th>BS Date</th><th>AD Date</th><th>Holiday</th></tr></thead>
           <tbody>
             {% for h in public_holidays %}
-              <tr><td>{{ h.date|date:"M d" }}</td><td>{{ h.name }}</td></tr>
+              <tr>
+                <td>{{ h.date|to_bs_short }}</td>
+                <td style="color:var(--color-text-muted);font-size:0.8rem;">{{ h.date|date:"M d" }}</td>
+                <td>{{ h.name }}</td>
+              </tr>
             {% empty %}
-              <tr><td colspan="2" class="empty-state">No public holidays this month.</td></tr>
+              <tr><td colspan="3" class="empty-state">No public holidays this month.</td></tr>
             {% endfor %}
           </tbody>
         </table>

@@ -1,4 +1,3 @@
-from calendar import Calendar, month_name
 from datetime import date, timedelta
 
 from django.contrib.auth.decorators import login_required
@@ -13,7 +12,104 @@ from leaves.models import (
     PublicHoliday,
 )
 from leaves.permissions import manager_required
-from leaves.views import get_fiscal_year_start  # reuse the shared helper
+from leaves.views import get_fiscal_year_start
+from leaves.bs_convert import ad_to_bs, bs_month_name, bs_to_ad, build_ad_label, _BS
+
+
+def _build_bs_calendar(
+    bs_year: int,
+    bs_month: int,
+    today: date,
+    holiday_map: dict,
+    leave_map: dict | None = None,
+    month_leaves: list | None = None,
+    is_manager: bool = False,
+) -> list:
+    """
+    Build a calendar grid for the given BS month.
+    Returns a list of weeks; each week is a list of 7 day-dicts.
+    Week starts on Sunday (weekday index 6).
+
+    leave_map  – {AD date: LeaveRequest}  for employee view
+    month_leaves – [LeaveRequest, ...]    for manager view
+    """
+    total_days = _BS[bs_year][bs_month - 1]
+    first_ad = bs_to_ad(bs_year, bs_month, 1)
+    last_ad  = bs_to_ad(bs_year, bs_month, total_days)
+
+    # weekday of first day: Python Mon=0..Sun=6; we want Sun=0 for grid
+    first_weekday_py = first_ad.weekday()          # Mon=0 … Sun=6
+    first_weekday_sun = (first_weekday_py + 1) % 7  # Sun=0 … Sat=6
+
+    # Build flat list of day-dicts, padded at start
+    days_flat = [{}] * first_weekday_sun  # empty leading cells
+
+    for bs_d in range(1, total_days + 1):
+        ad_date = first_ad + timedelta(days=bs_d - 1)
+        is_saturday = ad_date.weekday() == 5  # Saturday = weekend in Nepal
+
+        classes = []
+        title = None
+        leave_count = 0
+
+        if is_saturday:
+            classes.append("weekend")
+        if ad_date == today:
+            classes.append("today")
+
+        if not is_saturday:
+            if ad_date in holiday_map:
+                classes.append("holiday")
+                title = holiday_map[ad_date]
+            elif not is_manager and leave_map is not None:
+                if ad_date in leave_map:
+                    leave_today = leave_map[ad_date]
+                    if leave_today.status == "approved":
+                        classes.append("leave-approved")
+                        title = f"{leave_today.leave_type.name} – Approved"
+                    else:
+                        classes.append("leave-pending")
+                        title = f"{leave_today.leave_type.name} – Pending"
+            elif is_manager and month_leaves is not None:
+                leaves_today = [
+                    l for l in month_leaves
+                    if l.start_date <= ad_date <= l.end_date
+                ]
+                if leaves_today:
+                    has_approved = any(l.status == "approved" for l in leaves_today)
+                    approved_names = sorted({
+                        l.employee.get_full_name() or l.employee.username
+                        for l in leaves_today if l.status == "approved"
+                    })
+                    pending_names = sorted({
+                        l.employee.get_full_name() or l.employee.username
+                        for l in leaves_today if l.status == "pending"
+                    })
+                    title_parts = []
+                    if approved_names:
+                        title_parts.append(f"Approved: {', '.join(approved_names)}")
+                    if pending_names:
+                        title_parts.append(f"Pending: {', '.join(pending_names)}")
+                    title = " | ".join(title_parts)
+                    leave_count = len(leaves_today)
+                    classes.append("leave-approved" if has_approved else "leave-pending")
+
+        days_flat.append({
+            "day_number": ad_date.day,
+            "bs_day": bs_d,
+            "ad_date": ad_date,
+            "classes": " ".join(classes),
+            "title": title,
+            "leave_count": leave_count,
+        })
+
+    # Chunk into weeks of 7
+    # Pad end to complete the last row
+    while len(days_flat) % 7 != 0:
+        days_flat.append({})
+
+    weeks = [days_flat[i:i + 7] for i in range(0, len(days_flat), 7)]
+    return weeks
 
 
 # ---------------------------------------------------------------------------
@@ -51,88 +147,51 @@ def dashboard(request):
     own_holiday_approved = HolidayWorkRequest.objects.filter(employee=user, status="approved").count()
     own_pending_count = own_leave_pending + own_attendance_pending + own_holiday_pending
 
-    # ---- Calendar grid ----
-    # FIX: pre-fetch holidays and leaves for the whole month in two queries
-    # instead of one DB hit per calendar day.
+    # ── Current BS month ──────────────────────────────────────────────────────
+    bs_y, bs_m, _ = ad_to_bs(today)
+    total_bs_days = _BS[bs_y][bs_m - 1]
+    bs_month_start_ad = bs_to_ad(bs_y, bs_m, 1)
+    bs_month_end_ad   = bs_to_ad(bs_y, bs_m, total_bs_days)
+    # One day past the end for "less than" comparisons
+    bs_month_after_ad = bs_month_end_ad + timedelta(days=1)
 
-    month_start = date(today.year, today.month, 1)
-    if today.month == 12:
-        next_month_start = date(today.year + 1, 1, 1)
-    else:
-        next_month_start = date(today.year, today.month + 1, 1)
-
-    # Build holiday lookup: {date: holiday_name}
     holiday_map = {
         h.date: h.name
-        for h in PublicHoliday.objects.filter(date__year=today.year, date__month=today.month)
+        for h in PublicHoliday.objects.filter(
+            date__gte=bs_month_start_ad,
+            date__lte=bs_month_end_ad,
+        )
     }
 
-    # Build leave lookup: {date: leave_obj} for the current user
-    # A leave can span multiple days, so expand it into per-day entries.
+    # Build employee leave map for this BS month's AD range
     user_leave_map = {}
     for leave in LeaveRequest.objects.filter(
         employee=user,
-        start_date__lt=next_month_start,
-        end_date__gte=month_start,
+        start_date__lt=bs_month_after_ad,
+        end_date__gte=bs_month_start_ad,
         status__in=["approved", "pending"],
     ).select_related("leave_type"):
-        d = max(leave.start_date, month_start)
-        while d < next_month_start and d <= leave.end_date:
-            if d not in user_leave_map:  # first match wins (approved > pending by query order)
+        d = max(leave.start_date, bs_month_start_ad)
+        while d < bs_month_after_ad and d <= leave.end_date:
+            if d not in user_leave_map:
                 user_leave_map[d] = leave
-            d = date(d.year, d.month, d.day + 1) if d.day < 28 else d.replace(day=1) if d.month == 12 else d  # noqa
-            # simpler:
             d = date.fromordinal(d.toordinal() + 1)
 
-    cal = Calendar(firstweekday=6)
-    weeks = []
-    for week in cal.monthdayscalendar(today.year, today.month):
-        week_data = []
-        for day_num in week:
-            if day_num == 0:
-                week_data.append({})
-                continue
+    weeks = _build_bs_calendar(
+        bs_year=bs_y,
+        bs_month=bs_m,
+        today=today,
+        holiday_map=holiday_map,
+        leave_map=user_leave_map,
+        is_manager=False,
+    )
 
-            day_date = date(today.year, today.month, day_num)
-            classes = []
-            title = None
-
-            if day_date.weekday() == 5:  # Saturday
-                classes.append("weekend")
-                week_data.append({
-                    "day_number": day_num,
-                    "classes": "weekend",
-                    "title": None,
-                })
-                continue
-
-            if day_date == today:
-                classes.append("today")
-
-            if day_date in holiday_map:
-                classes.append("holiday")
-                title = holiday_map[day_date]
-            elif day_date in user_leave_map:
-                leave_today = user_leave_map[day_date]
-                if leave_today.status == "approved":
-                    classes.append("leave-approved")
-                    title = f"{leave_today.leave_type.name} – Approved"
-                else:
-                    classes.append("leave-pending")
-                    title = f"{leave_today.leave_type.name} – Pending"
-
-            week_data.append({
-                "day_number": day_num,
-                "classes": " ".join(classes),
-                "title": title,
-            })
-        weeks.append(week_data)
-
+    # Team on leave this BS month
     team_leaves = (
         LeaveRequest.objects.filter(
             status="approved",
-            start_date__lt=next_month_start,
-            end_date__gte=month_start,
+            start_date__lt=bs_month_after_ad,
+            end_date__gte=bs_month_start_ad,
         )
         .exclude(employee=user)
         .select_related("employee", "leave_type")
@@ -143,6 +202,12 @@ def dashboard(request):
         "type": l.leave_type.name,
     } for l in team_leaves]
 
+    # Public holidays for this BS month
+    public_holidays = PublicHoliday.objects.filter(
+        date__gte=bs_month_start_ad,
+        date__lte=bs_month_end_ad,
+    )
+
     overflow_percent = max(round(((balance.used - balance.total) / balance.total) * 100), 0) if balance and balance.total > 0 else 0
 
     context = {
@@ -150,6 +215,7 @@ def dashboard(request):
         "balance_total": balance.total if balance else 12,
         "balance_remaining": balance.remaining if balance else 12,
         "balance_percent": balance.percent if balance else 0,
+        "overflow_percent": overflow_percent,
         "days_taken": days_taken,
         "recent_leaves": recent_leaves,
         "own_pending_count": own_pending_count,
@@ -158,13 +224,12 @@ def dashboard(request):
         "own_holiday_pending": own_holiday_pending,
         "own_attendance_approved": own_attendance_approved,
         "own_holiday_approved": own_holiday_approved,
-        "calendar_month_label": f"{month_name[today.month]} {today.year}",
+        # Calendar labels — BS is primary, AD is sub
+        "calendar_bs_month_label": f"{bs_month_name(bs_m)} {bs_y}",
+        "calendar_ad_month_label": build_ad_label(bs_month_start_ad, bs_month_end_ad),
         "calendar_weeks": weeks,
-        "public_holidays": PublicHoliday.objects.filter(
-            date__year=today.year, date__month=today.month
-        ),
+        "public_holidays": public_holidays,
         "team_on_leave_this_month": team_on_leave_this_month,
-        "overflow_percent": overflow_percent,
     }
 
     return render(request, "dashboard/dashboard.html", context)
@@ -214,8 +279,6 @@ def manager_dashboard(request):
         ).exclude(employee=request.user)
     )
 
-    # "Needs attention" — employees with pending requests
-    # Fetch counts in 3 bulk queries instead of N*3
     from django.db.models import Count
     emp_ids = list(employees.values_list('id', flat=True))
 
@@ -269,86 +332,39 @@ def manager_dashboard(request):
         .order_by("start_date")[:15]
     )]
 
-    month_start = date(today.year, today.month, 1)
-    next_month_start = (
-        date(today.year + 1, 1, 1) if today.month == 12
-        else date(today.year, today.month + 1, 1)
-    )
+    # ── Current BS month ──────────────────────────────────────────────────────
+    bs_y, bs_m, _ = ad_to_bs(today)
+    total_bs_days = _BS[bs_y][bs_m - 1]
+    bs_month_start_ad = bs_to_ad(bs_y, bs_m, 1)
+    bs_month_end_ad   = bs_to_ad(bs_y, bs_m, total_bs_days)
+    bs_month_after_ad = bs_month_end_ad + timedelta(days=1)
+
+    month_holidays = {
+        h.date: h.name
+        for h in PublicHoliday.objects.filter(
+            date__gte=bs_month_start_ad,
+            date__lte=bs_month_end_ad,
+        )
+    }
 
     month_leaves = list(
         LeaveRequest.objects.filter(
             status__in=["approved", "pending"],
-            start_date__lt=next_month_start,
-            end_date__gte=month_start,
+            start_date__lt=bs_month_after_ad,
+            end_date__gte=bs_month_start_ad,
         )
         .exclude(employee=request.user)
         .select_related("employee")
     )
-    month_holidays = {
-        h.date: h.name
-        for h in PublicHoliday.objects.filter(date__year=today.year, date__month=today.month)
-    }
 
-    cal = Calendar(firstweekday=6)
-    weeks = []
-    for week in cal.monthdayscalendar(today.year, today.month):
-        week_data = []
-        for day_num in week:
-            if day_num == 0:
-                week_data.append({})
-                continue
-
-            day_date = date(today.year, today.month, day_num)
-            classes = []
-            title_bits = []
-
-            is_weekend = day_date.weekday() == 5
-            is_holiday = day_date in month_holidays
-
-            if is_weekend:
-                classes.append("weekend")
-            if day_date == today:
-                classes.append("today")
-            if is_holiday:
-                classes.append("holiday")
-                title_bits.append(month_holidays[day_date])
-
-            leave_count = 0
-            if not is_weekend and not is_holiday:
-                leaves_today = [l for l in month_leaves if l.start_date <= day_date <= l.end_date]
-                if leaves_today:
-                    has_approved = any(l.status == 'approved' for l in leaves_today)
-
-                    approved_names = sorted({
-                        l.employee.get_full_name() or l.employee.username
-                        for l in leaves_today if l.status == 'approved'
-                    })
-                    pending_names = sorted({
-                        l.employee.get_full_name() or l.employee.username
-                        for l in leaves_today if l.status == 'pending'
-                    })
-
-                    title_parts = []
-                    if approved_names:
-                        title_parts.append(f"Approved: {', '.join(approved_names)}")
-                    if pending_names:
-                        title_parts.append(f"Pending: {', '.join(pending_names)}")
-
-                    title_bits.append(" | ".join(title_parts))
-                    leave_count = len(leaves_today)
-
-                    if has_approved:
-                        classes.append("leave-approved")
-                    else:
-                        classes.append("leave-pending")
-
-            week_data.append({
-                "day_number": day_num,
-                "classes": " ".join(classes),
-                "title": " — ".join(title_bits) if title_bits else None,
-                "leave_count": leave_count,
-            })
-        weeks.append(week_data)
+    weeks = _build_bs_calendar(
+        bs_year=bs_y,
+        bs_month=bs_m,
+        today=today,
+        holiday_map=month_holidays,
+        month_leaves=month_leaves,
+        is_manager=True,
+    )
 
     context = {
         "employee_count": employee_count,
@@ -361,7 +377,9 @@ def manager_dashboard(request):
         "days_taken_this_fy": days_taken_this_fy,
         "needs_attention": needs_attention,
         "upcoming_leaves": upcoming_leaves,
-        "calendar_month_label": f"{month_name[today.month]} {today.year}",
+        # Calendar labels — BS is primary, AD is sub
+        "calendar_bs_month_label": f"{bs_month_name(bs_m)} {bs_y}",
+        "calendar_ad_month_label": build_ad_label(bs_month_start_ad, bs_month_end_ad),
         "calendar_weeks": weeks,
     }
 

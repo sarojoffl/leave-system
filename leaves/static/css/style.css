@@ -1202,6 +1202,32 @@ textarea {
   flex-shrink: 0;
 }
 
+/* BS Calendar styles */
+.cal-month-sub {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  font-weight: 600;
+  margin-top: 3px;
+  letter-spacing: 0.03em;
+  text-transform: none;
+}
+
+.cal-bs-day {
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1;
+  color: inherit;
+}
+
+.cal-ad-day {
+  font-size: 0.6rem;
+  color: var(--color-text-muted);
+  font-weight: 500;
+  margin-top: 3px;
+  line-height: 1;
+}
+
 /* ==========================================================================
    High-Tech Layout Components
    ========================================================================== */

@@ -1,4 +1,5 @@
 {% extends "base/base.html" %}
+{% load bs_date %}
 
 {% block title %}My Leaves{% endblock %}
 {% block page_title %}My Leaves{% endblock %}
@@ -33,11 +34,11 @@
             <tr data-status="{% if l.status == 'approved' %}approved{% elif l.status == 'pending' %}pending{% else %}rejected{% endif %}">
               <td>{{ l.id|stringformat:"03d" }}</td>
               <td>{{ l.leave_type.name }}</td>
-              <td>{{ l.start_date|date:"M d" }}</td>
-              <td>{{ l.end_date|date:"M d" }}</td>
+              <td>{{ l.start_date|to_bs_short }}</td>
+              <td>{{ l.end_date|to_bs_short }}</td>
               <td>{{ l.days|floatformat:"-1" }}</td>
               <td>{{ l.reason|truncatechars:40 }}</td>
-              <td>{{ l.created_at|date:"M d" }}</td>
+              <td>{{ l.created_at|to_bs_short }}</td>
               <td>
                 {% if l.status == "approved" %}<span class="badge approved">Approved</span>
                 {% elif l.status == "pending" %}<span class="badge pending">Pending</span>
@@ -91,9 +92,9 @@
           {% for a in attendance_requests %}
             <tr>
               <td>{{ a.id|stringformat:"03d" }}</td>
-              <td>{{ a.date|date:"M d" }}</td>
+              <td>{{ a.date|to_bs_short }}</td>
               <td>{{ a.reason|truncatechars:50 }}</td>
-              <td>{{ a.created_at|date:"M d" }}</td>
+              <td>{{ a.created_at|to_bs_short }}</td>
               <td>
                 {% if a.status == "approved" %}<span class="badge approved">Approved</span>
                 {% elif a.status == "pending" %}<span class="badge pending">Pending</span>
@@ -125,9 +126,9 @@
           {% for h in holiday_work_requests %}
             <tr>
               <td>{{ h.id|stringformat:"03d" }}</td>
-              <td>{{ h.date|date:"M d" }}</td>
+              <td>{{ h.date|to_bs_short }}</td>
               <td>{{ h.reason|truncatechars:50 }}</td>
-              <td>{{ h.created_at|date:"M d" }}</td>
+              <td>{{ h.created_at|to_bs_short }}</td>
               <td>
                 {% if h.status == "approved" %}<span class="badge approved">Approved</span>
                 {% elif h.status == "pending" %}<span class="badge pending">Pending</span>

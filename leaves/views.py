@@ -9,7 +9,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.mail import send_mail
 from django.db import transaction
 from django.db.models import F, Sum
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -19,6 +19,7 @@ from .models import AttendanceRequest, HolidayWorkRequest, LeaveBalance, LeaveRe
 from .permissions import manager_required
 
 logger = logging.getLogger(__name__)
+from leaves.bs_convert import ad_to_bs_display
 
 
 # ---------------------------------------------------------------------------
@@ -169,6 +170,17 @@ def send_day_request_notification_email(day_request, action_type, label):
 # ---------------------------------------------------------------------------
 
 @login_required
+def ad_to_bs_api(request):
+    from leaves.bs_convert import ad_to_bs_display
+    d = request.GET.get("date")
+    try:
+        from datetime import datetime
+        parsed = datetime.strptime(d, "%Y-%m-%d").date()
+        return JsonResponse({"bs": ad_to_bs_display(parsed)})
+    except Exception:
+        return JsonResponse({"bs": ""})
+
+@login_required
 def apply_leave(request):
     today = date.today()
 
@@ -248,8 +260,8 @@ def apply_leave(request):
             request.session["show_success_modal"] = True
             request.session["modal_summary"] = {
                 "type": leave.leave_type.name,
-                "from_date": from_date.strftime("%b %d, %Y"),
-                "to_date": to_date.strftime("%b %d, %Y"),
+                "from_date": ad_to_bs_display(from_date),
+                "to_date": ad_to_bs_display(to_date),
                 "days": leave.days,
             }
             return redirect("my_leaves")
@@ -354,11 +366,11 @@ def approvals(request):
         "employee_name": l.employee.get_full_name() or l.employee.username,
         "employee_initials": l.employee.initials,
         "type": l.leave_type.name,
-        "from_date": l.start_date.strftime("%b %d"),
-        "to_date": l.end_date.strftime("%b %d"),
+        "from_date": l.start_date,
+        "to_date": l.end_date,
         "days": l.days,
         "reason": l.reason,
-        "applied_on": l.created_at.strftime("%b %d"),
+        "applied_on": l.created_at,
     } for l in pending]
 
     recently_processed = [{
@@ -376,16 +388,16 @@ def approvals(request):
             "id": r.id,
             "employee_name": r.employee.get_full_name() or r.employee.username,
             "employee_initials": r.employee.initials,
-            "date": r.date.strftime("%b %d"),
+            "date": r.date,
             "reason": r.reason,
-            "applied_on": r.created_at.strftime("%b %d"),
+            "applied_on": r.created_at,
         } for r in qs]
 
     def _serialize_processed_day_requests(qs):
         return [{
             "id": r.id,
             "employee_name": r.employee.get_full_name() or r.employee.username,
-            "date": r.date.strftime("%b %d"),
+            "date": r.date,
             "decision": r.get_status_display(),
             "note": r.decision_note,
         } for r in qs]

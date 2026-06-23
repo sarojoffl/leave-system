@@ -1,4 +1,5 @@
 {% extends "base/base.html" %}
+{% load bs_date %}
 
 {% block title %}Approvals{% endblock %}
 {% block page_title %}Leave Approvals{% endblock %}
@@ -34,11 +35,11 @@
             <tr>
               <td><span class="avatar avatar-sm">{{ a.employee_initials }}</span>{{ a.employee_name }}</td>
               <td>{{ a.type }}</td>
-              <td>{{ a.from_date }}</td>
-              <td>{{ a.to_date }}</td>
+              <td>{{ a.from_date|to_bs_short }}</td>
+              <td>{{ a.to_date|to_bs_short }}</td>
               <td>{{ a.days|floatformat:"-1" }}</td>
               <td>{{ a.reason|truncatechars:40 }}</td>
-              <td>{{ a.applied_on }}</td>
+              <td>{{ a.applied_on|to_bs_short }}</td>
               <td>
                 <div class="flex-actions">
                   <button class="btn btn-success btn-sm"
@@ -106,9 +107,9 @@
           {% for a in pending_attendance %}
             <tr>
               <td><span class="avatar avatar-sm">{{ a.employee_initials }}</span>{{ a.employee_name }}</td>
-              <td>{{ a.date }}</td>
+              <td>{{ a.date|to_bs_short }}</td>
               <td>{{ a.reason|truncatechars:50 }}</td>
-              <td>{{ a.applied_on }}</td>
+              <td>{{ a.applied_on|to_bs_short }}</td>
               <td>
                 <div class="flex-actions">
                   <button class="btn btn-success btn-sm"
@@ -139,7 +140,7 @@
           {% for r in recently_processed_attendance %}
             <tr>
               <td>{{ r.employee_name }}</td>
-              <td>{{ r.date }}</td>
+              <td>{{ r.date|to_bs_short }}</td>
               <td>
                 {% if r.decision == "Approved" %}<span class="badge approved">Approved</span>
                 {% elif r.decision == "Rejected" %}<span class="badge rejected">Rejected</span>
@@ -167,9 +168,9 @@
           {% for h in pending_holiday_work %}
             <tr>
               <td><span class="avatar avatar-sm">{{ h.employee_initials }}</span>{{ h.employee_name }}</td>
-              <td>{{ h.date }}</td>
+              <td>{{ h.date|to_bs_short }}</td>
               <td>{{ h.reason|truncatechars:50 }}</td>
-              <td>{{ h.applied_on }}</td>
+              <td>{{ h.applied_on|to_bs_short }}</td>
               <td>
                 <div class="flex-actions">
                   <button class="btn btn-success btn-sm"
@@ -200,7 +201,7 @@
           {% for r in recently_processed_holiday_work %}
             <tr>
               <td>{{ r.employee_name }}</td>
-              <td>{{ r.date }}</td>
+              <td>{{ r.date|to_bs_short }}</td>
               <td>
                 {% if r.decision == "Approved" %}<span class="badge approved">Approved</span>
                 {% elif r.decision == "Rejected" %}<span class="badge rejected">Rejected</span>

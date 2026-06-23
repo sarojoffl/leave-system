@@ -1,4 +1,5 @@
 {% extends "base/base.html" %}
+{% load bs_date %}
 
 {% block title %}Manager Dashboard{% endblock %}
 {% block page_title %}Hello, {{ user.first_name|default:user.username }}!{% endblock %}
@@ -42,7 +43,14 @@
         <thead><tr><th>Employee</th><th>Type</th><th>Returns</th></tr></thead>
         <tbody>
           {% for o in on_leave_today %}
-            <tr><td>{{ o.name }}</td><td>{{ o.type }}</td><td>{{ o.returns|date:"M d" }}</td></tr>
+            <tr>
+              <td>{{ o.name }}</td>
+              <td>{{ o.type }}</td>
+              <td>
+                {{ o.returns|to_bs_short }}
+                <span style="display:block;font-size:0.75rem;color:var(--color-text-muted);">{{ o.returns|date:"M d" }}</span>
+              </td>
+            </tr>
           {% empty %}
             <tr><td colspan="3" class="empty-state">Everyone's in today.</td></tr>
           {% endfor %}
@@ -72,7 +80,10 @@
   <div class="card">
     <div class="cal-wrap">
       <div class="cal-month-header">
-        <span class="cal-month-title">{{ calendar_month_label }}</span>
+        <div>
+          <span class="cal-month-title">{{ calendar_bs_month_label }}</span>
+          <span class="cal-month-sub">{{ calendar_ad_month_label }}</span>
+        </div>
       </div>
       <div class="cal-grid">
         <div class="cal-day-name">Sun</div>
@@ -87,7 +98,8 @@
           {% for day in week %}
             {% if day.day_number %}
               <div class="cal-day {{ day.classes }}" {% if day.title %}title="{{ day.title }}"{% endif %}>
-                {{ day.day_number }}
+                <span class="cal-bs-day">{{ day.bs_day }}</span>
+                <span class="cal-ad-day">{{ day.day_number }}</span>
                 {% if day.leave_count %}
                   <span style="display:block;font-size:0.6rem;font-weight:700;line-height:1;opacity:0.85;">{{ day.leave_count }} away</span>
                 {% endif %}

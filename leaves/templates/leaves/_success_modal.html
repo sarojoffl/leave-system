@@ -1,3 +1,4 @@
+{% load bs_date %}
 <div class="modal-bg" id="modal-bg" data-show="{% if show_success_modal %}true{% else %}false{% endif %}">
   <div class="modal">
     <div class="modal-header">
@@ -10,7 +11,7 @@
 
       {% if modal_summary %}
       <div id="modal-summary" class="modal-summary">
-        <strong>{{ modal_summary.type }}</strong> · {{ modal_summary.from_date }} – {{ modal_summary.to_date }}
+        <strong>{{ modal_summary.type }}</strong> · {{ modal_summary.from_date|to_bs_short }} – {{ modal_summary.to_date|to_bs_short }}
         ({{ modal_summary.days }} day{{ modal_summary.days|pluralize }})
       </div>
       {% endif %}

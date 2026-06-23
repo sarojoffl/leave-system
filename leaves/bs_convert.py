@@ -1,16 +1,13 @@
 """
-AD → BS date conversion, ported from Module:नेपाली मिति (Lua).
+AD ↔ BS date conversion, ported from Module:नेपाली मिति (Lua).
 Base reference: AD 1943-04-14 = BS 2000-01-01
 Supported BS range: 1975–2099
 """
 
 from datetime import date, timedelta
+from calendar import month_abbr
 
 # ── BS month-length lookup table ────────────────────────────────────────────
-# Each list: [Baisakh, Jestha, Asar, Shravan, Bhadra, Ashwin,
-#              Kartik, Mangsir, Poush, Magh, Falgun, Chaitra]
-# Aliased rows share the same list object (identical pattern), matching Lua.
-
 _BS: dict[int, list[int]] = {}
 
 _BS[1975] = [31, 31, 32, 32, 31, 30, 30, 29, 30, 29, 30, 30]
@@ -140,22 +137,14 @@ _BS[2098] = _BS[1978]
 _BS[2099] = _BS[1975]
 
 # ── Base reference ────────────────────────────────────────────────────────────
-_BASE_AD = date(1943, 4, 14)   # = BS 2000-01-01
+_BASE_AD = date(1943, 4, 14)
 _BASE_BS_YEAR  = 2000
 _BASE_BS_MONTH = 1
 _BASE_BS_DAY   = 1
 
 
 def ad_to_bs(ad_date: date) -> tuple[int, int, int]:
-    """
-    Convert a Python date object (AD/Gregorian) to a Bikram Sambat (BS) date.
-
-    Returns (bs_year, bs_month, bs_day).
-    bs_month is 1-indexed (1 = Baisakh, 12 = Chaitra).
-
-    Raises ValueError for dates outside the supported BS range 1975–2099.
-    """
-    offset = (ad_date - _BASE_AD).days  # signed day offset from base
+    offset = (ad_date - _BASE_AD).days
 
     bs_y, bs_m, bs_d = _BASE_BS_YEAR, _BASE_BS_MONTH, _BASE_BS_DAY
 
@@ -165,7 +154,7 @@ def ad_to_bs(ad_date: date) -> tuple[int, int, int]:
             if months is None:
                 raise ValueError(f"BS year {bs_y} not in lookup table")
             bs_d += 1
-            if bs_d > months[bs_m - 1]:   # months list is 0-indexed
+            if bs_d > months[bs_m - 1]:
                 bs_d = 1
                 bs_m += 1
                 if bs_m > 12:
@@ -190,35 +179,93 @@ def ad_to_bs(ad_date: date) -> tuple[int, int, int]:
     return bs_y, bs_m, bs_d
 
 
-def bs_fiscal_year(ad_date: date) -> str:
+def bs_to_ad(bs_year: int, bs_month: int, bs_day: int) -> date:
+    """Convert a BS date to its corresponding AD date."""
+    if not (1975 <= bs_year <= 2099):
+        raise ValueError(f"BS year {bs_year} out of supported range 1975–2099")
+
+    # Count total days from the base (BS 2000-01-01) to the target BS date
+    total = 0
+
+    # Add full BS years from base year up to (not including) target year
+    for y in range(_BASE_BS_YEAR, bs_year):
+        months = _BS.get(y)
+        if months is None:
+            raise ValueError(f"BS year {y} not in lookup table")
+        total += sum(months)
+
+    # Add full months in the target year up to (not including) target month
+    months = _BS.get(bs_year)
+    if months is None:
+        raise ValueError(f"BS year {bs_year} not in lookup table")
+    for mo in range(1, bs_month):
+        total += months[mo - 1]
+
+    # Add days within target month (1-indexed so subtract 1)
+    total += bs_day - 1
+
+    return _BASE_AD + timedelta(days=total)
+
+
+# ── Month names ───────────────────────────────────────────────────────────────
+
+BS_MONTHS = [
+    "Baisakh", "Jestha", "Asar", "Shrawan",
+    "Bhadra", "Ashwin", "Kartik", "Mangsir",
+    "Poush", "Magh", "Falgun", "Chaitra",
+]
+
+def bs_month_name(month: int) -> str:
+    """Return English BS month name for 1-indexed month number."""
+    return BS_MONTHS[month - 1]
+
+
+def format_bs_date(bs_year: int, bs_month: int, bs_day: int, include_year: bool = True) -> str:
+    """Format a BS date as 'Baisakh 1, 2083'."""
+    name = bs_month_name(bs_month)
+    if include_year:
+        return f"{name} {bs_day}, {bs_year}"
+    return f"{name} {bs_day}"
+
+
+def ad_to_bs_display(ad_date: date, include_year: bool = True) -> str:
+    """Convert AD date to formatted BS string. Returns original on error."""
+    try:
+        bs_y, bs_m, bs_d = ad_to_bs(ad_date)
+        return format_bs_date(bs_y, bs_m, bs_d, include_year)
+    except (ValueError, AttributeError):
+        return str(ad_date)
+
+
+def build_ad_label(start_ad: date, end_ad: date) -> str:
     """
-    Return the Nepali fiscal year string for a given AD date.
-
-    Nepal's fiscal year runs Shrawan 1 to Ashad end (roughly mid-July to mid-July).
-    We convert the AD date to BS, then check: if BS month >= 4 (Shrawan = month 4),
-    we are in the NEW fiscal year starting that BS year; otherwise we are in the
-    fiscal year that started the previous BS year.
-
-    Returns e.g. "२०८१–८२"  (Nepali digits) or use bs_fiscal_year_ascii for "2081–82".
+    Build a compact AD label for a BS month's date range.
+    e.g. 'Jun 2026' if same month, 'Jun/Jul 2026' if spans two months
+    in the same year, 'Dec 2026/Jan 2027' if it spans a year boundary.
     """
-    bs_y, bs_m, _ = ad_to_bs(ad_date)
-
-    # Nepali FY starts Shrawan (month 4)
-    if bs_m >= 4:
-        fy_start = bs_y
+    if start_ad.month == end_ad.month and start_ad.year == end_ad.year:
+        return f"{month_abbr[start_ad.month]} {start_ad.year}"
+    elif start_ad.year == end_ad.year:
+        return f"{month_abbr[start_ad.month]}/{month_abbr[end_ad.month]} {start_ad.year}"
     else:
-        fy_start = bs_y - 1
-
-    fy_end_short = (fy_start + 1) % 100   # last two digits
-    return f"{fy_start}–{fy_end_short:02d}"
+        return f"{month_abbr[start_ad.month]} {start_ad.year}/{month_abbr[end_ad.month]} {end_ad.year}"
 
 
-# ── Optional: Nepali-digit formatting ────────────────────────────────────────
+# ── Fiscal year helpers ───────────────────────────────────────────────────────
+
 _NP_DIGITS = str.maketrans("0123456789", "०१२३४५६७८९")
 
 def to_nepali_digits(s: str) -> str:
     return str(s).translate(_NP_DIGITS)
 
+def bs_fiscal_year(ad_date: date) -> str:
+    bs_y, bs_m, _ = ad_to_bs(ad_date)
+    if bs_m >= 4:
+        fy_start = bs_y
+    else:
+        fy_start = bs_y - 1
+    fy_end_short = (fy_start + 1) % 100
+    return f"{fy_start}–{fy_end_short:02d}"
+
 def bs_fiscal_year_nepali(ad_date: date) -> str:
-    """Same as bs_fiscal_year() but with Devanagari digits."""
     return to_nepali_digits(bs_fiscal_year(ad_date))

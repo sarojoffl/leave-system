@@ -26,14 +26,16 @@
               <option value="{{ lt.id }}">{{ lt.name }}</option>
             {% endfor %}
           </select>
-        </div></br>
+        </div><br>
         <div class="form-group">
           <label for="from-date">From Date *</label>
           <input type="date" id="from-date" name="from_date" min="{% now 'Y-m-d' %}">
+          <small id="from-date-bs" style="color:var(--color-primary);font-size:0.75rem;min-height:1.2em;display:block;"></small>
         </div>
         <div class="form-group">
           <label for="to-date">To Date *</label>
           <input type="date" id="to-date" name="to_date" min="{% now 'Y-m-d' %}">
+          <small id="to-date-bs" style="color:var(--color-primary);font-size:0.75rem;min-height:1.2em;display:block;"></small>
         </div>
         <div class="form-group full">
           <label for="reason">Reason *</label>
@@ -50,7 +52,7 @@
           <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
           Submit Request
         </button>
-        <button type="reset" class="btn btn-outline" onclick="document.getElementById('calc-days').value=''">Clear Form</button>
+        <button type="reset" class="btn btn-outline" onclick="document.getElementById('calc-days').value='';document.getElementById('from-date-bs').textContent='';document.getElementById('to-date-bs').textContent='';">Clear Form</button>
       </div>
     </form>
   </div>
@@ -65,6 +67,7 @@
         <div class="form-group">
           <label for="att-date">Date *</label>
           <input type="date" id="att-date" name="date" max="{% now 'Y-m-d' %}">
+          <small id="att-date-bs" style="color:var(--color-primary);font-size:0.75rem;min-height:1.2em;display:block;"></small>
         </div>
         <div class="form-group full">
           <label for="att-reason">Reason *</label>
@@ -88,6 +91,7 @@
         <div class="form-group">
           <label for="hw-date">Date *</label>
           <input type="date" id="hw-date" name="date" max="{% now 'Y-m-d' %}">
+          <small id="hw-date-bs" style="color:var(--color-primary);font-size:0.75rem;min-height:1.2em;display:block;"></small>
         </div>
         <div class="form-group full">
           <label for="hw-reason">Reason / Work Description *</label>
@@ -105,6 +109,26 @@
 
 {% block extra_js %}
 <script>
+  const BS_API = "{% url 'ad_to_bs_api' %}";
+
+  async function showBs(inputId, labelId) {
+    const val = document.getElementById(inputId).value;
+    const label = document.getElementById(labelId);
+    if (!val) { label.textContent = ''; return; }
+    try {
+      const res = await fetch(`${BS_API}?date=${val}`);
+      const data = await res.json();
+      label.textContent = data.bs ? data.bs : '';
+    } catch (e) {
+      label.textContent = '';
+    }
+  }
+
+  document.getElementById('from-date').addEventListener('change', () => showBs('from-date', 'from-date-bs'));
+  document.getElementById('to-date').addEventListener('change',   () => showBs('to-date',   'to-date-bs'));
+  document.getElementById('att-date').addEventListener('change',  () => showBs('att-date',  'att-date-bs'));
+  document.getElementById('hw-date').addEventListener('change',   () => showBs('hw-date',   'hw-date-bs'));
+
   document.querySelectorAll('input[type="date"]').forEach(input => {
     input.addEventListener('click', () => {
       if (input.showPicker) {
@@ -122,7 +146,6 @@
     });
   });
 
-  // Re-open the relevant tab after a redirect (e.g. validation error on attendance/holiday form)
   document.addEventListener('DOMContentLoaded', () => {
     const tabParam = new URLSearchParams(window.location.search).get('tab');
     if (tabParam) {

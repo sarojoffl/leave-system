@@ -23,4 +23,6 @@ urlpatterns = [
 
     path('employee/<int:employee_id>/', views.employee_detail, name='employee_detail'),
     path("employee/<int:employee_id>/export/", views.export_employee_csv, name="export_employee_csv"),
+
+    path("api/ad-to-bs/", views.ad_to_bs_api, name="ad_to_bs_api"),
 ]

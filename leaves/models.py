@@ -59,12 +59,15 @@ class LeaveRequest(models.Model):
         return working_days
 
     @property
-    def date_range(self):
+    def date_range(self) -> str:
+        from leaves.bs_convert import ad_to_bs, bs_month_name
+        bs_y1, bs_m1, bs_d1 = ad_to_bs(self.start_date)
         if self.start_date == self.end_date:
-            return self.start_date.strftime("%b %d")
-        if self.start_date.month == self.end_date.month:
-            return f"{self.start_date.strftime('%b %d')}–{self.end_date.strftime('%d')}"
-        return f"{self.start_date.strftime('%b %d')} – {self.end_date.strftime('%b %d')}"
+            return f"{bs_month_name(bs_m1)} {bs_d1}, {bs_y1}"
+        bs_y2, bs_m2, bs_d2 = ad_to_bs(self.end_date)
+        if bs_m1 == bs_m2 and bs_y1 == bs_y2:
+            return f"{bs_month_name(bs_m1)} {bs_d1}–{bs_d2}, {bs_y1}"
+        return f"{bs_month_name(bs_m1)} {bs_d1}, {bs_y1} – {bs_month_name(bs_m2)} {bs_d2}, {bs_y2}"
 
 
 class LeaveBalance(models.Model):
@@ -96,7 +99,8 @@ class PublicHoliday(models.Model):
 
     def __str__(self):
         return f"{self.date}: {self.name}"
-    
+
+
 class BaseDayRequest(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pending'),
@@ -119,6 +123,11 @@ class BaseDayRequest(models.Model):
     class Meta:
         abstract = True
         ordering = ['-created_at']
+
+    @property
+    def date_bs(self) -> str:
+        from leaves.bs_convert import ad_to_bs_display
+        return ad_to_bs_display(self.date)
 
 
 class AttendanceRequest(BaseDayRequest):
