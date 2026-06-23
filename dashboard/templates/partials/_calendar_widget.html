@@ -1,0 +1,45 @@
+<div class="cal-wrap">
+  <div class="cal-month-header">
+    <a href="#" id="cal-prev" class="cal-nav {% if not prev_url %}disabled{% endif %}">‹</a>
+    <div style="text-align:center;">
+      <span class="cal-month-title" id="cal-month-title">{{ calendar_bs_month_label }}</span>
+      <span class="cal-month-sub" id="cal-month-sub">{{ calendar_ad_month_label }}</span>
+    </div>
+    <a href="#" id="cal-next" class="cal-nav {% if not next_url %}disabled{% endif %}">›</a>
+  </div>
+  <div id="cal-back-link" style="text-align:center;margin-bottom:6px;">
+    {% if not is_current_month %}
+      <a href="?" style="font-size:0.75rem;color:var(--color-primary);text-decoration:none;">↩ Back to current month</a>
+    {% endif %}
+  </div>
+  <div class="cal-grid" id="cal-grid">
+    <div class="cal-day-name">Sun</div>
+    <div class="cal-day-name">Mon</div>
+    <div class="cal-day-name">Tue</div>
+    <div class="cal-day-name">Wed</div>
+    <div class="cal-day-name">Thu</div>
+    <div class="cal-day-name">Fri</div>
+    <div class="cal-day-name">Sat</div>
+    {% for week in calendar_weeks %}
+      {% for day in week %}
+        {% if day.day_number %}
+          <div class="cal-day {{ day.classes }}" {% if day.title %}title="{{ day.title }}"{% endif %}>
+            <span class="cal-bs-day">{{ day.bs_day }}</span>
+            <span class="cal-ad-day">{{ day.day_number }}</span>
+            {% if day.leave_count %}
+              <span style="display:block;font-size:0.6rem;font-weight:700;line-height:1;opacity:0.85;">{{ day.leave_count }} away</span>
+            {% endif %}
+          </div>
+        {% else %}
+          <div class="cal-day other"></div>
+        {% endif %}
+      {% endfor %}
+    {% endfor %}
+  </div>
+  <div class="cal-legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--color-primary);box-shadow:0 0 8px var(--color-primary);"></div>Today</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--color-success-bg);border:1px solid var(--color-success-border);"></div>Leave (Approved)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--color-pending-bg);border:1px solid var(--color-pending-border);"></div>Leave (Pending)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--color-rejected-bg);border:1px solid var(--color-rejected-border);"></div>Public Holiday</div>
+  </div>
+</div>

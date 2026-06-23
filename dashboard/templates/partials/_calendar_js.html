@@ -1,0 +1,81 @@
+<script>
+const CAL_API = "{% url 'calendar_data' %}";
+
+async function loadCalendar(params) {
+  const url = params ? `${CAL_API}?${params}` : CAL_API;
+  let data;
+  try {
+    const res = await fetch(url);
+    data = await res.json();
+  } catch(e) { return; }
+
+  document.getElementById("cal-month-title").textContent = data.bs_month_label;
+  document.getElementById("cal-month-sub").textContent   = data.ad_month_label;
+
+  const prev = document.getElementById("cal-prev");
+  const next = document.getElementById("cal-next");
+
+  if (data.prev_params) {
+    prev.classList.remove("disabled");
+    prev.dataset.params = data.prev_params;
+  } else {
+    prev.classList.add("disabled");
+    prev.dataset.params = "";
+  }
+  if (data.next_params) {
+    next.classList.remove("disabled");
+    next.dataset.params = data.next_params;
+  } else {
+    next.classList.add("disabled");
+    next.dataset.params = "";
+  }
+
+  const backDiv = document.getElementById("cal-back-link");
+  backDiv.innerHTML = !data.is_current_month
+    ? `<a href="#" onclick="loadCalendar('');return false;" style="font-size:0.75rem;color:var(--color-primary);text-decoration:none;">↩ Back to current month</a>`
+    : "";
+
+  const grid = document.getElementById("cal-grid");
+  const headers = Array.from(grid.querySelectorAll(".cal-day-name"));
+  grid.innerHTML = "";
+  headers.forEach(h => grid.appendChild(h));
+
+  data.weeks.forEach(week => {
+    week.forEach(day => {
+      const cell = document.createElement("div");
+      if (day.day_number) {
+        cell.className = `cal-day ${day.classes}`;
+        if (day.title) cell.title = day.title;
+        cell.innerHTML = `
+          <span class="cal-bs-day">${day.bs_day}</span>
+          <span class="cal-ad-day">${day.day_number}</span>
+          ${day.leave_count ? `<span style="display:block;font-size:0.6rem;font-weight:700;line-height:1;opacity:0.85;">${day.leave_count} away</span>` : ""}
+        `;
+      } else {
+        cell.className = "cal-day other";
+      }
+      grid.appendChild(cell);
+    });
+  });
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const prev = document.getElementById("cal-prev");
+  const next = document.getElementById("cal-next");
+
+  prev.dataset.params = "{{ prev_params }}";
+  next.dataset.params = "{{ next_params }}";
+
+  prev.addEventListener("click", function(e) {
+    e.preventDefault();
+    if (!this.classList.contains("disabled") && this.dataset.params)
+      loadCalendar(this.dataset.params);
+  });
+
+  next.addEventListener("click", function(e) {
+    e.preventDefault();
+    if (!this.classList.contains("disabled") && this.dataset.params)
+      loadCalendar(this.dataset.params);
+  });
+});
+</script>

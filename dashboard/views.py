@@ -1,7 +1,8 @@
 from datetime import date, timedelta
 
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, redirect
+from django.shortcuts import render
+from django.http import JsonResponse
 
 from accounts.utils import get_view_mode
 from leaves.models import (
@@ -27,7 +28,6 @@ def _build_bs_calendar(
 ) -> list:
     total_days = _BS[bs_year][bs_month - 1]
     first_ad = bs_to_ad(bs_year, bs_month, 1)
-    last_ad  = bs_to_ad(bs_year, bs_month, total_days)
 
     first_weekday_py  = first_ad.weekday()
     first_weekday_sun = (first_weekday_py + 1) % 7
@@ -100,7 +100,6 @@ def _build_bs_calendar(
 
 
 def _get_bs_month_from_request(request, today):
-    """Parse bs_year/bs_month from GET params, fall back to current BS month."""
     bs_y_today, bs_m_today, _ = ad_to_bs(today)
     try:
         bs_y = int(request.GET.get("bs_year", bs_y_today))
@@ -112,8 +111,8 @@ def _get_bs_month_from_request(request, today):
     return bs_y, bs_m, bs_y_today, bs_m_today
 
 
-def _nav_urls(bs_y, bs_m):
-    """Return prev/next URL query strings for calendar navigation."""
+def _nav_params(bs_y, bs_m):
+    """Return prev/next param strings (without ?) for calendar navigation."""
     if bs_m == 1:
         prev_y, prev_m = bs_y - 1, 12
     else:
@@ -124,13 +123,101 @@ def _nav_urls(bs_y, bs_m):
     else:
         next_y, next_m = bs_y, bs_m + 1
 
-    prev_valid = prev_y in _BS
-    next_valid = next_y in _BS
+    prev = f"bs_year={prev_y}&bs_month={prev_m}" if prev_y in _BS else None
+    nxt  = f"bs_year={next_y}&bs_month={next_m}" if next_y in _BS else None
+    return prev, nxt
 
-    return (
-        f"?bs_year={prev_y}&bs_month={prev_m}" if prev_valid else None,
-        f"?bs_year={next_y}&bs_month={next_m}" if next_valid else None,
-    )
+
+def _nav_urls(bs_y, bs_m):
+    prev, nxt = _nav_params(bs_y, bs_m)
+    return (f"?{prev}" if prev else None), (f"?{nxt}" if nxt else None)
+
+
+def _serialize_weeks(weeks):
+    result = []
+    for week in weeks:
+        row = []
+        for day in week:
+            if day.get("day_number"):
+                row.append({
+                    "day_number": day["day_number"],
+                    "bs_day": day["bs_day"],
+                    "classes": day["classes"],
+                    "title": day["title"] or "",
+                    "leave_count": day["leave_count"],
+                })
+            else:
+                row.append({})
+        result.append(row)
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Calendar JSON API
+# ---------------------------------------------------------------------------
+
+@login_required
+def calendar_data(request):
+    today = date.today()
+    is_manager = get_view_mode(request) == 'manager' and request.user.has_management_access
+
+    bs_y, bs_m, bs_y_today, bs_m_today = _get_bs_month_from_request(request, today)
+
+    total_bs_days     = _BS[bs_y][bs_m - 1]
+    bs_month_start_ad = bs_to_ad(bs_y, bs_m, 1)
+    bs_month_end_ad   = bs_to_ad(bs_y, bs_m, total_bs_days)
+    bs_month_after_ad = bs_month_end_ad + timedelta(days=1)
+
+    holiday_map = {
+        h.date: h.name
+        for h in PublicHoliday.objects.filter(
+            date__gte=bs_month_start_ad,
+            date__lte=bs_month_end_ad,
+        )
+    }
+
+    if is_manager:
+        month_leaves = list(
+            LeaveRequest.objects.filter(
+                status__in=["approved", "pending"],
+                start_date__lt=bs_month_after_ad,
+                end_date__gte=bs_month_start_ad,
+            )
+            .exclude(employee=request.user)
+            .select_related("employee")
+        )
+        weeks = _build_bs_calendar(
+            bs_year=bs_y, bs_month=bs_m, today=today,
+            holiday_map=holiday_map, month_leaves=month_leaves, is_manager=True,
+        )
+    else:
+        user_leave_map = {}
+        for leave in LeaveRequest.objects.filter(
+            employee=request.user,
+            start_date__lt=bs_month_after_ad,
+            end_date__gte=bs_month_start_ad,
+            status__in=["approved", "pending"],
+        ).select_related("leave_type"):
+            d = max(leave.start_date, bs_month_start_ad)
+            while d < bs_month_after_ad and d <= leave.end_date:
+                if d not in user_leave_map:
+                    user_leave_map[d] = leave
+                d = date.fromordinal(d.toordinal() + 1)
+        weeks = _build_bs_calendar(
+            bs_year=bs_y, bs_month=bs_m, today=today,
+            holiday_map=holiday_map, leave_map=user_leave_map, is_manager=False,
+        )
+
+    prev_params, next_params = _nav_params(bs_y, bs_m)
+
+    return JsonResponse({
+        "bs_month_label":  f"{bs_month_name(bs_m)} {bs_y}",
+        "ad_month_label":  build_ad_label(bs_month_start_ad, bs_month_end_ad),
+        "is_current_month": bs_y == bs_y_today and bs_m == bs_m_today,
+        "prev_params": prev_params,
+        "next_params": next_params,
+        "weeks": _serialize_weeks(weeks),
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -199,12 +286,8 @@ def dashboard(request):
             d = date.fromordinal(d.toordinal() + 1)
 
     weeks = _build_bs_calendar(
-        bs_year=bs_y,
-        bs_month=bs_m,
-        today=today,
-        holiday_map=holiday_map,
-        leave_map=user_leave_map,
-        is_manager=False,
+        bs_year=bs_y, bs_month=bs_m, today=today,
+        holiday_map=holiday_map, leave_map=user_leave_map, is_manager=False,
     )
 
     team_leaves = (
@@ -232,6 +315,8 @@ def dashboard(request):
         if balance and balance.total > 0 else 0
     )
 
+    prev_params, next_params = _nav_params(bs_y, bs_m)
+
     context = {
         "balance_used":        balance.used if balance else 0,
         "balance_total":       balance.total if balance else 12,
@@ -253,6 +338,8 @@ def dashboard(request):
         "team_on_leave_this_month":  team_on_leave_this_month,
         "prev_url":          prev_url,
         "next_url":          next_url,
+        "prev_params":       prev_params or "",
+        "next_params":       next_params or "",
         "is_current_month":  is_current_month,
     }
 
@@ -353,6 +440,7 @@ def manager_dashboard(request):
     bs_y, bs_m, bs_y_today, bs_m_today = _get_bs_month_from_request(request, today)
     is_current_month = (bs_y == bs_y_today and bs_m == bs_m_today)
     prev_url, next_url = _nav_urls(bs_y, bs_m)
+    prev_params, next_params = _nav_params(bs_y, bs_m)
 
     total_bs_days     = _BS[bs_y][bs_m - 1]
     bs_month_start_ad = bs_to_ad(bs_y, bs_m, 1)
@@ -378,12 +466,8 @@ def manager_dashboard(request):
     )
 
     weeks = _build_bs_calendar(
-        bs_year=bs_y,
-        bs_month=bs_m,
-        today=today,
-        holiday_map=month_holidays,
-        month_leaves=month_leaves,
-        is_manager=True,
+        bs_year=bs_y, bs_month=bs_m, today=today,
+        holiday_map=month_holidays, month_leaves=month_leaves, is_manager=True,
     )
 
     context = {
@@ -402,6 +486,8 @@ def manager_dashboard(request):
         "calendar_weeks":            weeks,
         "prev_url":          prev_url,
         "next_url":          next_url,
+        "prev_params":       prev_params or "",
+        "next_params":       next_params or "",
         "is_current_month":  is_current_month,
     }
 
