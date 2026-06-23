@@ -1228,6 +1228,20 @@ textarea {
   line-height: 1;
 }
 
+.cal-nav {
+  font-size: 1.4rem;
+  color: var(--color-text-muted);
+  padding: 0 10px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.2s;
+  user-select: none;
+  line-height: 1;
+}
+
+.cal-nav:hover { color: var(--color-primary); }
+.cal-nav.disabled { opacity: 0.2; pointer-events: none; }
+
 /* ==========================================================================
    High-Tech Layout Components
    ========================================================================== */

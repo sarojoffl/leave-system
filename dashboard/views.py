@@ -25,28 +25,18 @@ def _build_bs_calendar(
     month_leaves: list | None = None,
     is_manager: bool = False,
 ) -> list:
-    """
-    Build a calendar grid for the given BS month.
-    Returns a list of weeks; each week is a list of 7 day-dicts.
-    Week starts on Sunday (weekday index 6).
-
-    leave_map  – {AD date: LeaveRequest}  for employee view
-    month_leaves – [LeaveRequest, ...]    for manager view
-    """
     total_days = _BS[bs_year][bs_month - 1]
     first_ad = bs_to_ad(bs_year, bs_month, 1)
     last_ad  = bs_to_ad(bs_year, bs_month, total_days)
 
-    # weekday of first day: Python Mon=0..Sun=6; we want Sun=0 for grid
-    first_weekday_py = first_ad.weekday()          # Mon=0 … Sun=6
-    first_weekday_sun = (first_weekday_py + 1) % 7  # Sun=0 … Sat=6
+    first_weekday_py  = first_ad.weekday()
+    first_weekday_sun = (first_weekday_py + 1) % 7
 
-    # Build flat list of day-dicts, padded at start
-    days_flat = [{}] * first_weekday_sun  # empty leading cells
+    days_flat = [{}] * first_weekday_sun
 
     for bs_d in range(1, total_days + 1):
         ad_date = first_ad + timedelta(days=bs_d - 1)
-        is_saturday = ad_date.weekday() == 5  # Saturday = weekend in Nepal
+        is_saturday = ad_date.weekday() == 5
 
         classes = []
         title = None
@@ -103,13 +93,44 @@ def _build_bs_calendar(
             "leave_count": leave_count,
         })
 
-    # Chunk into weeks of 7
-    # Pad end to complete the last row
     while len(days_flat) % 7 != 0:
         days_flat.append({})
 
-    weeks = [days_flat[i:i + 7] for i in range(0, len(days_flat), 7)]
-    return weeks
+    return [days_flat[i:i + 7] for i in range(0, len(days_flat), 7)]
+
+
+def _get_bs_month_from_request(request, today):
+    """Parse bs_year/bs_month from GET params, fall back to current BS month."""
+    bs_y_today, bs_m_today, _ = ad_to_bs(today)
+    try:
+        bs_y = int(request.GET.get("bs_year", bs_y_today))
+        bs_m = int(request.GET.get("bs_month", bs_m_today))
+        if not (1 <= bs_m <= 12) or bs_y not in _BS:
+            raise ValueError
+    except (ValueError, TypeError):
+        bs_y, bs_m = bs_y_today, bs_m_today
+    return bs_y, bs_m, bs_y_today, bs_m_today
+
+
+def _nav_urls(bs_y, bs_m):
+    """Return prev/next URL query strings for calendar navigation."""
+    if bs_m == 1:
+        prev_y, prev_m = bs_y - 1, 12
+    else:
+        prev_y, prev_m = bs_y, bs_m - 1
+
+    if bs_m == 12:
+        next_y, next_m = bs_y + 1, 1
+    else:
+        next_y, next_m = bs_y, bs_m + 1
+
+    prev_valid = prev_y in _BS
+    next_valid = next_y in _BS
+
+    return (
+        f"?bs_year={prev_y}&bs_month={prev_m}" if prev_valid else None,
+        f"?bs_year={next_y}&bs_month={next_m}" if next_valid else None,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -140,19 +161,20 @@ def dashboard(request):
         )
     )
 
-    own_leave_pending = LeaveRequest.objects.filter(employee=user, status="pending").count()
-    own_attendance_pending = AttendanceRequest.objects.filter(employee=user, status="pending").count()
-    own_holiday_pending = HolidayWorkRequest.objects.filter(employee=user, status="pending").count()
-    own_attendance_approved = AttendanceRequest.objects.filter(employee=user, status="approved").count()
-    own_holiday_approved = HolidayWorkRequest.objects.filter(employee=user, status="approved").count()
-    own_pending_count = own_leave_pending + own_attendance_pending + own_holiday_pending
+    own_leave_pending        = LeaveRequest.objects.filter(employee=user, status="pending").count()
+    own_attendance_pending   = AttendanceRequest.objects.filter(employee=user, status="pending").count()
+    own_holiday_pending      = HolidayWorkRequest.objects.filter(employee=user, status="pending").count()
+    own_attendance_approved  = AttendanceRequest.objects.filter(employee=user, status="approved").count()
+    own_holiday_approved     = HolidayWorkRequest.objects.filter(employee=user, status="approved").count()
+    own_pending_count        = own_leave_pending + own_attendance_pending + own_holiday_pending
 
-    # ── Current BS month ──────────────────────────────────────────────────────
-    bs_y, bs_m, _ = ad_to_bs(today)
-    total_bs_days = _BS[bs_y][bs_m - 1]
+    bs_y, bs_m, bs_y_today, bs_m_today = _get_bs_month_from_request(request, today)
+    is_current_month = (bs_y == bs_y_today and bs_m == bs_m_today)
+    prev_url, next_url = _nav_urls(bs_y, bs_m)
+
+    total_bs_days     = _BS[bs_y][bs_m - 1]
     bs_month_start_ad = bs_to_ad(bs_y, bs_m, 1)
     bs_month_end_ad   = bs_to_ad(bs_y, bs_m, total_bs_days)
-    # One day past the end for "less than" comparisons
     bs_month_after_ad = bs_month_end_ad + timedelta(days=1)
 
     holiday_map = {
@@ -163,7 +185,6 @@ def dashboard(request):
         )
     }
 
-    # Build employee leave map for this BS month's AD range
     user_leave_map = {}
     for leave in LeaveRequest.objects.filter(
         employee=user,
@@ -186,7 +207,6 @@ def dashboard(request):
         is_manager=False,
     )
 
-    # Team on leave this BS month
     team_leaves = (
         LeaveRequest.objects.filter(
             status="approved",
@@ -202,34 +222,38 @@ def dashboard(request):
         "type": l.leave_type.name,
     } for l in team_leaves]
 
-    # Public holidays for this BS month
     public_holidays = PublicHoliday.objects.filter(
         date__gte=bs_month_start_ad,
         date__lte=bs_month_end_ad,
     )
 
-    overflow_percent = max(round(((balance.used - balance.total) / balance.total) * 100), 0) if balance and balance.total > 0 else 0
+    overflow_percent = (
+        max(round(((balance.used - balance.total) / balance.total) * 100), 0)
+        if balance and balance.total > 0 else 0
+    )
 
     context = {
-        "balance_used": balance.used if balance else 0,
-        "balance_total": balance.total if balance else 12,
-        "balance_remaining": balance.remaining if balance else 12,
-        "balance_percent": balance.percent if balance else 0,
-        "overflow_percent": overflow_percent,
-        "days_taken": days_taken,
-        "recent_leaves": recent_leaves,
-        "own_pending_count": own_pending_count,
-        "own_leave_pending": own_leave_pending,
-        "own_attendance_pending": own_attendance_pending,
-        "own_holiday_pending": own_holiday_pending,
-        "own_attendance_approved": own_attendance_approved,
-        "own_holiday_approved": own_holiday_approved,
-        # Calendar labels — BS is primary, AD is sub
-        "calendar_bs_month_label": f"{bs_month_name(bs_m)} {bs_y}",
-        "calendar_ad_month_label": build_ad_label(bs_month_start_ad, bs_month_end_ad),
-        "calendar_weeks": weeks,
-        "public_holidays": public_holidays,
-        "team_on_leave_this_month": team_on_leave_this_month,
+        "balance_used":        balance.used if balance else 0,
+        "balance_total":       balance.total if balance else 12,
+        "balance_remaining":   balance.remaining if balance else 12,
+        "balance_percent":     balance.percent if balance else 0,
+        "overflow_percent":    overflow_percent,
+        "days_taken":          days_taken,
+        "recent_leaves":       recent_leaves,
+        "own_pending_count":         own_pending_count,
+        "own_leave_pending":         own_leave_pending,
+        "own_attendance_pending":    own_attendance_pending,
+        "own_holiday_pending":       own_holiday_pending,
+        "own_attendance_approved":   own_attendance_approved,
+        "own_holiday_approved":      own_holiday_approved,
+        "calendar_bs_month_label":   f"{bs_month_name(bs_m)} {bs_y}",
+        "calendar_ad_month_label":   build_ad_label(bs_month_start_ad, bs_month_end_ad),
+        "calendar_weeks":            weeks,
+        "public_holidays":           public_holidays,
+        "team_on_leave_this_month":  team_on_leave_this_month,
+        "prev_url":          prev_url,
+        "next_url":          next_url,
+        "is_current_month":  is_current_month,
     }
 
     return render(request, "dashboard/dashboard.html", context)
@@ -261,16 +285,10 @@ def manager_dashboard(request):
     } for l in on_leave_qs]
     on_leave_today_count = len(on_leave_today)
 
-    pending_leave_count = (
-        LeaveRequest.objects.filter(status="pending").exclude(employee=request.user).count()
-    )
-    pending_attendance_count = (
-        AttendanceRequest.objects.filter(status="pending").exclude(employee=request.user).count()
-    )
-    pending_holiday_count = (
-        HolidayWorkRequest.objects.filter(status="pending").exclude(employee=request.user).count()
-    )
-    total_pending = pending_leave_count + pending_attendance_count + pending_holiday_count
+    pending_leave_count      = LeaveRequest.objects.filter(status="pending").exclude(employee=request.user).count()
+    pending_attendance_count = AttendanceRequest.objects.filter(status="pending").exclude(employee=request.user).count()
+    pending_holiday_count    = HolidayWorkRequest.objects.filter(status="pending").exclude(employee=request.user).count()
+    total_pending            = pending_leave_count + pending_attendance_count + pending_holiday_count
 
     fiscal_start = get_fiscal_year_start(today)
     days_taken_this_fy = sum(
@@ -332,9 +350,11 @@ def manager_dashboard(request):
         .order_by("start_date")[:15]
     )]
 
-    # ── Current BS month ──────────────────────────────────────────────────────
-    bs_y, bs_m, _ = ad_to_bs(today)
-    total_bs_days = _BS[bs_y][bs_m - 1]
+    bs_y, bs_m, bs_y_today, bs_m_today = _get_bs_month_from_request(request, today)
+    is_current_month = (bs_y == bs_y_today and bs_m == bs_m_today)
+    prev_url, next_url = _nav_urls(bs_y, bs_m)
+
+    total_bs_days     = _BS[bs_y][bs_m - 1]
     bs_month_start_ad = bs_to_ad(bs_y, bs_m, 1)
     bs_month_end_ad   = bs_to_ad(bs_y, bs_m, total_bs_days)
     bs_month_after_ad = bs_month_end_ad + timedelta(days=1)
@@ -367,20 +387,22 @@ def manager_dashboard(request):
     )
 
     context = {
-        "employee_count": employee_count,
-        "on_leave_today_count": on_leave_today_count,
-        "on_leave_today": on_leave_today,
-        "total_pending": total_pending,
-        "pending_leave_count": pending_leave_count,
-        "pending_attendance_count": pending_attendance_count,
-        "pending_holiday_count": pending_holiday_count,
-        "days_taken_this_fy": days_taken_this_fy,
-        "needs_attention": needs_attention,
-        "upcoming_leaves": upcoming_leaves,
-        # Calendar labels — BS is primary, AD is sub
-        "calendar_bs_month_label": f"{bs_month_name(bs_m)} {bs_y}",
-        "calendar_ad_month_label": build_ad_label(bs_month_start_ad, bs_month_end_ad),
-        "calendar_weeks": weeks,
+        "employee_count":            employee_count,
+        "on_leave_today_count":      on_leave_today_count,
+        "on_leave_today":            on_leave_today,
+        "total_pending":             total_pending,
+        "pending_leave_count":       pending_leave_count,
+        "pending_attendance_count":  pending_attendance_count,
+        "pending_holiday_count":     pending_holiday_count,
+        "days_taken_this_fy":        days_taken_this_fy,
+        "needs_attention":           needs_attention,
+        "upcoming_leaves":           upcoming_leaves,
+        "calendar_bs_month_label":   f"{bs_month_name(bs_m)} {bs_y}",
+        "calendar_ad_month_label":   build_ad_label(bs_month_start_ad, bs_month_end_ad),
+        "calendar_weeks":            weeks,
+        "prev_url":          prev_url,
+        "next_url":          next_url,
+        "is_current_month":  is_current_month,
     }
 
     return render(request, "dashboard/manager_dashboard.html", context)

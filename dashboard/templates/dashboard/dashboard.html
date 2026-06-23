@@ -42,10 +42,8 @@
           ">
             {% if balance_remaining < 0 %}
             <div style="
-              position:absolute;
-              right:0;top:0;
-              height:100%;
-              width:{{ overflow_percent }}%;
+              position:absolute;right:0;top:0;
+              height:100%;width:{{ overflow_percent }}%;
               background:var(--color-danger);
               box-shadow:0 0 8px var(--color-danger);
               border-radius:0 99px 99px 0;
@@ -58,7 +56,6 @@
           {% if balance_remaining < 0 %}<span style="font-size:0.7rem;display:block;">{{ balance_remaining|floatformat:"-1" }} days over</span>{% endif %}
         </span>
       </div>
-
       <div class="balance-row">
         <span class="bal-label">Attendance</span>
         <div class="bar-wrap"></div>
@@ -68,7 +65,6 @@
           {% if not own_attendance_approved and not own_attendance_pending %}—{% endif %}
         </span>
       </div>
-
       <div class="balance-row">
         <span class="bal-label">Holiday Work</span>
         <div class="bar-wrap"></div>
@@ -115,11 +111,18 @@
   <div class="card">
     <div class="cal-wrap">
       <div class="cal-month-header">
-        <div>
+        <a href="{{ prev_url }}" class="cal-nav {% if not prev_url %}disabled{% endif %}">‹</a>
+        <div style="text-align:center;">
           <span class="cal-month-title">{{ calendar_bs_month_label }}</span>
           <span class="cal-month-sub">{{ calendar_ad_month_label }}</span>
         </div>
+        <a href="{{ next_url }}" class="cal-nav {% if not next_url %}disabled{% endif %}">›</a>
       </div>
+      {% if not is_current_month %}
+        <div style="text-align:center;margin-bottom:6px;">
+          <a href="?" style="font-size:0.75rem;color:var(--color-primary);text-decoration:none;">↩ Back to current month</a>
+        </div>
+      {% endif %}
       <div class="cal-grid">
         <div class="cal-day-name">Sun</div>
         <div class="cal-day-name">Mon</div>
@@ -128,7 +131,6 @@
         <div class="cal-day-name">Thu</div>
         <div class="cal-day-name">Fri</div>
         <div class="cal-day-name">Sat</div>
-
         {% for week in calendar_weeks %}
           {% for day in week %}
             {% if day.day_number %}
@@ -173,7 +175,7 @@
     </div>
     <div class="card">
       <div class="card-header">
-        <span class="card-title">Team on Leave This Month</span>
+        <span class="card-title">Team on Leave — {{ calendar_bs_month_label }}</span>
         <span class="card-meta">{{ team_on_leave_this_month|length }} member{{ team_on_leave_this_month|length|pluralize }}</span>
       </div>
       <div class="table-responsive">
