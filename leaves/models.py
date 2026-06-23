@@ -1,3 +1,4 @@
+from django.utils.functional import cached_property
 from django.db import models
 from django.conf import settings
 
@@ -36,7 +37,7 @@ class LeaveRequest(models.Model):
     def __str__(self):
         return f"{self.employee.username} - {self.leave_type.name}"
 
-    @property
+    @cached_property
     def days(self):
         import datetime
         from django.apps import apps
@@ -77,7 +78,7 @@ class LeaveBalance(models.Model):
 
     @property
     def remaining(self):
-        return max(self.total - self.used, 0)
+        return self.total - self.used
 
     @property
     def percent(self):

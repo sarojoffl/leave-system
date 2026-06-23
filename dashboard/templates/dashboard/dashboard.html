@@ -5,9 +5,9 @@
 
 {% block content %}
 <div class="stat-grid">
-  <div class="stat-card blue">
+  <div class="stat-card {% if balance_remaining < 0 %}red{% else %}blue{% endif %}">
     <div class="stat-label">Leave Balance</div>
-    <div class="stat-value">{{ balance_remaining|floatformat:"-1" }}</div>
+    <div class="stat-value" {% if balance_remaining < 0 %}style="color:var(--color-danger)"{% endif %}>{{ balance_remaining|floatformat:"-1" }}</div>
     <div class="stat-sub">of {{ balance_total|floatformat:"-1" }} days remaining</div>
   </div>
   <div class="stat-card orange">
@@ -27,9 +27,57 @@
     <div class="card-header"><span class="card-title">Leave Balance</span></div>
     {% if balance_total %}
       <div class="balance-row">
-        <span class="bal-label">Total Leave</span>
-        <div class="bar-wrap"><div class="bar-fill" style="width:{{ balance_percent }}%;background:#4299e1;"></div></div>
-        <span class="bal-nums">{{ balance_used|floatformat:"-1" }} / {{ balance_total|floatformat:"-1" }}</span>
+        <span class="bal-label">Leave Used</span>
+        <div class="bar-wrap" style="display:flex;overflow:hidden;border-radius:99px;">
+          {# Blue portion — always 100% when exceeded, otherwise normal percent #}
+          <div style="
+            height:8px;
+            width:{% if balance_remaining < 0 %}100{% else %}{{ balance_percent }}{% endif %}%;
+            background:#4299e1;
+            box-shadow:0 0 8px #4299e1;
+            border-radius:{% if balance_remaining < 0 %}0{% else %}99px{% endif %};
+            flex-shrink:0;
+            transition:width 0.8s;
+            position:relative;
+          ">
+            {# Red overflow layered on top of the right side #}
+            {% if balance_remaining < 0 %}
+            <div style="
+              position:absolute;
+              right:0;top:0;
+              height:100%;
+              width:{{ overflow_percent }}%;
+              background:var(--color-danger);
+              box-shadow:0 0 8px var(--color-danger);
+              border-radius:0 99px 99px 0;
+            "></div>
+            {% endif %}
+          </div>
+        </div>
+        <span class="bal-nums" {% if balance_remaining < 0 %}style="color:var(--color-danger)"{% endif %}>
+          {{ balance_used|floatformat:"-1" }} / {{ balance_total|floatformat:"-1" }}
+          {% if balance_remaining < 0 %}<span style="font-size:0.7rem;display:block;">{{ balance_remaining|floatformat:"-1" }} days over</span>{% endif %}
+        </span>
+      </div>
+
+      <div class="balance-row">
+        <span class="bal-label">Attendance</span>
+        <div class="bar-wrap"></div>
+        <span class="bal-nums" style="width:auto;text-align:right;">
+          {% if own_attendance_approved %}<span class="badge approved">{{ own_attendance_approved }} approved</span> {% endif %}
+          {% if own_attendance_pending %}<span class="badge pending">{{ own_attendance_pending }} pending</span>{% endif %}
+          {% if not own_attendance_approved and not own_attendance_pending %}—{% endif %}
+        </span>
+      </div>
+
+      <div class="balance-row">
+        <span class="bal-label">Holiday Work</span>
+        <div class="bar-wrap"></div>
+        <span class="bal-nums" style="width:auto;text-align:right;">
+          {% if own_holiday_approved %}<span class="badge approved">{{ own_holiday_approved }} approved</span> {% endif %}
+          {% if own_holiday_pending %}<span class="badge pending">{{ own_holiday_pending }} pending</span>{% endif %}
+          {% if not own_holiday_approved and not own_holiday_pending %}—{% endif %}
+        </span>
       </div>
     {% else %}
       <div class="empty-state">No leave balance set up yet.</div>

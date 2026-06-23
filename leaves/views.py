@@ -235,30 +235,6 @@ def apply_leave(request):
                 messages.error(request, e)
         else:
             with transaction.atomic():
-                balance, _ = LeaveBalance.objects.select_for_update().get_or_create(
-                    employee=request.user,
-                    defaults={"total": 12},
-                )
-
-                pending_days = sum(
-                    r.days for r in LeaveRequest.objects.filter(
-                        employee=request.user, status='pending'
-                    ).select_for_update()
-                )
-
-                available = balance.remaining - pending_days
-                if requested_days > available:
-                    messages.error(
-                        request,
-                        f"Insufficient balance. You requested {requested_days} day(s), "
-                        f"but only have {available} day(s) available."
-                    )
-                    return render(
-                        request,
-                        "leaves/apply_leave.html",
-                        {"leave_types": LeaveType.objects.all()},
-                    )
-
                 leave = LeaveRequest.objects.create(
                     employee=request.user,
                     leave_type=leave_type,
@@ -476,20 +452,11 @@ def approve_leave(request, id):
             defaults={"total": 12},
         )
 
-        if balance.remaining < leave.days:
-            messages.error(
-                request,
-                f"Insufficient balance. Employee has only {balance.remaining} day(s) remaining, "
-                f"but requested {leave.days} day(s)."
-            )
-            return redirect(f"{reverse('approvals')}?tab={tab}")
-
         leave.status = "approved"
         leave.decided_at = timezone.now()
         leave.decision_note = request.POST.get("note", "").strip()
         leave.save(update_fields=["status", "decided_at", "decision_note"])
 
-        # F() expression — no race condition
         balance.used = F("used") + leave.days
         balance.save(update_fields=["used"])
 

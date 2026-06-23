@@ -44,11 +44,12 @@ def dashboard(request):
         )
     )
 
-    own_pending_count = (
-        LeaveRequest.objects.filter(employee=user, status="pending").count()
-        + AttendanceRequest.objects.filter(employee=user, status="pending").count()
-        + HolidayWorkRequest.objects.filter(employee=user, status="pending").count()
-    )
+    own_leave_pending = LeaveRequest.objects.filter(employee=user, status="pending").count()
+    own_attendance_pending = AttendanceRequest.objects.filter(employee=user, status="pending").count()
+    own_holiday_pending = HolidayWorkRequest.objects.filter(employee=user, status="pending").count()
+    own_attendance_approved = AttendanceRequest.objects.filter(employee=user, status="approved").count()
+    own_holiday_approved = HolidayWorkRequest.objects.filter(employee=user, status="approved").count()
+    own_pending_count = own_leave_pending + own_attendance_pending + own_holiday_pending
 
     # ---- Calendar grid ----
     # FIX: pre-fetch holidays and leaves for the whole month in two queries
@@ -142,6 +143,8 @@ def dashboard(request):
         "type": l.leave_type.name,
     } for l in team_leaves]
 
+    overflow_percent = max(round(((balance.used - balance.total) / balance.total) * 100), 0) if balance and balance.total > 0 else 0
+
     context = {
         "balance_used": balance.used if balance else 0,
         "balance_total": balance.total if balance else 12,
@@ -150,10 +153,18 @@ def dashboard(request):
         "days_taken": days_taken,
         "recent_leaves": recent_leaves,
         "own_pending_count": own_pending_count,
+        "own_leave_pending": own_leave_pending,
+        "own_attendance_pending": own_attendance_pending,
+        "own_holiday_pending": own_holiday_pending,
+        "own_attendance_approved": own_attendance_approved,
+        "own_holiday_approved": own_holiday_approved,
         "calendar_month_label": f"{month_name[today.month]} {today.year}",
         "calendar_weeks": weeks,
-        "public_holidays": list(holiday_map.items()),  # already fetched
+        "public_holidays": PublicHoliday.objects.filter(
+            date__year=today.year, date__month=today.month
+        ),
         "team_on_leave_this_month": team_on_leave_this_month,
+        "overflow_percent": overflow_percent,
     }
 
     return render(request, "dashboard/dashboard.html", context)

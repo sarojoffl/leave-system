@@ -227,20 +227,20 @@ a {
 
 .sidebar-logo {
   padding: 24px 24px 20px;
-  font-size: 1.15rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  color: var(--color-text);
   border-bottom: 1px solid var(--color-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  text-shadow: 0 0 10px rgba(255,255,255,0.1);
 }
 
-.sidebar-logo span {
-  color: var(--color-primary);
-  font-weight: 800;
+.logo-img-wrap img {
+  height: 52px;
+  max-width: 190px;
+  width: auto;
+  object-fit: contain;
+  background: #fff;
+  border-radius: 10px;
+  padding: 6px 12px;
 }
 
 .sidebar-close {
@@ -1132,12 +1132,13 @@ textarea {
   opacity: 0.35;
 }
 
-.cal-day.today { 
-  background: rgba(0, 229, 255, 0.15); 
-  color: var(--color-text); 
-  border-color: var(--color-primary); 
+.cal-day.today {
+  background: rgba(0, 229, 255, 0.15);
+  color: var(--color-text);
+  border-color: var(--color-primary) !important;
+  border-width: 2px !important;
   font-weight: 800;
-  box-shadow: 0 0 15px rgba(0, 229, 255, 0.2);
+  box-shadow: 0 0 15px rgba(0, 229, 255, 0.25) !important;
 }
 
 .cal-day.leave-approved { 
@@ -1442,8 +1443,7 @@ textarea {
   }
 
   .topbar-date {
-    font-size: 0.72rem;
-    padding: 4px 8px;
+    display: none;
   }
 
   .content {
@@ -1495,10 +1495,6 @@ textarea {
 
   .topbar h1 {
     font-size: 1.1rem;
-  }
-
-  .role-badge {
-    display: none;
   }
 
   .balance-row {
