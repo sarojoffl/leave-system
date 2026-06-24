@@ -13,7 +13,7 @@
 
 <div class="type-panel" data-panel="leave">
   <div class="flex-actions" style="justify-content: flex-end; margin-bottom: 16px;">
-    <a href="{% url 'export_my_leaves_csv' %}" class="btn btn-outline btn-sm">⬇ Export CSV</a>
+    <a href="{% url 'export_my_leaves_csv' %}" class="btn btn-outline btn-sm" id="export-leaves-csv" style="display: none;">⬇ Export CSV</a>
   </div>
 
   <div class="tabs">
@@ -81,16 +81,26 @@
 </div>
 
 <div class="type-panel" data-panel="attendance" style="display:none;">
+  <div class="flex-actions" style="justify-content: flex-end; margin-bottom: 16px;">
+    <a href="{% url 'export_my_attendance_csv' %}" class="btn btn-outline btn-sm" id="export-attendance-csv" style="display: none;">⬇ Export CSV</a>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-filter="all">All Requests</div>
+    <div class="tab" data-filter="pending">Pending</div>
+    <div class="tab" data-filter="approved">Approved</div>
+    <div class="tab" data-filter="rejected">Rejected</div>
+  </div>
+
   <div class="card">
-    <div class="card-header"><span class="card-title">Attendance Requests</span></div>
     <div class="table-responsive">
       <table>
         <thead>
           <tr><th>#</th><th>Date</th><th>Reason</th><th>Applied On</th><th>Status</th><th>Note</th></tr>
         </thead>
-        <tbody>
+        <tbody id="my-attendance-body">
           {% for a in attendance_requests %}
-            <tr>
+            <tr data-status="{{ a.status }}">
               <td>{{ a.id|stringformat:"03d" }}</td>
               <td>{{ a.date|to_bs_short }}</td>
               <td>{{ a.reason|truncatechars:50 }}</td>
@@ -115,16 +125,26 @@
 </div>
 
 <div class="type-panel" data-panel="holiday" style="display:none;">
+  <div class="flex-actions" style="justify-content: flex-end; margin-bottom: 16px;">
+    <a href="{% url 'export_my_holiday_work_csv' %}" class="btn btn-outline btn-sm" id="export-holiday-csv" style="display: none;">⬇ Export CSV</a>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-filter="all">All Requests</div>
+    <div class="tab" data-filter="pending">Pending</div>
+    <div class="tab" data-filter="approved">Approved</div>
+    <div class="tab" data-filter="rejected">Rejected</div>
+  </div>
+
   <div class="card">
-    <div class="card-header"><span class="card-title">Holiday Work Records</span></div>
     <div class="table-responsive">
       <table>
         <thead>
           <tr><th>#</th><th>Date</th><th>Reason</th><th>Applied On</th><th>Status</th><th>Note</th></tr>
         </thead>
-        <tbody>
+        <tbody id="my-holiday-body">
           {% for h in holiday_work_requests %}
-            <tr>
+            <tr data-status="{{ h.status }}">
               <td>{{ h.id|stringformat:"03d" }}</td>
               <td>{{ h.date|to_bs_short }}</td>
               <td>{{ h.reason|truncatechars:50 }}</td>

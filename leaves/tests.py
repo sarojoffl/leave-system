@@ -24,14 +24,14 @@ class LeaveSystemTestCase(TestCase):
         
         # Create Leave Type
         self.annual_leave = LeaveType.objects.create(
-            name="Annual Leave",
-            total_days=10,
-            color="#ff0000"
+            name="Annual Leave"
         )
         
-        # Note: Signals create LeaveBalance for existing users when LeaveType is created.
+        # Note: Signals create LeaveBalance for existing users when they are created.
         # Let's verify and grab it
-        self.balance = LeaveBalance.objects.get(employee=self.employee, leave_type=self.annual_leave)
+        self.balance = LeaveBalance.objects.get(employee=self.employee)
+        self.balance.total = 10.0
+        self.balance.save()
         
         # Set up a public holiday on Friday, June 19, 2026
         self.holiday_date = date(2026, 6, 19)
@@ -61,7 +61,6 @@ class LeaveSystemTestCase(TestCase):
             leave_type=self.annual_leave,
             start_date=date(2026, 6, 18),
             end_date=date(2026, 6, 22),
-            duration="full",
             reason="Vacation"
         )
         self.assertEqual(req.days, 3.0)
@@ -70,25 +69,33 @@ class LeaveSystemTestCase(TestCase):
         """
         Verify that we cannot apply for leaves that overlap existing ones.
         """
+        from datetime import timedelta
         self.client.login(username="employee", password="password123")
         
-        # Apply for leave June 22 to June 23 (2 working days)
+        today = date.today()
+        # Find a future date range starting next Monday
+        days_ahead = 7 - today.weekday()
+        if days_ahead <= 0:
+            days_ahead += 7
+        next_monday = today + timedelta(days=days_ahead)
+        next_tuesday = next_monday + timedelta(days=1)
+        next_wednesday = next_monday + timedelta(days=2)
+
+        # Apply for leave next_monday to next_tuesday (2 working days)
         response1 = self.client.post(reverse("apply_leave"), {
             "leave_type": self.annual_leave.id,
-            "from_date": "2026-06-22",
-            "to_date": "2026-06-23",
-            "duration": "full",
+            "from_date": next_monday.strftime("%Y-%m-%d"),
+            "to_date": next_tuesday.strftime("%Y-%m-%d"),
             "reason": "First request"
         })
         self.assertRedirects(response1, reverse("my_leaves"))
         self.assertTrue(LeaveRequest.objects.filter(employee=self.employee, reason="First request").exists())
         
-        # Try to apply for overlapping leave June 23 to June 24
+        # Try to apply for overlapping leave next_tuesday to next_wednesday
         response2 = self.client.post(reverse("apply_leave"), {
             "leave_type": self.annual_leave.id,
-            "from_date": "2026-06-23",
-            "to_date": "2026-06-24",
-            "duration": "full",
+            "from_date": next_tuesday.strftime("%Y-%m-%d"),
+            "to_date": next_wednesday.strftime("%Y-%m-%d"),
             "reason": "Overlapping request"
         })
         # Overlapping should cause validation failure and not redirect
@@ -99,83 +106,92 @@ class LeaveSystemTestCase(TestCase):
         """
         Verify that an employee cannot request more leave than they have available.
         """
+        from datetime import timedelta
         self.client.login(username="employee", password="password123")
         
-        # Employee has 10 days total balance. Let's request 12 working days.
-        # June 15 to June 28 (14 calendar days)
-        # Weekends (Saturdays): June 20, June 27 (2 Saturdays)
-        # Working days = 12. Exceeds 10 days balance.
+        # We need a range of 14 calendar days starting from next Monday
+        today = date.today()
+        days_ahead = 7 - today.weekday()
+        if days_ahead <= 0:
+            days_ahead += 7
+        next_monday = today + timedelta(days=days_ahead)
+        end_date = next_monday + timedelta(days=13)  # 14 calendar days
+
+        # Even though the range has 12 working days (exceeds 10 balance),
+        # balance enforcement was relaxed in f058067, so the request now succeeds.
         response = self.client.post(reverse("apply_leave"), {
             "leave_type": self.annual_leave.id,
-            "from_date": "2026-06-15",
-            "to_date": "2026-06-28",
-            "duration": "full",
+            "from_date": next_monday.strftime("%Y-%m-%d"),
+            "to_date": end_date.strftime("%Y-%m-%d"),
             "reason": "Too long"
         })
-        self.assertEqual(response.status_code, 200)
-        self.assertFalse(LeaveRequest.objects.filter(employee=self.employee, reason="Too long").exists())
+        # Should now redirect (302) because balance enforcement was removed
+        self.assertRedirects(response, reverse("my_leaves"))
+        self.assertTrue(LeaveRequest.objects.filter(employee=self.employee, reason="Too long").exists())
 
-    def test_approve_blocks_insufficient_balance(self):
+    def test_approve_always_succeeds_regardless_of_balance(self):
         """
-        Verify that a manager cannot approve a leave request if the employee's balance has become insufficient.
+        Since balance enforcement was relaxed (commit f058067),
+        a manager can approve leave requests even when the employee's balance
+        would be exceeded. Both requests should be approved.
         """
-        # Create request for 6 days
         req1 = LeaveRequest.objects.create(
             employee=self.employee,
             leave_type=self.annual_leave,
             start_date=date(2026, 6, 15),
-            end_date=date(2026, 6, 21), # 7 calendar days, 1 Sat (20) -> 6 working days
-            duration="full",
+            end_date=date(2026, 6, 21),  # 5 working days
             reason="First"
         )
-        # Create another request for 6 days
         req2 = LeaveRequest.objects.create(
             employee=self.employee,
             leave_type=self.annual_leave,
             start_date=date(2026, 6, 22),
-            end_date=date(2026, 6, 28), # 7 calendar days, 1 Sat (27) -> 6 working days
-            duration="full",
+            end_date=date(2026, 6, 28),  # 6 working days
             reason="Second"
         )
-        
-        # Log in as manager to approve
+
         self.client.login(username="manager", password="password123")
-        
-        # Approve first (succeeds)
+
+        # Approve first request — should succeed
         self.client.post(reverse("approve_leave", args=[req1.id]))
         req1.refresh_from_db()
         self.assertEqual(req1.status, "approved")
-        self.balance.refresh_from_db()
-        self.assertEqual(self.balance.used, 5.0)
-        
-        # Try to approve second (fails since only 5 days remain but request is 6)
-        response = self.client.post(reverse("approve_leave", args=[req2.id]))
+
+        # Approve second request — should also succeed (no balance check)
+        self.client.post(reverse("approve_leave", args=[req2.id]))
         req2.refresh_from_db()
-        self.assertEqual(req2.status, "pending") # Status unchanged
+        self.assertEqual(req2.status, "approved")
 
     def test_cancel_approved_leave_refunds_balance(self):
         """
         Verify that cancelling an approved leave request refunds the employee's balance.
+        Only future leaves (start_date > today) can be cancelled by employees.
         """
+        from datetime import timedelta
+        today = date.today()
+        days_ahead = 7 - today.weekday()
+        if days_ahead <= 0:
+            days_ahead += 7
+        next_monday = today + timedelta(days=days_ahead)
+        next_thursday = next_monday + timedelta(days=3)  # 4 working days
+
         req = LeaveRequest.objects.create(
             employee=self.employee,
             leave_type=self.annual_leave,
-            start_date=date(2026, 6, 22),
-            end_date=date(2026, 6, 25), # 4 working days (no Saturdays)
-            duration="full",
+            start_date=next_monday,
+            end_date=next_thursday,  # 4 working days (Mon-Thu)
             reason="Cancel test",
             status="approved"
         )
-        # Setup balance used
+        # Setup balance as if it was already deducted
         self.balance.used = 4.0
         self.balance.save()
-        
-        # Login as employee to cancel
+
         self.client.login(username="employee", password="password123")
-        
+
         response = self.client.post(reverse("cancel_leave", args=[req.id]))
         self.assertRedirects(response, reverse("my_leaves"))
-        
+
         req.refresh_from_db()
         self.assertEqual(req.status, "cancelled")
         self.balance.refresh_from_db()
@@ -184,26 +200,102 @@ class LeaveSystemTestCase(TestCase):
     def test_revoke_approved_leave_refunds_balance(self):
         """
         Verify that a manager revoking an approved leave refunds the employee's balance.
+        Revoke is only allowed if the leave has not yet ended.
         """
+        from datetime import timedelta
+        today = date.today()
+        days_ahead = 7 - today.weekday()
+        if days_ahead <= 0:
+            days_ahead += 7
+        next_monday = today + timedelta(days=days_ahead)
+        next_thursday = next_monday + timedelta(days=3)  # 4 working days
+
         req = LeaveRequest.objects.create(
             employee=self.employee,
             leave_type=self.annual_leave,
-            start_date=date(2026, 6, 22),
-            end_date=date(2026, 6, 25), # 4 working days
-            duration="full",
+            start_date=next_monday,
+            end_date=next_thursday,
             reason="Revoke test",
             status="approved"
         )
         self.balance.used = 4.0
         self.balance.save()
-        
-        # Login as manager to revoke
+
         self.client.login(username="manager", password="password123")
-        
+
         response = self.client.post(reverse("reject_leave", args=[req.id]))
-        self.assertRedirects(response, reverse("approvals"))
-        
+        # Redirect goes to approvals with ?tab=leave (default tab)
+        self.assertRedirects(response, f"{reverse('approvals')}?tab=leave")
+
         req.refresh_from_db()
         self.assertEqual(req.status, "rejected")
         self.balance.refresh_from_db()
         self.assertEqual(self.balance.used, 0.0)
+
+
+class CSVExportTestCase(TestCase):
+    """Tests for CSV export endpoints under My Leaves."""
+
+    def setUp(self):
+        self.employee = User.objects.create_user(
+            username="csvuser",
+            password="password123",
+            role="employee",
+            email="csvuser@company.com"
+        )
+        self.client = Client()
+        self.client.login(username="csvuser", password="password123")
+
+    def test_export_my_attendance_csv_returns_csv(self):
+        """
+        Verify that the attendance CSV export endpoint returns a 200 response
+        with the correct content-type and header row.
+        """
+        from leaves.models import AttendanceRequest
+        AttendanceRequest.objects.create(
+            employee=self.employee,
+            date=date(2026, 6, 1),
+            reason="Late login",
+            status="approved"
+        )
+        response = self.client.get(reverse("export_my_attendance_csv"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "text/csv")
+        content = b"".join(response.streaming_content) if hasattr(response, "streaming_content") else response.content
+        decoded = content.decode("utf-8")
+        self.assertIn("Date (AD)", decoded)
+        self.assertIn("Date (BS)", decoded)
+        self.assertIn("Reason", decoded)
+        self.assertIn("Late login", decoded)
+
+    def test_export_my_holiday_work_csv_returns_csv(self):
+        """
+        Verify that the holiday work CSV export endpoint returns a 200 response
+        with the correct content-type and header row.
+        """
+        from leaves.models import HolidayWorkRequest
+        HolidayWorkRequest.objects.create(
+            employee=self.employee,
+            date=date(2026, 6, 5),
+            reason="Office delivery",
+            status="approved"
+        )
+        response = self.client.get(reverse("export_my_holiday_work_csv"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "text/csv")
+        content = b"".join(response.streaming_content) if hasattr(response, "streaming_content") else response.content
+        decoded = content.decode("utf-8")
+        self.assertIn("Date (AD)", decoded)
+        self.assertIn("Date (BS)", decoded)
+        self.assertIn("Reason", decoded)
+        self.assertIn("Office delivery", decoded)
+
+    def test_export_endpoints_require_login(self):
+        """
+        Verify that the export endpoints require authentication.
+        """
+        self.client.logout()
+        for url_name in ["export_my_attendance_csv", "export_my_holiday_work_csv"]:
+            response = self.client.get(reverse(url_name))
+            self.assertEqual(response.status_code, 302)
+            self.assertIn("/accounts/login/", response["Location"])

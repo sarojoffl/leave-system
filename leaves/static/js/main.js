@@ -139,19 +139,39 @@ function initSuccessModal() {
    My Leaves: client-side status tabs
 ------------------------------------------- */
 function initLeaveTabs() {
-  const tabs = document.querySelectorAll('.tab[data-filter]');
-  const rows = document.querySelectorAll('#my-leaves-body tr');
+  const panels = document.querySelectorAll('.type-panel');
+  if (!panels.length) return;
 
-  if (!tabs.length || !rows.length) return;
+  panels.forEach((panel) => {
+    const tabs = panel.querySelectorAll('.tabs .tab[data-filter]');
+    const rows = panel.querySelectorAll('tbody tr');
+    const exportBtn = panel.querySelector('.flex-actions a[id^="export-"]');
 
-  tabs.forEach((tab) => {
-    tab.addEventListener('click', () => {
-      tabs.forEach((t) => t.classList.remove('active'));
-      tab.classList.add('active');
+    if (!tabs.length || !rows.length) return;
 
-      const filter = tab.dataset.filter;
-      rows.forEach((row) => {
-        row.style.display = (filter === 'all' || row.dataset.status === filter) ? '' : 'none';
+    // Show/hide export button initially based on active tab
+    const activeTab = panel.querySelector('.tabs .tab.active');
+    const initialFilter = activeTab ? activeTab.dataset.filter : 'all';
+    if (exportBtn) {
+      exportBtn.style.display = initialFilter === 'approved' ? '' : 'none';
+    }
+
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        tabs.forEach((t) => t.classList.remove('active'));
+        tab.classList.add('active');
+
+        const filter = tab.dataset.filter;
+        rows.forEach((row) => {
+          if (row.querySelector('.empty-state') || row.classList.contains('empty-state')) {
+            return;
+          }
+          row.style.display = (filter === 'all' || row.dataset.status === filter) ? '' : 'none';
+        });
+
+        if (exportBtn) {
+          exportBtn.style.display = filter === 'approved' ? '' : 'none';
+        }
       });
     });
   });

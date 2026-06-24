@@ -963,3 +963,57 @@ def export_my_leaves_csv(request):
         ])
 
     return response
+
+
+@login_required
+def export_my_attendance_csv(request):
+    today = date.today()
+    requests = (
+        AttendanceRequest.objects.filter(employee=request.user, status="approved")
+        .order_by("-date")
+    )
+
+    filename = f"my_approved_attendance_{request.user.username}_{today.isoformat()}.csv"
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    writer = csv.writer(response)
+
+    writer.writerow([f"Approved Attendance Corrections — {request.user.get_full_name() or request.user.username}"])
+    writer.writerow([f"Exported on {today}"])
+    writer.writerow([])
+
+    writer.writerow(["Date (AD)", "Date (BS)", "Reason", "Decision Note", "Approved On"])
+    for r in requests:
+        writer.writerow([
+            r.date, r.date_bs, r.reason, r.decision_note or "",
+            r.decided_at.strftime("%Y-%m-%d") if r.decided_at else "",
+        ])
+
+    return response
+
+
+@login_required
+def export_my_holiday_work_csv(request):
+    today = date.today()
+    requests = (
+        HolidayWorkRequest.objects.filter(employee=request.user, status="approved")
+        .order_by("-date")
+    )
+
+    filename = f"my_approved_holiday_work_{request.user.username}_{today.isoformat()}.csv"
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    writer = csv.writer(response)
+
+    writer.writerow([f"Approved Holiday Work — {request.user.get_full_name() or request.user.username}"])
+    writer.writerow([f"Exported on {today}"])
+    writer.writerow([])
+
+    writer.writerow(["Date (AD)", "Date (BS)", "Reason", "Decision Note", "Approved On"])
+    for r in requests:
+        writer.writerow([
+            r.date, r.date_bs, r.reason, r.decision_note or "",
+            r.decided_at.strftime("%Y-%m-%d") if r.decided_at else "",
+        ])
+
+    return response
