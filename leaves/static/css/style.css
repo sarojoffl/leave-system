@@ -47,6 +47,7 @@
   --radius-sm: 10px;
   --shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.7);
   --shadow-neon: 0 0 20px rgba(0, 229, 255, 0.15);
+  --shadow-sidebar-mobile: 10px 0 30px rgba(0, 0, 0, 0.8);
   --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 
   /* Glass overlay tints (used for hover/stripe backgrounds) */
@@ -110,6 +111,7 @@
 
   --shadow: 0 10px 30px -10px rgba(16, 21, 34, 0.12);
   --shadow-neon: 0 0 20px rgba(0, 145, 179, 0.1);
+  --shadow-sidebar-mobile: 10px 0 30px rgba(16, 21, 34, 0.15);
 
   --overlay-1: rgba(16, 21, 34, 0.015);
   --overlay-1-5: rgba(16, 21, 34, 0.02);
@@ -222,7 +224,7 @@ a {
   bottom: 0;
   left: 0;
   z-index: 100;
-  transition: transform var(--transition);
+  transition: transform var(--transition), box-shadow var(--transition);
 }
 
 .sidebar-logo {
@@ -1451,11 +1453,12 @@ textarea {
   .sidebar {
     transform: translateX(-100%);
     width: 260px;
-    box-shadow: 10px 0 30px rgba(0, 0, 0, 0.8);
+    box-shadow: none;
   }
 
   .sidebar.open {
     transform: translateX(0);
+    box-shadow: var(--shadow-sidebar-mobile);
   }
 
   .sidebar-overlay.open {
