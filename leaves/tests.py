@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
@@ -299,3 +299,94 @@ class CSVExportTestCase(TestCase):
             response = self.client.get(reverse(url_name))
             self.assertEqual(response.status_code, 302)
             self.assertIn("/accounts/login/", response["Location"])
+
+
+class StaffMovementTestCase(TestCase):
+    """Tests for Staff Movement logging, editing, and filtering."""
+
+    def setUp(self):
+        self.employee = User.objects.create_user(
+            username="testemployee",
+            password="password123",
+            role="employee",
+            email="testemployee@company.com"
+        )
+        self.manager = User.objects.create_user(
+            username="testmanager",
+            password="password123",
+            role="manager",
+            email="testmanager@company.com"
+        )
+        self.client = Client()
+
+    def test_log_movement_requires_login(self):
+        response = self.client.get(reverse("staff_movement"))
+        self.assertEqual(response.status_code, 302)
+
+    def test_employee_can_log_and_edit_movement(self):
+        self.client.login(username="testemployee", password="password123")
+        
+        # Log new movement
+        response = self.client.post(reverse("staff_movement"), {
+            "date": "2026-07-10",
+            "client": "Google Office",
+            "out_time": "10:30",
+            "purpose": "Technical Demo"
+        })
+        self.assertRedirects(response, reverse("staff_movement"))
+        
+        from leaves.models import StaffMovement
+        movement = StaffMovement.objects.get(client="Google Office")
+        self.assertEqual(movement.employee, self.employee)
+        self.assertEqual(movement.purpose, "Technical Demo")
+        self.assertIsNone(movement.in_time)
+
+        # Fill in return time (edit)
+        response_edit = self.client.post(reverse("staff_movement_edit", args=[movement.id]), {
+            "date": "2026-07-10",
+            "client": "Google Office",
+            "out_time": "10:30",
+            "in_time": "12:45",
+            "purpose": "Technical Demo Completed"
+        })
+        self.assertRedirects(response_edit, reverse("staff_movement"))
+        movement.refresh_from_db()
+        self.assertEqual(movement.in_time.strftime("%H:%M"), "12:45")
+        self.assertEqual(movement.purpose, "Technical Demo Completed")
+
+    def test_manager_can_view_and_filter_movements(self):
+        from leaves.models import StaffMovement
+        StaffMovement.objects.create(
+            employee=self.employee,
+            date=date(2026, 7, 10),
+            client="Google Office",
+            out_time=datetime.strptime("10:30", "%H:%M").time(),
+            purpose="Demo"
+        )
+        StaffMovement.objects.create(
+            employee=self.employee,
+            date=date(2026, 7, 11),
+            client="Microsoft Office",
+            out_time=datetime.strptime("11:00", "%H:%M").time(),
+            purpose="Meeting"
+        )
+
+        # Log in as manager
+        self.client.login(username="testmanager", password="password123")
+        
+        # Set session view_mode to manager to pass is_manager check
+        session = self.client.session
+        session["view_mode"] = "manager"
+        session.save()
+
+        # Load manager view
+        response = self.client.get(reverse("staff_movement"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Staff Movement Logs")
+        
+        # Filter by client "Microsoft"
+        response_filter = self.client.get(reverse("staff_movement"), {"client": "Microsoft"})
+        self.assertEqual(response_filter.status_code, 200)
+        self.assertContains(response_filter, "Microsoft Office")
+        self.assertNotContains(response_filter, "Google Office")
+

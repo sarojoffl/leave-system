@@ -3,7 +3,7 @@ from django.utils import timezone
 
 from .models import (
     LeaveType, LeaveRequest, LeaveBalance, PublicHoliday,
-    AttendanceRequest, HolidayWorkRequest,
+    AttendanceRequest, HolidayWorkRequest, StaffMovement,
 )
 
 
@@ -104,3 +104,13 @@ class AttendanceRequestAdmin(BaseDayRequestAdmin):
 @admin.register(HolidayWorkRequest)
 class HolidayWorkRequestAdmin(BaseDayRequestAdmin):
     pass
+
+
+@admin.register(StaffMovement)
+class StaffMovementAdmin(admin.ModelAdmin):
+    list_display = ("employee", "date", "client", "out_time", "in_time", "created_at")
+    list_filter = ("date", "employee", "client")
+    search_fields = ("employee__username", "employee__first_name", "employee__last_name", "client", "purpose")
+    date_hierarchy = "date"
+    readonly_fields = ("created_at",)
+    autocomplete_fields = ("employee",)

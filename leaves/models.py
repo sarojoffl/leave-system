@@ -138,3 +138,28 @@ class AttendanceRequest(BaseDayRequest):
 class HolidayWorkRequest(BaseDayRequest):
     def __str__(self):
         return f"{self.employee.username} - Holiday Work {self.date}"
+
+
+class StaffMovement(models.Model):
+    employee = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="staff_movements"
+    )
+    date = models.DateField()
+    client = models.CharField(max_length=200)
+    out_time = models.TimeField()
+    in_time = models.TimeField(null=True, blank=True)
+    purpose = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date", "-out_time"]
+
+    def __str__(self):
+        return f"{self.employee.username} - {self.client} on {self.date}"
+
+    @property
+    def date_bs(self) -> str:
+        from leaves.bs_convert import ad_to_bs_display
+        return ad_to_bs_display(self.date)

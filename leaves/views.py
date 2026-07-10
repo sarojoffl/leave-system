@@ -15,7 +15,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .models import AttendanceRequest, HolidayWorkRequest, LeaveBalance, LeaveRequest, LeaveType
+from .models import AttendanceRequest, HolidayWorkRequest, LeaveBalance, LeaveRequest, LeaveType, StaffMovement
 from .permissions import manager_required
 
 logger = logging.getLogger(__name__)
@@ -27,9 +27,15 @@ from leaves.bs_convert import ad_to_bs_display
 # ---------------------------------------------------------------------------
 
 def get_fiscal_year_start(today=None):
-    """Return the start date of the current Nepali fiscal year (Shrawan 1 ≈ July 17)."""
+    """Return the start date of the current Nepali fiscal year (Shrawan 1 = July 17).
+
+    The new fiscal year begins on July 17. Dates from July 1-16 still belong
+    to the *previous* fiscal year, so we check both month and day.
+    """
     today = today or date.today()
-    year = today.year if today.month >= 7 else today.year - 1
+    # New FY starts on July 17; before that date we are still in the previous FY
+    in_new_fy = today.month > 7 or (today.month == 7 and today.day >= 17)
+    year = today.year if in_new_fy else today.year - 1
     return date(year, 7, 17)
 
 
@@ -1017,3 +1023,182 @@ def export_my_holiday_work_csv(request):
         ])
 
     return response
+
+
+@login_required
+def staff_movement(request):
+    from accounts.utils import get_view_mode
+    today = date.today()
+    is_manager = get_view_mode(request) == 'manager' and request.user.has_management_access
+
+    if is_manager:
+        from accounts.models import User
+        # GET filters
+        filter_date = request.GET.get("date")
+        filter_employee_id = request.GET.get("employee")
+        filter_client = request.GET.get("client", "").strip()
+
+        movements = StaffMovement.objects.all().select_related("employee")
+
+        if filter_date:
+            try:
+                parsed_date = datetime.strptime(filter_date, "%Y-%m-%d").date()
+                movements = movements.filter(date=parsed_date)
+            except ValueError:
+                pass
+
+        if filter_employee_id:
+            try:
+                filter_employee_id = int(filter_employee_id)
+                movements = movements.filter(employee_id=filter_employee_id)
+            except ValueError:
+                filter_employee_id = None
+
+        if filter_client:
+            movements = movements.filter(client__icontains=filter_client)
+
+        employees = User.objects.exclude(role="system_admin").order_by("first_name", "username")
+
+        return render(request, "leaves/staff_movement.html", {
+            "movements": movements,
+            "employees": employees,
+            "filter_date": filter_date,
+            "filter_employee_id": filter_employee_id,
+            "filter_client": filter_client,
+            "is_manager": True,
+        })
+    else:
+        # Employee view
+        if request.method == "POST":
+            date_str = request.POST.get("date")
+            client_str = request.POST.get("client", "").strip()
+            out_time_str = request.POST.get("out_time")
+            in_time_str = request.POST.get("in_time")
+            purpose = request.POST.get("purpose", "").strip()
+
+            errors = []
+            if not date_str:
+                errors.append("Please select a date.")
+            if not client_str:
+                errors.append("Please specify the client / location.")
+            if not out_time_str:
+                errors.append("Please specify the departure time.")
+
+            movement_date = None
+            out_time = None
+            in_time = None
+
+            if date_str:
+                try:
+                    movement_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+                except ValueError:
+                    errors.append("Invalid date format.")
+
+            if out_time_str:
+                try:
+                    out_time = datetime.strptime(out_time_str, "%H:%M").time()
+                except ValueError:
+                    try:
+                        out_time = datetime.strptime(out_time_str, "%H:%M:%S").time()
+                    except ValueError:
+                        errors.append("Invalid departure time format.")
+
+            if in_time_str:
+                try:
+                    in_time = datetime.strptime(in_time_str, "%H:%M").time()
+                except ValueError:
+                    try:
+                        in_time = datetime.strptime(in_time_str, "%H:%M:%S").time()
+                    except ValueError:
+                        errors.append("Invalid return time format.")
+
+            if not errors:
+                StaffMovement.objects.create(
+                    employee=request.user,
+                    date=movement_date,
+                    client=client_str,
+                    out_time=out_time,
+                    in_time=in_time,
+                    purpose=purpose,
+                )
+                messages.success(request, "Staff movement record logged successfully.")
+                return redirect("staff_movement")
+            
+            for err in errors:
+                messages.error(request, err)
+
+        # GET request or fallback after POST validation failure
+        movements = StaffMovement.objects.filter(employee=request.user)
+        return render(request, "leaves/staff_movement.html", {
+            "movements": movements,
+            "is_manager": False,
+            "today": today,
+        })
+
+
+@login_required
+def staff_movement_edit(request, id):
+    movement = get_object_or_404(StaffMovement, id=id, employee=request.user)
+
+    if request.method == "POST":
+        date_str = request.POST.get("date")
+        client_str = request.POST.get("client", "").strip()
+        out_time_str = request.POST.get("out_time")
+        in_time_str = request.POST.get("in_time")
+        purpose = request.POST.get("purpose", "").strip()
+
+        errors = []
+        if not date_str:
+            errors.append("Please select a date.")
+        if not client_str:
+            errors.append("Please specify the client / location.")
+        if not out_time_str:
+            errors.append("Please specify the departure time.")
+
+        movement_date = None
+        out_time = None
+        in_time = None
+
+        if date_str:
+            try:
+                movement_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+            except ValueError:
+                errors.append("Invalid date format.")
+
+        if out_time_str:
+            try:
+                out_time = datetime.strptime(out_time_str, "%H:%M").time()
+            except ValueError:
+                try:
+                    out_time = datetime.strptime(out_time_str, "%H:%M:%S").time()
+                except ValueError:
+                    errors.append("Invalid departure time format.")
+
+        if in_time_str:
+            try:
+                in_time = datetime.strptime(in_time_str, "%H:%M").time()
+            except ValueError:
+                try:
+                    in_time = datetime.strptime(in_time_str, "%H:%M:%S").time()
+                except ValueError:
+                    errors.append("Invalid return time format.")
+
+        if not errors:
+            movement.date = movement_date
+            movement.client = client_str
+            movement.out_time = out_time
+            movement.in_time = in_time
+            movement.purpose = purpose
+            movement.save()
+            messages.success(request, "Staff movement record updated successfully.")
+            return redirect("staff_movement")
+
+        for err in errors:
+            messages.error(request, err)
+
+    # Pre-populate form
+    return render(request, "leaves/staff_movement.html", {
+        "movement": movement,
+        "is_edit": True,
+        "is_manager": False,
+    })

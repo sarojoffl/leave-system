@@ -5,6 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{% block title %}Global Link Technology — Leave System{% endblock %}</title>
+<link rel="icon" type="image/webp" href="https://globallinknepal.com/static/images/logo.webp">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -63,6 +64,12 @@
         </svg>
         Staff
       </a>
+      <a href="{% url 'staff_movement' %}" class="nav-item {% if request.resolver_match.url_name == 'staff_movement' %}active{% endif %}">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3V6zm6-3v15m6-15v15"/>
+        </svg>
+        Staff Movement
+      </a>
       {% else %}
       <a href="{% url 'dashboard' %}" class="nav-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
         <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
@@ -75,6 +82,12 @@
       <a href="{% url 'my_leaves' %}" class="nav-item {% if request.resolver_match.url_name == 'my_leaves' %}active{% endif %}">
         <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="m9 12 2 2 4-4"/></svg>
         My Leaves
+      </a>
+      <a href="{% url 'staff_movement' %}" class="nav-item {% if request.resolver_match.url_name == 'staff_movement' or request.resolver_match.url_name == 'staff_movement_edit' %}active{% endif %}">
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3V6zm6-3v15m6-15v15"/>
+        </svg>
+        Staff Movement
       </a>
       {% endif %}
     </nav>
