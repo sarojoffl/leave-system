@@ -227,8 +227,8 @@ a {
 }
 
 .logo-img-wrap img {
-  height: 52px;
-  max-width: 190px;
+  height: 64px;
+  max-width: 220px;
   width: auto;
   object-fit: contain;
   background: #fff;
