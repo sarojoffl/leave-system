@@ -3,84 +3,14 @@
    ========================================================================== */
 
 :root {
-  /* Futuristic Dark Accent Colors */
-  --color-primary: #00e5ff;       /* Glowing Neon Cyan */
-  --color-primary-dark: #090e1a;  /* Deep Space Black-Blue */
-  --color-primary-light: #82f5ff; /* Pale Cyan Accent */
-  --color-accent: #0088ff;        /* Neon blue */
-  --color-purple: #b966ff;        /* Neon purple */
-
-  /* Status Glowing Colors */
-  --color-success: #00e676;       /* Emerald green */
-  --color-success-bg: rgba(0, 230, 118, 0.08);
-  --color-success-border: rgba(0, 230, 118, 0.2);
-  --color-success-text: #00e676;
-
-  --color-warning: #ff9100;       /* Cyber Orange */
-  --color-pending-bg: rgba(255, 145, 0, 0.08);
-  --color-pending-border: rgba(255, 145, 0, 0.25);
-  --color-pending-text: #ff9100;
-
-  --color-danger: #ff1744;        /* Electric Red */
-  --color-danger-dark: #dc2626;
-  --color-rejected-bg: rgba(255, 23, 68, 0.08);
-  --color-rejected-border: rgba(255, 23, 68, 0.25);
-  --color-rejected-text: #ff1744;
-
-  /* Theme Surfaces (Glassmorphic) */
-  --color-bg: #07090e;                  /* Cyber Space Background */
-  --color-sidebar: #0b0f19;             /* Sidebar Deep Panel */
-  --color-card: rgba(16, 24, 45, 0.55); /* Translucent Glass */
-  --color-card-hover: rgba(22, 33, 62, 0.7);
-  --color-text: #f8fafc;                /* Premium Slate White */
-  --color-text-muted: #94a3b8;          /* Muted Slate Blue */
-  --color-text-light: #64748b;          /* Light Slate Gray */
-  
-  --color-border: rgba(255, 255, 255, 0.06);       /* Sleek Glass Border */
-  --color-border-light: rgba(255, 255, 255, 0.03); /* Whisper Border */
-  --color-focus-glow: rgba(0, 229, 255, 0.25);
-
-  /* Layout and Geometry */
-  --sidebar-width: 250px;
-  --topbar-height: 70px;
-  --radius: 16px;
-  --radius-sm: 10px;
-  --shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.7);
-  --shadow-neon: 0 0 20px rgba(0, 229, 255, 0.15);
-  --shadow-sidebar-mobile: 10px 0 30px rgba(0, 0, 0, 0.8);
-  --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-
-  /* Glass overlay tints (used for hover/stripe backgrounds) */
-  --overlay-1: rgba(255, 255, 255, 0.01);
-  --overlay-1-5: rgba(255, 255, 255, 0.015);
-  --overlay-2: rgba(255, 255, 255, 0.02);
-  --overlay-3: rgba(255, 255, 255, 0.03);
-  --overlay-4: rgba(255, 255, 255, 0.04);
-  --overlay-5: rgba(255, 255, 255, 0.05);
-  --overlay-8: rgba(255, 255, 255, 0.08);
-  --overlay-10: rgba(255, 255, 255, 0.1);
-  --overlay-15: rgba(255, 255, 255, 0.15);
-  --overlay-20: rgba(255, 255, 255, 0.2);
-
-  /* Input field surfaces */
-  --input-bg: rgba(7, 9, 14, 0.6);
-  --input-bg-strong: rgba(7, 9, 14, 0.75);
-  --input-bg-focus: rgba(7, 9, 14, 0.8);
-
-  color-scheme: dark;
-}
-
-/* ==========================================================================
-   Light Theme Overrides
-   ========================================================================== */
-
-[data-theme="light"] {
+  /* Light palette (default theme) */
   --color-primary: #0091b3;
   --color-primary-dark: #e8f7fa;
   --color-primary-light: #00b8d4;
   --color-accent: #0066cc;
   --color-purple: #8b3fd1;
 
+  /* Status Colors */
   --color-success: #0a9450;
   --color-success-bg: rgba(10, 148, 80, 0.08);
   --color-success-border: rgba(10, 148, 80, 0.2);
@@ -97,6 +27,7 @@
   --color-rejected-border: rgba(214, 0, 61, 0.25);
   --color-rejected-text: #d6003d;
 
+  /* Theme Surfaces */
   --color-bg: #f4f6fb;
   --color-sidebar: #ffffff;
   --color-card: rgba(255, 255, 255, 0.85);
@@ -109,10 +40,17 @@
   --color-border-light: rgba(16, 21, 34, 0.05);
   --color-focus-glow: rgba(0, 145, 179, 0.18);
 
+  /* Layout and Geometry */
+  --sidebar-width: 250px;
+  --topbar-height: 70px;
+  --radius: 16px;
+  --radius-sm: 10px;
   --shadow: 0 10px 30px -10px rgba(16, 21, 34, 0.12);
   --shadow-neon: 0 0 20px rgba(0, 145, 179, 0.1);
   --shadow-sidebar-mobile: 10px 0 30px rgba(16, 21, 34, 0.15);
+  --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 
+  /* Overlay tints (used for hover/stripe backgrounds) */
   --overlay-1: rgba(16, 21, 34, 0.015);
   --overlay-1-5: rgba(16, 21, 34, 0.02);
   --overlay-2: rgba(16, 21, 34, 0.03);
@@ -124,6 +62,7 @@
   --overlay-15: rgba(16, 21, 34, 0.15);
   --overlay-20: rgba(16, 21, 34, 0.2);
 
+  /* Input field surfaces */
   --input-bg: rgba(16, 21, 34, 0.03);
   --input-bg-strong: rgba(16, 21, 34, 0.05);
   --input-bg-focus: #ffffff;
@@ -131,19 +70,71 @@
   color-scheme: light;
 }
 
-[data-theme="light"] body {
-  background-image:
-    radial-gradient(circle at 10% 20%, rgba(0, 102, 204, 0.05) 0%, transparent 40%),
-    radial-gradient(circle at 80% 80%, rgba(139, 63, 209, 0.04) 0%, transparent 40%);
+/* ==========================================================================
+   Dark Theme Overrides
+   ========================================================================== */
+
+[data-theme="dark"] {
+  --color-primary: #00e5ff;
+  --color-primary-dark: #090e1a;
+  --color-primary-light: #82f5ff;
+  --color-accent: #0088ff;
+  --color-purple: #b966ff;
+
+  --color-success: #00e676;
+  --color-success-bg: rgba(0, 230, 118, 0.08);
+  --color-success-border: rgba(0, 230, 118, 0.2);
+  --color-success-text: #00e676;
+
+  --color-warning: #ff9100;
+  --color-pending-bg: rgba(255, 145, 0, 0.08);
+  --color-pending-border: rgba(255, 145, 0, 0.25);
+  --color-pending-text: #ff9100;
+
+  --color-danger: #ff1744;
+  --color-danger-dark: #dc2626;
+  --color-rejected-bg: rgba(255, 23, 68, 0.08);
+  --color-rejected-border: rgba(255, 23, 68, 0.25);
+  --color-rejected-text: #ff1744;
+
+  --color-bg: #07090e;
+  --color-sidebar: #0b0f19;
+  --color-card: rgba(16, 24, 45, 0.55);
+  --color-card-hover: rgba(22, 33, 62, 0.7);
+  --color-text: #f8fafc;
+  --color-text-muted: #94a3b8;
+  --color-text-light: #64748b;
+
+  --color-border: rgba(255, 255, 255, 0.06);
+  --color-border-light: rgba(255, 255, 255, 0.03);
+  --color-focus-glow: rgba(0, 229, 255, 0.25);
+
+  --shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.7);
+  --shadow-neon: 0 0 20px rgba(0, 229, 255, 0.15);
+  --shadow-sidebar-mobile: 10px 0 30px rgba(0, 0, 0, 0.8);
+
+  --overlay-1: rgba(255, 255, 255, 0.01);
+  --overlay-1-5: rgba(255, 255, 255, 0.015);
+  --overlay-2: rgba(255, 255, 255, 0.02);
+  --overlay-3: rgba(255, 255, 255, 0.03);
+  --overlay-4: rgba(255, 255, 255, 0.04);
+  --overlay-5: rgba(255, 255, 255, 0.05);
+  --overlay-8: rgba(255, 255, 255, 0.08);
+  --overlay-10: rgba(255, 255, 255, 0.1);
+  --overlay-15: rgba(255, 255, 255, 0.15);
+  --overlay-20: rgba(255, 255, 255, 0.2);
+
+  --input-bg: rgba(7, 9, 14, 0.6);
+  --input-bg-strong: rgba(7, 9, 14, 0.75);
+  --input-bg-focus: rgba(7, 9, 14, 0.8);
+
+  color-scheme: dark;
 }
 
-[data-theme="light"] .staff-search-input,
-[data-theme="light"] input[type="text"],
-[data-theme="light"] input[type="date"],
-[data-theme="light"] input[type="password"],
-[data-theme="light"] select {
-  color: var(--color-text);
-  border: 1.5px solid var(--color-border);
+[data-theme="dark"] body {
+  background-image:
+    radial-gradient(circle at 10% 20%, rgba(0, 136, 255, 0.05) 0%, transparent 40%),
+    radial-gradient(circle at 80% 80%, rgba(185, 102, 255, 0.04) 0%, transparent 40%);
 }
 
 /* ==========================================================================
@@ -160,8 +151,8 @@ body {
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   background: var(--color-bg);
   background-image: 
-    radial-gradient(circle at 10% 20%, rgba(0, 136, 255, 0.05) 0%, transparent 40%),
-    radial-gradient(circle at 80% 80%, rgba(185, 102, 255, 0.04) 0%, transparent 40%);
+    radial-gradient(circle at 10% 20%, rgba(0, 102, 204, 0.05) 0%, transparent 40%),
+    radial-gradient(circle at 80% 80%, rgba(139, 63, 209, 0.04) 0%, transparent 40%);
   background-attachment: fixed;
   color: var(--color-text);
   min-height: 100vh;
@@ -896,13 +887,14 @@ textarea:focus {
   box-shadow: 0 0 0 3px var(--color-focus-glow), inset 0 0 10px rgba(0, 229, 255, 0.05);
 }
 
-/* Date picker customization for webkit */
-input[type="date"]::-webkit-calendar-picker-indicator {
+/* Date picker customization for webkit — invert only in dark mode,
+   since the native icon is already dark and suits a light background */
+[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator {
   filter: invert(1);
   opacity: 0.6;
   cursor: pointer;
 }
-input[type="date"]::-webkit-calendar-picker-indicator:hover {
+[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator:hover {
   opacity: 1;
 }
 
@@ -1593,8 +1585,8 @@ textarea {
   width: 21px;
   height: 21px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--color-accent), var(--color-primary));
-  box-shadow: 0 0 8px var(--color-primary);
+  background: linear-gradient(135deg, #ffb300, #ff9100);
+  box-shadow: 0 0 8px rgba(255, 145, 0, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1607,10 +1599,10 @@ textarea {
   height: 13px;
 }
 
-[data-theme="light"] .theme-toggle-knob {
+[data-theme="dark"] .theme-toggle-knob {
   transform: translateX(24px);
-  background: linear-gradient(135deg, #ffb300, #ff9100);
-  box-shadow: 0 0 8px rgba(255, 145, 0, 0.4);
+  background: linear-gradient(135deg, var(--color-accent), var(--color-primary));
+  box-shadow: 0 0 8px var(--color-primary);
 }
 
 .theme-toggle-icon-sun,
@@ -1623,8 +1615,8 @@ textarea {
   transition: opacity 0.25s ease;
 }
 
-.theme-toggle-icon-sun { opacity: 0; }
-.theme-toggle-icon-moon { opacity: 1; }
+.theme-toggle-icon-sun { opacity: 1; }
+.theme-toggle-icon-moon { opacity: 0; }
 
-[data-theme="light"] .theme-toggle-icon-sun { opacity: 1; }
-[data-theme="light"] .theme-toggle-icon-moon { opacity: 0; }
+[data-theme="dark"] .theme-toggle-icon-sun { opacity: 0; }
+[data-theme="dark"] .theme-toggle-icon-moon { opacity: 1; }

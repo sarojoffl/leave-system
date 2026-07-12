@@ -35,6 +35,18 @@ function _prefetch(data) {
   if (data.next_params) _fetchCalendar(data.next_params).catch(() => {});
 }
 
+/* Instant visual feedback while a fetch is in flight */
+function _setLoading(isLoading) {
+  const grid = document.getElementById("cal-grid");
+  const prev = document.getElementById("cal-prev");
+  const next = document.getElementById("cal-next");
+
+  grid.style.opacity = isLoading ? "0.45" : "1";
+  grid.style.pointerEvents = isLoading ? "none" : "";
+  prev.style.pointerEvents = isLoading ? "none" : "";
+  next.style.pointerEvents = isLoading ? "none" : "";
+}
+
 function _renderCalendar(data) {
   if (!data) return;
 
@@ -89,8 +101,10 @@ function _renderCalendar(data) {
 }
 
 async function loadCalendar(params) {
+  _setLoading(true);
   const data = await _fetchCalendar(params);
   _renderCalendar(data);
+  _setLoading(false);
   /* After rendering, prefetch neighbours in the background */
   if (data) _prefetch(data);
 }
@@ -99,8 +113,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const prev = document.getElementById("cal-prev");
   const next = document.getElementById("cal-next");
 
-  prev.dataset.params = "{{ prev_params }}";
-  next.dataset.params = "{{ next_params }}";
+  prev.dataset.params = "{{ prev_params|default_if_none:''|escapejs }}";
+  next.dataset.params = "{{ next_params|default_if_none:''|escapejs }}";
 
   prev.addEventListener("click", function(e) {
     e.preventDefault();
@@ -115,8 +129,8 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   /* Kick off background prefetch of prev + next from the initial page load */
-  const initPrev = "{{ prev_params }}";
-  const initNext = "{{ next_params }}";
+  const initPrev = "{{ prev_params|default_if_none:''|escapejs }}";
+  const initNext = "{{ next_params|default_if_none:''|escapejs }}";
   if (initPrev) _fetchCalendar(initPrev).catch(() => {});
   if (initNext) _fetchCalendar(initNext).catch(() => {});
 });

@@ -151,6 +151,12 @@ class StaffMovement(models.Model):
     out_time = models.TimeField()
     in_time = models.TimeField(null=True, blank=True)
     purpose = models.TextField(blank=True)
+    assistants = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        related_name="assisted_movements",
+        blank=True,
+        help_text="Other staff who accompanied this movement"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -163,3 +169,9 @@ class StaffMovement(models.Model):
     def date_bs(self) -> str:
         from leaves.bs_convert import ad_to_bs_display
         return ad_to_bs_display(self.date)
+
+    @property
+    def assistants_display(self) -> str:
+        return ", ".join(
+            a.get_full_name() or a.username for a in self.assistants.all()
+        ) or "—"

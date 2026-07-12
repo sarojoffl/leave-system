@@ -11,11 +11,12 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /* ------------------------------------------
-   Theme toggle (dark / light)
-   Preference persisted in localStorage so it
-   sticks across pages and visits. The actual
-   class is applied early via an inline script
-   in base.html's <head> to avoid a flash.
+   Theme toggle (light / dark)
+   Light is the default. Preference persisted
+   in localStorage so it sticks across pages
+   and visits. The actual attribute is applied
+   early via an inline script in base.html's
+   <head> to avoid a flash.
 ------------------------------------------- */
 function initThemeToggle() {
   const toggle = document.getElementById('theme-toggle');
@@ -25,13 +26,13 @@ function initThemeToggle() {
   const root = document.documentElement;
 
   toggle.addEventListener('click', () => {
-    const isLight = root.getAttribute('data-theme') === 'light';
-    if (isLight) {
+    const isDark = root.getAttribute('data-theme') === 'dark';
+    if (isDark) {
       root.removeAttribute('data-theme');
-      localStorage.setItem(STORAGE_KEY, 'dark');
-    } else {
-      root.setAttribute('data-theme', 'light');
       localStorage.setItem(STORAGE_KEY, 'light');
+    } else {
+      root.setAttribute('data-theme', 'dark');
+      localStorage.setItem(STORAGE_KEY, 'dark');
     }
   });
 }

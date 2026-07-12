@@ -1028,17 +1028,19 @@ def export_my_holiday_work_csv(request):
 @login_required
 def staff_movement(request):
     from accounts.utils import get_view_mode
+    from accounts.models import User
+    from django.db.models import Q
+
     today = date.today()
     is_manager = get_view_mode(request) == 'manager' and request.user.has_management_access
 
     if is_manager:
-        from accounts.models import User
         # GET filters
         filter_date = request.GET.get("date")
         filter_employee_id = request.GET.get("employee")
         filter_client = request.GET.get("client", "").strip()
 
-        movements = StaffMovement.objects.all().select_related("employee")
+        movements = StaffMovement.objects.all().select_related("employee").prefetch_related("assistants")
 
         if filter_date:
             try:
@@ -1069,12 +1071,15 @@ def staff_movement(request):
         })
     else:
         # Employee view
+        other_employees = User.objects.exclude(id=request.user.id).exclude(role="system_admin").order_by("first_name", "username")
+
         if request.method == "POST":
             date_str = request.POST.get("date")
             client_str = request.POST.get("client", "").strip()
             out_time_str = request.POST.get("out_time")
             in_time_str = request.POST.get("in_time")
             purpose = request.POST.get("purpose", "").strip()
+            assistant_ids = request.POST.getlist("assistants")
 
             errors = []
             if not date_str:
@@ -1113,7 +1118,7 @@ def staff_movement(request):
                         errors.append("Invalid return time format.")
 
             if not errors:
-                StaffMovement.objects.create(
+                movement = StaffMovement.objects.create(
                     employee=request.user,
                     date=movement_date,
                     client=client_str,
@@ -1121,24 +1126,36 @@ def staff_movement(request):
                     in_time=in_time,
                     purpose=purpose,
                 )
+                if assistant_ids:
+                    movement.assistants.set(
+                        User.objects.filter(id__in=assistant_ids).exclude(id=request.user.id)
+                    )
                 messages.success(request, "Staff movement record logged successfully.")
                 return redirect("staff_movement")
-            
+
             for err in errors:
                 messages.error(request, err)
 
         # GET request or fallback after POST validation failure
-        movements = StaffMovement.objects.filter(employee=request.user)
+        # Include records where user is the logger OR an assistant
+        movements = StaffMovement.objects.filter(
+            Q(employee=request.user) | Q(assistants=request.user)
+        ).distinct().select_related("employee").prefetch_related("assistants")
+
         return render(request, "leaves/staff_movement.html", {
             "movements": movements,
             "is_manager": False,
             "today": today,
+            "other_employees": other_employees,
         })
 
 
 @login_required
 def staff_movement_edit(request, id):
+    from accounts.models import User
+
     movement = get_object_or_404(StaffMovement, id=id, employee=request.user)
+    other_employees = User.objects.exclude(id=request.user.id).exclude(role="system_admin").order_by("first_name", "username")
 
     if request.method == "POST":
         date_str = request.POST.get("date")
@@ -1146,6 +1163,7 @@ def staff_movement_edit(request, id):
         out_time_str = request.POST.get("out_time")
         in_time_str = request.POST.get("in_time")
         purpose = request.POST.get("purpose", "").strip()
+        assistant_ids = request.POST.getlist("assistants")
 
         errors = []
         if not date_str:
@@ -1190,6 +1208,9 @@ def staff_movement_edit(request, id):
             movement.in_time = in_time
             movement.purpose = purpose
             movement.save()
+            movement.assistants.set(
+                User.objects.filter(id__in=assistant_ids).exclude(id=request.user.id) if assistant_ids else []
+            )
             messages.success(request, "Staff movement record updated successfully.")
             return redirect("staff_movement")
 
@@ -1201,4 +1222,6 @@ def staff_movement_edit(request, id):
         "movement": movement,
         "is_edit": True,
         "is_manager": False,
+        "other_employees": other_employees,
+        "selected_assistant_ids": list(movement.assistants.values_list("id", flat=True)),
     })
