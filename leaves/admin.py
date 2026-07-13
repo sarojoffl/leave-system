@@ -108,9 +108,9 @@ class HolidayWorkRequestAdmin(BaseDayRequestAdmin):
 
 @admin.register(StaffMovement)
 class StaffMovementAdmin(admin.ModelAdmin):
-    list_display = ("employee", "date", "client", "out_time", "in_time", "created_at")
-    list_filter = ("date", "employee", "client")
-    search_fields = ("employee__username", "employee__first_name", "employee__last_name", "client", "purpose")
+    list_display = ("employee", "date", "client", "purpose_type", "out_time", "in_time", "resolution_status", "created_at")
+    list_filter = ("date", "employee", "client", "purpose_type", "resolution_status")
+    search_fields = ("employee__username", "employee__first_name", "employee__last_name", "client", "purpose", "problem_description", "completion_notes")
     date_hierarchy = "date"
     readonly_fields = ("created_at",)
     autocomplete_fields = ("employee",)

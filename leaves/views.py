@@ -1183,7 +1183,10 @@ def staff_movement(request):
             client_str = request.POST.get("client", "").strip()
             out_time_str = request.POST.get("out_time")
             in_time_str = request.POST.get("in_time")
+            purpose_type = request.POST.get("purpose_type", "").strip()
             purpose = request.POST.get("purpose", "").strip()
+            problem_description = request.POST.get("problem_description", "").strip()
+            resolution_status = request.POST.get("resolution_status", "").strip()
             assistant_ids = request.POST.getlist("assistants")
 
             errors = []
@@ -1193,10 +1196,15 @@ def staff_movement(request):
                 errors.append("Please specify the client / location.")
             if not out_time_str:
                 errors.append("Please specify the departure time.")
+            if in_time_str:
+                errors.append("Return time must be filled in after the movement is logged.")
+            if purpose_type not in dict(StaffMovement.PURPOSE_CHOICES):
+                errors.append("Please select a purpose.")
+            if purpose_type == "problem_solving" and not problem_description:
+                errors.append("Please describe the problem being addressed.")
 
             movement_date = None
             out_time = None
-            in_time = None
 
             if date_str:
                 try:
@@ -1213,23 +1221,17 @@ def staff_movement(request):
                     except ValueError:
                         errors.append("Invalid departure time format.")
 
-            if in_time_str:
-                try:
-                    in_time = datetime.strptime(in_time_str, "%H:%M").time()
-                except ValueError:
-                    try:
-                        in_time = datetime.strptime(in_time_str, "%H:%M:%S").time()
-                    except ValueError:
-                        errors.append("Invalid return time format.")
-
             if not errors:
                 movement = StaffMovement.objects.create(
                     employee=request.user,
                     date=movement_date,
                     client=client_str,
                     out_time=out_time,
-                    in_time=in_time,
+                    in_time=None,
+                    purpose_type=purpose_type,
                     purpose=purpose,
+                    problem_description=problem_description,
+                    resolution_status="",
                 )
                 if assistant_ids:
                     movement.assistants.set(
@@ -1252,6 +1254,8 @@ def staff_movement(request):
             "is_manager": False,
             "today": today,
             "other_employees": other_employees,
+            "purpose_choices": StaffMovement.PURPOSE_CHOICES,
+            "resolution_choices": StaffMovement.RESOLUTION_CHOICES,
         })
 
 
@@ -1272,23 +1276,14 @@ def staff_movement_edit(request, id):
         date_str = request.POST.get("date")
         client_str = request.POST.get("client", "").strip()
         in_time_str = request.POST.get("in_time")
-        purpose = request.POST.get("purpose", "").strip()
-        assistant_ids = request.POST.getlist("assistants")
+        resolution_status = request.POST.get("resolution_status", "").strip()
+        completion_notes = request.POST.get("completion_notes", "").strip()
 
         errors = []
-        if not date_str:
-            errors.append("Please select a date.")
-        if not client_str:
-            errors.append("Please specify the client / location.")
+        if not in_time_str:
+            errors.append("Please enter the return time.")
 
-        movement_date = None
         in_time = None
-
-        if date_str:
-            try:
-                movement_date = datetime.strptime(date_str, "%Y-%m-%d").date()
-            except ValueError:
-                errors.append("Invalid date format.")
 
         if in_time_str:
             try:
@@ -1299,16 +1294,19 @@ def staff_movement_edit(request, id):
                 except ValueError:
                     errors.append("Invalid return time format.")
 
+        if movement.purpose_type == "problem_solving":
+            if resolution_status not in dict(StaffMovement.RESOLUTION_CHOICES):
+                errors.append("Please select whether the problem was solved.")
+
+        if in_time and in_time <= movement.out_time:
+            errors.append("Return time must be later than the departure time for a same-day movement.")
+
         if not errors:
             # Rule 2: out_time is immutable after creation — never take it from POST
-            movement.date = movement_date
-            movement.client = client_str
             movement.in_time = in_time
-            movement.purpose = purpose
+            movement.resolution_status = resolution_status
+            movement.completion_notes = completion_notes
             movement.save()
-            movement.assistants.set(
-                User.objects.filter(id__in=assistant_ids).exclude(id=request.user.id) if assistant_ids else []
-            )
             messages.success(request, "Staff movement record updated successfully.")
             return redirect("staff_movement")
 
@@ -1322,4 +1320,6 @@ def staff_movement_edit(request, id):
         "is_manager": False,
         "other_employees": other_employees,
         "selected_assistant_ids": list(movement.assistants.values_list("id", flat=True)),
+        "purpose_choices": StaffMovement.PURPOSE_CHOICES,
+        "resolution_choices": StaffMovement.RESOLUTION_CHOICES,
     })

@@ -141,6 +141,16 @@ class HolidayWorkRequest(BaseDayRequest):
 
 
 class StaffMovement(models.Model):
+    PURPOSE_CHOICES = [
+        ("problem_solving", "Problem solving"),
+        ("goods_bill_delivery", "Goods / bill delivery"),
+        ("goods_pickup", "Goods pickup"),
+    ]
+    RESOLUTION_CHOICES = [
+        ("solved", "Solved"),
+        ("not_solved", "Not solved"),
+    ]
+
     employee = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -150,7 +160,11 @@ class StaffMovement(models.Model):
     client = models.CharField(max_length=200)
     out_time = models.TimeField()
     in_time = models.TimeField(null=True, blank=True)
+    purpose_type = models.CharField(max_length=30, choices=PURPOSE_CHOICES, blank=True)
     purpose = models.TextField(blank=True)
+    problem_description = models.TextField(blank=True)
+    resolution_status = models.CharField(max_length=20, choices=RESOLUTION_CHOICES, blank=True)
+    completion_notes = models.TextField(blank=True)
     assistants = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
         related_name="assisted_movements",

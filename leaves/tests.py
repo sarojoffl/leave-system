@@ -331,6 +331,7 @@ class StaffMovementTestCase(TestCase):
             "date": "2026-07-10",
             "client": "Google Office",
             "out_time": "10:30",
+            "purpose_type": "goods_bill_delivery",
             "purpose": "Technical Demo"
         })
         self.assertRedirects(response, reverse("staff_movement"))
@@ -347,12 +348,93 @@ class StaffMovementTestCase(TestCase):
             "client": "Google Office",
             "out_time": "10:30",
             "in_time": "12:45",
-            "purpose": "Technical Demo Completed"
+            "purpose_type": "goods_bill_delivery",
+            "purpose": "Technical Demo Completed",
+            "completion_notes": "Technical Demo Completed"
         })
         self.assertRedirects(response_edit, reverse("staff_movement"))
         movement.refresh_from_db()
         self.assertEqual(movement.in_time.strftime("%H:%M"), "12:45")
-        self.assertEqual(movement.purpose, "Technical Demo Completed")
+        self.assertEqual(movement.purpose, "Technical Demo")
+        self.assertEqual(movement.completion_notes, "Technical Demo Completed")
+
+    def test_problem_movement_requires_description_and_solve_status_on_return(self):
+        self.client.login(username="testemployee", password="password123")
+
+        response = self.client.post(reverse("staff_movement"), {
+            "date": "2026-07-10",
+            "client": "Client Site",
+            "out_time": "10:30",
+            "purpose_type": "problem_solving",
+        })
+        self.assertContains(response, "Please describe the problem being addressed.")
+
+        response = self.client.post(reverse("staff_movement"), {
+            "date": "2026-07-10",
+            "client": "Client Site",
+            "out_time": "10:30",
+            "purpose_type": "problem_solving",
+            "problem_description": "Internet is not working",
+        })
+        self.assertRedirects(response, reverse("staff_movement"))
+
+        from leaves.models import StaffMovement
+        movement = StaffMovement.objects.get(client="Client Site")
+        response = self.client.post(reverse("staff_movement_edit", args=[movement.id]), {
+            "date": "2026-07-10",
+            "client": "Client Site",
+            "in_time": "12:45",
+            "purpose_type": "problem_solving",
+            "problem_description": "Internet is not working",
+        })
+        self.assertContains(response, "Please select whether the problem was solved.")
+
+        response = self.client.post(reverse("staff_movement_edit", args=[movement.id]), {
+            "date": "2026-07-10",
+            "client": "Client Site",
+            "in_time": "12:45",
+            "purpose_type": "problem_solving",
+            "problem_description": "Internet is not working",
+            "resolution_status": "solved",
+        })
+        self.assertRedirects(response, reverse("staff_movement"))
+        movement.refresh_from_db()
+        self.assertEqual(movement.resolution_status, "solved")
+
+    def test_return_time_must_be_filled_later_and_after_departure(self):
+        self.client.login(username="testemployee", password="password123")
+        from leaves.models import StaffMovement
+
+        movement = StaffMovement.objects.create(
+            employee=self.employee,
+            date=date(2026, 7, 10),
+            client="Client Site",
+            out_time=datetime.strptime("10:30", "%H:%M").time(),
+            purpose_type="goods_pickup",
+        )
+
+        response = self.client.post(reverse("staff_movement_edit", args=[movement.id]), {
+            "date": "2026-07-10",
+            "client": "Client Site",
+            "purpose_type": "goods_pickup",
+        })
+        self.assertContains(response, "Please enter the return time.")
+
+        response = self.client.post(reverse("staff_movement_edit", args=[movement.id]), {
+            "date": "2026-07-10",
+            "client": "Client Site",
+            "in_time": "10:30",
+            "purpose_type": "goods_pickup",
+        })
+        self.assertContains(response, "Return time must be later than the departure time")
+
+        response = self.client.post(reverse("staff_movement_edit", args=[movement.id]), {
+            "date": "2026-07-10",
+            "client": "Client Site",
+            "in_time": "10:29",
+            "purpose_type": "goods_pickup",
+        })
+        self.assertContains(response, "Return time must be later than the departure time")
 
     def test_manager_can_view_and_filter_movements(self):
         from leaves.models import StaffMovement
@@ -389,4 +471,3 @@ class StaffMovementTestCase(TestCase):
         self.assertEqual(response_filter.status_code, 200)
         self.assertContains(response_filter, "Microsoft Office")
         self.assertNotContains(response_filter, "Google Office")
-

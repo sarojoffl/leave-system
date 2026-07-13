@@ -115,6 +115,9 @@
             <th>Out Time</th>
             <th>In Time</th>
             <th>Purpose</th>
+            <th>Additional Notes</th>
+            <th>Problem / Solve Status</th>
+            <th>Completion Notes</th>
           </tr>
         </thead>
         <tbody>
@@ -140,11 +143,25 @@
                   <span class="badge rejected">Out</span>
                 {% endif %}
               </td>
+              <td>{{ m.get_purpose_type_display|default:"—" }}</td>
               <td title="{{ m.purpose }}">{{ m.purpose|default:"—"|truncatechars:50 }}</td>
+              <td>
+                {% if m.purpose_type == "problem_solving" %}
+                  <div title="{{ m.problem_description }}">{{ m.problem_description|default:"—"|truncatechars:50 }}</div>
+                  {% if m.resolution_status %}
+                    <span class="badge {% if m.resolution_status == 'solved' %}approved{% else %}rejected{% endif %}" style="margin-top:5px;">{{ m.get_resolution_status_display }}</span>
+                  {% elif m.in_time %}
+                    <span class="badge pending" style="margin-top:5px;">Status missing</span>
+                  {% endif %}
+                {% else %}
+                  <span style="color:var(--color-text-muted);">—</span>
+                {% endif %}
+              </td>
+              <td title="{{ m.completion_notes }}">{{ m.completion_notes|default:"—"|truncatechars:50 }}</td>
             </tr>
           {% empty %}
             <tr>
-              <td colspan="7" class="empty-state">No staff movements logged.</td>
+              <td colspan="10" class="empty-state">No staff movements logged.</td>
             </tr>
           {% endfor %}
         </tbody>
@@ -172,36 +189,78 @@
     <form method="post" action="{% if is_edit %}{% url 'staff_movement_edit' movement.id %}{% else %}{% url 'staff_movement' %}{% endif %}" class="card-body">
       {% csrf_token %}
       <div class="form-grid">
-        <div class="form-group">
-          <label for="date">Date *</label>
-          <input type="date" id="date" name="date" value="{% if is_edit %}{{ movement.date|date:'Y-m-d' }}{% else %}{{ today|date:'Y-m-d' }}{% endif %}">
-          <small id="date-bs" style="color:var(--color-primary);font-size:0.75rem;min-height:1.2em;display:block;"></small>
-        </div>
+        {% if not is_edit %}
+          <div class="form-group">
+            <label for="date">Date *</label>
+            <input type="date" id="date" name="date" value="{{ today|date:'Y-m-d' }}">
+            <small id="date-bs" style="color:var(--color-primary);font-size:0.75rem;min-height:1.2em;display:block;"></small>
+          </div>
 
-        <div class="form-group">
-          <label for="client">Client / Location *</label>
-          <input type="text" id="client" name="client" value="{% if is_edit %}{{ movement.client }}{% endif %}" placeholder="e.g. ABC Tech Office, Client Site">
-        </div>
+          <div class="form-group">
+            <label for="client">Client / Location *</label>
+            <input type="text" id="client" name="client" placeholder="e.g. ABC Tech Office, Client Site">
+          </div>
 
-        <div class="form-group">
-          <label for="out_time">Departure Time (Out) *</label>
-          <input type="time" id="out_time" name="out_time" value="{% if is_edit %}{{ movement.out_time|time:'H:i' }}{% endif %}">
-        </div>
+          <div class="form-group">
+            <label for="out_time">Departure Time (Out) *</label>
+            <input type="time" id="out_time" name="out_time" required>
+          </div>
+        {% endif %}
 
-        <div class="form-group">
-          <label for="in_time">Return Time (In) <span style="font-weight:normal;opacity:0.6;">(Optional)</span></label>
-          <input type="time" id="in_time" name="in_time" value="{% if is_edit and movement.in_time %}{{ movement.in_time|time:'H:i' }}{% endif %}">
-        </div>
+        {% if is_edit %}
+          <div class="form-group">
+            <label for="in_time">Return Time (In) *</label>
+            <input type="time" id="in_time" name="in_time" required>
+          </div>
+        {% endif %}
 
-        <div class="form-group full">
-          <label for="purpose">Purpose / Notes</label>
-          <textarea id="purpose" name="purpose" placeholder="Describe the purpose of the visit (optional)...">{% if is_edit %}{{ movement.purpose }}{% endif %}</textarea>
-        </div>
+        {% if not is_edit %}
+          <div class="form-group full">
+            <label for="purpose_type">Purpose *</label>
+            <select id="purpose_type" name="purpose_type" required>
+            <option value="">— Select purpose —</option>
+            {% for value, label in purpose_choices %}
+              <option value="{{ value }}" {% if is_edit and movement.purpose_type == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+            </select>
+          </div>
 
-        <div class="form-group full">
-          <label>Assist(s) <span style="font-weight:normal;opacity:0.6;">(optional — others who went together)</span></label>
+          <div class="form-group full" id="problem-description-group" hidden>
+            <label for="problem_description">Problem Description *</label>
+            <textarea id="problem_description" name="problem_description" placeholder="Describe the problem that needs to be solved..."></textarea>
+          </div>
+        {% endif %}
 
-          <input type="text" id="assistant-search" placeholder="Search employees..."
+        {% if is_edit and movement.purpose_type == "problem_solving" %}
+          <div class="form-group full">
+            <label for="resolution_status">Solve Status *</label>
+            <select id="resolution_status" name="resolution_status">
+              <option value="">— Was the problem solved? —</option>
+              {% for value, label in resolution_choices %}
+                <option value="{{ value }}" {% if movement.resolution_status == value %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+            <small style="color:var(--color-text-muted);font-size:0.75rem;">Required when filling in the return time for a problem-solving visit.</small>
+          </div>
+        {% endif %}
+
+        {% if is_edit %}
+          <div class="form-group full">
+            <label for="completion_notes">Completion / Return Notes <span style="font-weight:normal;opacity:0.6;">(Optional)</span></label>
+            <textarea id="completion_notes" name="completion_notes" placeholder="Add work completed, pending items, or next steps..."></textarea>
+          </div>
+        {% endif %}
+
+        {% if not is_edit %}
+          <div class="form-group full">
+            <label for="purpose">Additional Notes <span style="font-weight:normal;opacity:0.6;">(Optional)</span></label>
+            <textarea id="purpose" name="purpose" placeholder="Add any extra details..."></textarea>
+          </div>
+
+          <div class="form-group full">
+            <label>Assist(s) <span style="font-weight:normal;opacity:0.6;">(optional — others who went together)</span></label>
+
+            <input type="text" id="assistant-search" placeholder="Search employees..."
             style="width:100%;max-width:320px;margin-top:6px;padding:8px 12px;background:var(--input-bg);border:1.5px solid var(--color-border);border-radius:var(--radius-sm);font-size:0.85rem;color:var(--color-text);font-family:inherit;">
 
           <div id="assistant-list" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;max-height:200px;overflow-y:auto;padding:8px;border:1px solid var(--color-border);border-radius:var(--radius-sm);">
@@ -216,7 +275,8 @@
           </div>
 
           <small id="assistant-count" style="display:block;margin-top:4px;color:var(--color-text-muted);font-size:0.75rem;"></small>
-        </div>
+          </div>
+        {% endif %}
       </div>
 
       <div class="form-actions">
@@ -248,6 +308,9 @@
               <th>Out Time</th>
               <th>In Time</th>
               <th>Purpose</th>
+              <th>Additional Notes</th>
+              <th>Problem / Solve Status</th>
+              <th>Completion Notes</th>
               <th>Action</th>
             </tr>
           </thead>
@@ -276,7 +339,21 @@
                     <span class="badge rejected">Out</span>
                   {% endif %}
                 </td>
+                <td>{{ m.get_purpose_type_display|default:"—" }}</td>
                 <td title="{{ m.purpose }}">{{ m.purpose|default:"—"|truncatechars:40 }}</td>
+                <td>
+                  {% if m.purpose_type == "problem_solving" %}
+                    <div title="{{ m.problem_description }}">{{ m.problem_description|default:"—"|truncatechars:40 }}</div>
+                    {% if m.resolution_status %}
+                      <span class="badge {% if m.resolution_status == 'solved' %}approved{% else %}rejected{% endif %}" style="margin-top:5px;">{{ m.get_resolution_status_display }}</span>
+                    {% elif m.in_time %}
+                      <span class="badge pending" style="margin-top:5px;">Status missing</span>
+                    {% endif %}
+                  {% else %}
+                    <span style="color:var(--color-text-muted);">—</span>
+                  {% endif %}
+                </td>
+                <td title="{{ m.completion_notes }}">{{ m.completion_notes|default:"—"|truncatechars:40 }}</td>
                 <td>
                   {% if m.employee_id == request.user.id %}
                     {% if not m.in_time %}
@@ -291,7 +368,7 @@
               </tr>
             {% empty %}
               <tr>
-                <td colspan="8" class="empty-state">You haven't logged any movements yet.</td>
+              <td colspan="11" class="empty-state">You haven't logged any movements yet.</td>
               </tr>
             {% endfor %}
           </tbody>
@@ -371,5 +448,28 @@
     cb.addEventListener('change', updateAssistantCount);
   });
   updateAssistantCount();
+
+  const purposeType = document.getElementById('purpose_type');
+  const problemGroup = document.getElementById('problem-description-group');
+  const problemDescription = document.getElementById('problem_description');
+  const resolutionGroup = document.getElementById('resolution-status-group');
+  const resolutionStatus = document.getElementById('resolution_status');
+  const inTime = document.getElementById('in_time');
+
+  function updateProblemFields() {
+    if (!purposeType) return;
+    const isProblemVisit = purposeType.value === 'problem_solving';
+    const isReturning = Boolean(inTime && inTime.value);
+    problemGroup.hidden = !isProblemVisit;
+    if (resolutionGroup) resolutionGroup.hidden = !isProblemVisit;
+    problemDescription.required = isProblemVisit;
+    if (resolutionStatus) resolutionStatus.required = isProblemVisit && isReturning;
+  }
+
+  if (purposeType) {
+    purposeType.addEventListener('change', updateProblemFields);
+    if (inTime) inTime.addEventListener('change', updateProblemFields);
+    updateProblemFields();
+  }
 </script>
 {% endblock %}
