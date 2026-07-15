@@ -10,6 +10,21 @@
 {% endblock %}
 
 {% block extra_css %}
+<style>
+  .out-time-field {
+    background: var(--input-bg);
+    border: 1.5px solid var(--color-border);
+    color: var(--color-text-muted);
+    font-family: inherit;
+    cursor: not-allowed;
+    opacity: 0.85;
+  }
+  .out-time-field:focus {
+    outline: none;
+    box-shadow: none;
+  }
+</style>
+
 {% if is_manager %}
 <style>
   .staff-filters {
@@ -203,7 +218,8 @@
 
           <div class="form-group">
             <label for="out_time">Departure Time (Out) *</label>
-            <input type="time" id="out_time" name="out_time" required>
+            <input type="time" id="out_time" name="out_time" readonly class="out-time-field">
+            <small style="color:var(--color-text-muted);font-size:0.75rem;display:block;">Auto-set to the current time when you submit.</small>
           </div>
         {% endif %}
 
@@ -421,6 +437,19 @@
         try { filterDateInput.showPicker(); } catch (e) {}
       }
     });
+  }
+
+  // Live-updating out-time display (informational only — server sets the real value on submit)
+  const outTimeField = document.getElementById('out_time');
+  if (outTimeField) {
+    function updateOutTimeDisplay() {
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2, '0');
+      const mm = String(now.getMinutes()).padStart(2, '0');
+      outTimeField.value = `${hh}:${mm}`;
+    }
+    updateOutTimeDisplay();
+    setInterval(updateOutTimeDisplay, 15000);
   }
 
   // Assist(s) search filter

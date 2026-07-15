@@ -1350,7 +1350,6 @@ def staff_movement(request):
         if request.method == "POST":
             date_str = request.POST.get("date")
             client_str = request.POST.get("client", "").strip()
-            out_time_str = request.POST.get("out_time")
             in_time_str = request.POST.get("in_time")
             purpose_type = request.POST.get("purpose_type", "").strip()
             purpose = request.POST.get("purpose", "").strip()
@@ -1358,13 +1357,14 @@ def staff_movement(request):
             resolution_status = request.POST.get("resolution_status", "").strip()
             assistant_ids = request.POST.getlist("assistants")
 
+            # Out time is never taken from the client — it's always "now" at submission time
+            out_time = datetime.now().time()
+
             errors = []
             if not date_str:
                 errors.append("Please select a date.")
             if not client_str:
                 errors.append("Please specify the client / location.")
-            if not out_time_str:
-                errors.append("Please specify the departure time.")
             if in_time_str:
                 errors.append("Return time must be filled in after the movement is logged.")
             if purpose_type not in dict(StaffMovement.PURPOSE_CHOICES):
@@ -1373,22 +1373,12 @@ def staff_movement(request):
                 errors.append("Please describe the problem being addressed.")
 
             movement_date = None
-            out_time = None
 
             if date_str:
                 try:
                     movement_date = datetime.strptime(date_str, "%Y-%m-%d").date()
                 except ValueError:
                     errors.append("Invalid date format.")
-
-            if out_time_str:
-                try:
-                    out_time = datetime.strptime(out_time_str, "%H:%M").time()
-                except ValueError:
-                    try:
-                        out_time = datetime.strptime(out_time_str, "%H:%M:%S").time()
-                    except ValueError:
-                        errors.append("Invalid departure time format.")
 
             if not errors:
                 movement = StaffMovement.objects.create(
