@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initMobileNav();
   initDayCalculator();
   initSuccessModal();
+  initTypeTabs();
   initLeaveTabs();
   initThemeToggle();
 });
@@ -137,7 +138,33 @@ function initSuccessModal() {
 }
 
 /* ------------------------------------------
+   My Leaves: top-level type tabs
+   (Leave Requests / Attendance / Holiday Work)
+------------------------------------------- */
+function initTypeTabs() {
+  const typeTabs = document.querySelectorAll('#my-leaves-type-tabs .type-tab');
+  if (!typeTabs.length) return;
+
+  typeTabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      typeTabs.forEach((t) => t.classList.remove('active'));
+      tab.classList.add('active');
+
+      document.querySelectorAll('.type-panel').forEach((p) => {
+        p.style.display = 'none';
+      });
+      const target = document.querySelector(`.type-panel[data-panel="${tab.dataset.type}"]`);
+      if (target) target.style.display = '';
+    });
+  });
+}
+
+/* ------------------------------------------
    My Leaves: client-side status tabs
+   (All / Pending / Approved / Rejected)
+   PDF links (single "export-*" button or
+   per-row ".pdf-download" links) are only
+   shown while the "Approved" filter is active.
 ------------------------------------------- */
 function initLeaveTabs() {
   const panels = document.querySelectorAll('.type-panel');
@@ -147,32 +174,34 @@ function initLeaveTabs() {
     const tabs = panel.querySelectorAll('.tabs .tab[data-filter]');
     const rows = panel.querySelectorAll('tbody tr');
     const exportBtn = panel.querySelector('.flex-actions a[id^="export-"]');
+    const pdfLinks = panel.querySelectorAll('.pdf-download');
 
     if (!tabs.length || !rows.length) return;
 
-    // Show/hide export button initially based on active tab
-    const activeTab = panel.querySelector('.tabs .tab.active');
-    const initialFilter = activeTab ? activeTab.dataset.filter : 'all';
-    if (exportBtn) {
-      exportBtn.style.display = initialFilter === 'approved' ? '' : 'none';
+    function applyFilter(filter) {
+      rows.forEach((row) => {
+        if (row.querySelector('.empty-state') || row.classList.contains('empty-state')) {
+          return;
+        }
+        row.style.display = (filter === 'all' || row.dataset.status === filter) ? '' : 'none';
+      });
+
+      if (exportBtn) {
+        exportBtn.style.display = filter === 'approved' ? '' : 'none';
+      }
+      pdfLinks.forEach((link) => {
+        link.style.display = filter === 'approved' ? '' : 'none';
+      });
     }
+
+    const activeTab = panel.querySelector('.tabs .tab.active');
+    applyFilter(activeTab ? activeTab.dataset.filter : 'all');
 
     tabs.forEach((tab) => {
       tab.addEventListener('click', () => {
         tabs.forEach((t) => t.classList.remove('active'));
         tab.classList.add('active');
-
-        const filter = tab.dataset.filter;
-        rows.forEach((row) => {
-          if (row.querySelector('.empty-state') || row.classList.contains('empty-state')) {
-            return;
-          }
-          row.style.display = (filter === 'all' || row.dataset.status === filter) ? '' : 'none';
-        });
-
-        if (exportBtn) {
-          exportBtn.style.display = filter === 'approved' ? '' : 'none';
-        }
+        applyFilter(tab.dataset.filter);
       });
     });
   });

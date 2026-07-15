@@ -12,10 +12,6 @@
 </div>
 
 <div class="type-panel" data-panel="leave">
-  <div class="flex-actions" style="justify-content: flex-end; margin-bottom: 16px;">
-    <a href="{% url 'export_my_leaves_pdf' %}" class="btn btn-outline btn-sm" id="export-leaves-pdf" style="display: none;">⬇ Export PDF</a>
-  </div>
-
   <div class="tabs">
     <div class="tab active" data-filter="all">All Requests</div>
     <div class="tab" data-filter="pending">Pending</div>
@@ -68,6 +64,9 @@
                     {% csrf_token %}
                     <button type="submit" class="btn btn-danger btn-sm">Cancel</button>
                   </form>
+                  <a href="{% url 'export_leave_pdf' l.id %}" class="btn btn-outline btn-sm pdf-download">⬇ PDF</a>
+                {% elif l.status == "approved" %}
+                  <a href="{% url 'export_leave_pdf' l.id %}" class="btn btn-outline btn-sm pdf-download">⬇ PDF</a>
                 {% else %}—{% endif %}
               </td>
             </tr>
@@ -81,10 +80,6 @@
 </div>
 
 <div class="type-panel" data-panel="attendance" style="display:none;">
-  <div class="flex-actions" style="justify-content: flex-end; margin-bottom: 16px;">
-    <a href="{% url 'export_my_attendance_pdf' %}" class="btn btn-outline btn-sm" id="export-attendance-pdf" style="display: none;">⬇ Export PDF</a>
-  </div>
-
   <div class="tabs">
     <div class="tab active" data-filter="all">All Requests</div>
     <div class="tab" data-filter="pending">Pending</div>
@@ -96,7 +91,7 @@
     <div class="table-responsive">
       <table>
         <thead>
-          <tr><th>#</th><th>Date</th><th>Reason</th><th>Applied On</th><th>Status</th><th>Note</th></tr>
+          <tr><th>#</th><th>Date</th><th>Reason</th><th>Applied On</th><th>Status</th><th>Note</th><th>Action</th></tr>
         </thead>
         <tbody id="my-attendance-body">
           {% for a in attendance_requests %}
@@ -114,9 +109,14 @@
               <td>
                 {% if a.decision_note %}<span style="color:var(--text-muted);font-size:0.85rem;">{{ a.decision_note }}</span>{% else %}—{% endif %}
               </td>
+              <td>
+                {% if a.status == "approved" %}
+                  <a href="{% url 'export_attendance_request_pdf' a.id %}" class="btn btn-outline btn-sm pdf-download">⬇ PDF</a>
+                {% else %}—{% endif %}
+              </td>
             </tr>
           {% empty %}
-            <tr><td colspan="6" class="empty-state">You haven't submitted any attendance requests yet.</td></tr>
+            <tr><td colspan="7" class="empty-state">You haven't submitted any attendance requests yet.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -125,10 +125,6 @@
 </div>
 
 <div class="type-panel" data-panel="holiday" style="display:none;">
-  <div class="flex-actions" style="justify-content: flex-end; margin-bottom: 16px;">
-    <a href="{% url 'export_my_holiday_work_pdf' %}" class="btn btn-outline btn-sm" id="export-holiday-pdf" style="display: none;">⬇ Export PDF</a>
-  </div>
-
   <div class="tabs">
     <div class="tab active" data-filter="all">All Requests</div>
     <div class="tab" data-filter="pending">Pending</div>
@@ -140,7 +136,7 @@
     <div class="table-responsive">
       <table>
         <thead>
-          <tr><th>#</th><th>Date</th><th>Reason</th><th>Applied On</th><th>Status</th><th>Note</th></tr>
+          <tr><th>#</th><th>Date</th><th>Reason</th><th>Applied On</th><th>Status</th><th>Note</th><th>Action</th></tr>
         </thead>
         <tbody id="my-holiday-body">
           {% for h in holiday_work_requests %}
@@ -158,9 +154,14 @@
               <td>
                 {% if h.decision_note %}<span style="color:var(--text-muted);font-size:0.85rem;">{{ h.decision_note }}</span>{% else %}—{% endif %}
               </td>
+              <td>
+                {% if h.status == "approved" %}
+                  <a href="{% url 'export_holiday_work_request_pdf' h.id %}" class="btn btn-outline btn-sm pdf-download">⬇ PDF</a>
+                {% else %}—{% endif %}
+              </td>
             </tr>
           {% empty %}
-            <tr><td colspan="6" class="empty-state">You haven't submitted any holiday work records yet.</td></tr>
+            <tr><td colspan="7" class="empty-state">You haven't submitted any holiday work records yet.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -190,17 +191,4 @@
     </div>
   </div>
 </div>
-{% endblock %}
-
-{% block extra_js %}
-<script>
-  document.querySelectorAll('#my-leaves-type-tabs .type-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('#my-leaves-type-tabs .type-tab').forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
-      document.querySelectorAll('.type-panel').forEach(p => p.style.display = 'none');
-      document.querySelector(`.type-panel[data-panel="${tab.dataset.type}"]`).style.display = '';
-    });
-  });
-</script>
 {% endblock %}
