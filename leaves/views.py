@@ -1429,22 +1429,29 @@ def staff_movement_edit(request, id):
         messages.error(request, "This record already has a return time and can no longer be edited.")
         return redirect("staff_movement")
 
+    # Rule 3: self-service correction window — only same-day records can be
+    # completed by the employee. Once the day has passed, only a manager can fix it.
+    if movement.date != date.today():
+        messages.error(
+            request,
+            "This record is from a previous day, so the self-service correction "
+            "window has closed. Please contact your manager to update it."
+        )
+        return redirect("staff_movement")
+
     other_employees = User.objects.exclude(id=request.user.id).exclude(role="ceo").order_by("first_name", "username")
 
     if request.method == "POST":
-        date_str = request.POST.get("date")
-        client_str = request.POST.get("client", "").strip()
         in_time_str = request.POST.get("in_time")
         resolution_status = request.POST.get("resolution_status", "").strip()
         completion_notes = request.POST.get("completion_notes", "").strip()
 
         errors = []
-        if not in_time_str:
-            errors.append("Please enter the return time.")
 
         in_time = None
-
-        if in_time_str:
+        if not in_time_str:
+            errors.append("Please enter the return time.")
+        else:
             try:
                 in_time = datetime.strptime(in_time_str, "%H:%M").time()
             except ValueError:
@@ -1453,12 +1460,17 @@ def staff_movement_edit(request, id):
                 except ValueError:
                     errors.append("Invalid return time format.")
 
+        now = datetime.now().time()
+
+        if in_time is not None:
+            if in_time <= movement.out_time:
+                errors.append("Return time must be later than the departure time.")
+            if in_time > now:
+                errors.append("Return time can't be in the future.")
+
         if movement.purpose_type == "problem_solving":
             if resolution_status not in dict(StaffMovement.RESOLUTION_CHOICES):
                 errors.append("Please select whether the problem was solved.")
-
-        if in_time and in_time <= movement.out_time:
-            errors.append("Return time must be later than the departure time for a same-day movement.")
 
         if not errors:
             # Rule 2: out_time is immutable after creation — never take it from POST

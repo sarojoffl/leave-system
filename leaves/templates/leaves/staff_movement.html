@@ -227,6 +227,7 @@
           <div class="form-group">
             <label for="in_time">Return Time (In) *</label>
             <input type="time" id="in_time" name="in_time" required>
+            <small style="color:var(--color-text-muted);font-size:0.75rem;display:block;">Set the time you returned from the visit.</small>
           </div>
         {% endif %}
 
@@ -439,17 +440,26 @@
     });
   }
 
-  // Live-updating out-time display (informational only — server sets the real value on submit)
+  // Out Time (create form): readonly, keeps ticking live until submit —
+  // server is the source of truth, this is just visual feedback.
   const outTimeField = document.getElementById('out_time');
   if (outTimeField) {
-    function updateOutTimeDisplay() {
+    function updateOutTime() {
       const now = new Date();
-      const hh = String(now.getHours()).padStart(2, '0');
-      const mm = String(now.getMinutes()).padStart(2, '0');
-      outTimeField.value = `${hh}:${mm}`;
+      outTimeField.value = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     }
-    updateOutTimeDisplay();
-    setInterval(updateOutTimeDisplay, 15000);
+    updateOutTime();
+    setInterval(updateOutTime, 15000);
+  }
+
+  // In Time (edit form): pre-filled with the current time ONCE as a sensible
+  // default, but left fully editable so the user can correct it if they
+  // actually returned earlier and forgot to log it. Does not keep ticking,
+  // so it never overwrites a manual correction.
+  const inTimeField = document.getElementById('in_time');
+  if (inTimeField && !inTimeField.value) {
+    const now = new Date();
+    inTimeField.value = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
   }
 
   // Assist(s) search filter
