@@ -1295,6 +1295,7 @@ def export_holiday_work_request_pdf(request, id):
 def staff_movement(request):
     from accounts.utils import get_view_mode
     from accounts.models import User
+    from django.conf import settings
     from django.db.models import Q
 
     today = date.today()
@@ -1307,7 +1308,7 @@ def staff_movement(request):
         filter_client = request.GET.get("client", "").strip()
         show_all = request.GET.get("all") == "1"
 
-        movements = StaffMovement.objects.all().select_related("employee").prefetch_related("assistants")
+        movements = StaffMovement.objects.all().select_related("employee", "logged_by").prefetch_related("assistants")
 
         # Default to today's records when the page is loaded with no filters at all
         if not filter_date and not show_all and not filter_employee_id and not filter_client:
@@ -1347,6 +1348,9 @@ def staff_movement(request):
         # Employee view
         other_employees = User.objects.exclude(id=request.user.id).exclude(role="ceo").order_by("first_name", "username")
 
+        can_log_on_behalf = request.user.username in getattr(settings, "STAFF_MOVEMENT_PROXY_LOGGER_USERNAMES", [])
+        proxy_employees = User.objects.exclude(role="ceo").order_by("first_name", "username") if can_log_on_behalf else None
+
         if request.method == "POST":
             date_str = request.POST.get("date")
             client_str = request.POST.get("client", "").strip()
@@ -1356,6 +1360,7 @@ def staff_movement(request):
             problem_description = request.POST.get("problem_description", "").strip()
             resolution_status = request.POST.get("resolution_status", "").strip()
             assistant_ids = request.POST.getlist("assistants")
+            on_behalf_of_id = request.POST.get("on_behalf_of", "").strip()
 
             # Out time is never taken from the client — it's always "now" at submission time
             out_time = datetime.now().time()
@@ -1372,8 +1377,15 @@ def staff_movement(request):
             if purpose_type == "problem_solving" and not problem_description:
                 errors.append("Please describe the problem being addressed.")
 
-            movement_date = None
+            # Resolve who the record actually belongs to
+            target_employee = request.user
+            if can_log_on_behalf and on_behalf_of_id:
+                try:
+                    target_employee = User.objects.exclude(role="ceo").get(id=int(on_behalf_of_id))
+                except (ValueError, User.DoesNotExist):
+                    errors.append("Please select a valid employee to log this visit for.")
 
+            movement_date = None
             if date_str:
                 try:
                     movement_date = datetime.strptime(date_str, "%Y-%m-%d").date()
@@ -1382,7 +1394,8 @@ def staff_movement(request):
 
             if not errors:
                 movement = StaffMovement.objects.create(
-                    employee=request.user,
+                    employee=target_employee,
+                    logged_by=request.user if target_employee != request.user else None,
                     date=movement_date,
                     client=client_str,
                     out_time=out_time,
@@ -1394,19 +1407,25 @@ def staff_movement(request):
                 )
                 if assistant_ids:
                     movement.assistants.set(
-                        User.objects.filter(id__in=assistant_ids).exclude(id=request.user.id)
+                        User.objects.filter(id__in=assistant_ids).exclude(id=target_employee.id)
                     )
-                messages.success(request, "Staff movement record logged successfully.")
+                if target_employee == request.user:
+                    messages.success(request, "Staff movement record logged successfully.")
+                else:
+                    messages.success(
+                        request,
+                        f"Movement logged on behalf of {target_employee.get_full_name() or target_employee.username}."
+                    )
                 return redirect("staff_movement")
 
             for err in errors:
                 messages.error(request, err)
 
         # GET request or fallback after POST validation failure
-        # Include records where user is the logger OR an assistant
+        # Include records where user is the logger, an assistant, or logged something on their behalf
         movements = StaffMovement.objects.filter(
-            Q(employee=request.user) | Q(assistants=request.user)
-        ).distinct().select_related("employee").prefetch_related("assistants")
+            Q(employee=request.user) | Q(assistants=request.user) | Q(logged_by=request.user)
+        ).distinct().select_related("employee", "logged_by").prefetch_related("assistants")
 
         return render(request, "leaves/staff_movement.html", {
             "movements": movements,
@@ -1415,14 +1434,20 @@ def staff_movement(request):
             "other_employees": other_employees,
             "purpose_choices": StaffMovement.PURPOSE_CHOICES,
             "resolution_choices": StaffMovement.RESOLUTION_CHOICES,
+            "can_log_on_behalf": can_log_on_behalf,
+            "proxy_employees": proxy_employees,
         })
 
 
 @login_required
 def staff_movement_edit(request, id):
     from accounts.models import User
+    from django.db.models import Q
 
-    movement = get_object_or_404(StaffMovement, id=id, employee=request.user)
+    movement = get_object_or_404(
+        StaffMovement.objects.filter(Q(employee=request.user) | Q(logged_by=request.user)),
+        id=id
+    )
 
     # Rule 1: once a return time is logged, the record is locked — no further edits
     if movement.in_time:
@@ -1430,7 +1455,7 @@ def staff_movement_edit(request, id):
         return redirect("staff_movement")
 
     # Rule 3: self-service correction window — only same-day records can be
-    # completed by the employee. Once the day has passed, only a manager can fix it.
+    # completed. Once the day has passed, only a manager can fix it.
     if movement.date != date.today():
         messages.error(
             request,
@@ -1447,7 +1472,6 @@ def staff_movement_edit(request, id):
         completion_notes = request.POST.get("completion_notes", "").strip()
 
         errors = []
-
         in_time = None
         if not in_time_str:
             errors.append("Please enter the return time.")
@@ -1461,7 +1485,6 @@ def staff_movement_edit(request, id):
                     errors.append("Invalid return time format.")
 
         now = datetime.now().time()
-
         if in_time is not None:
             if in_time <= movement.out_time:
                 errors.append("Return time must be later than the departure time.")

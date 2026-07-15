@@ -142,6 +142,9 @@
                 <div style="display: flex; align-items: center; gap: 8px;">
                   <span class="avatar avatar-sm">{{ m.employee.initials }}</span>
                   {{ m.employee.get_full_name|default:m.employee.username }}
+                  {% if m.logged_on_behalf %}
+                    <span class="badge" style="background:var(--color-primary-light);color:var(--color-primary);font-size:0.7rem;" title="Logged by {{ m.logged_by.get_full_name|default:m.logged_by.username }}">Proxy-logged</span>
+                  {% endif %}
                 </div>
               </td>
               <td>
@@ -211,6 +214,19 @@
             <small id="date-bs" style="color:var(--color-primary);font-size:0.75rem;min-height:1.2em;display:block;"></small>
           </div>
 
+          {% if can_log_on_behalf %}
+            <div class="form-group">
+              <label for="on_behalf_of">Log On Behalf Of</label>
+              <select id="on_behalf_of" name="on_behalf_of">
+                <option value="">— Myself —</option>
+                {% for emp in proxy_employees %}
+                  <option value="{{ emp.id }}">{{ emp.get_full_name|default:emp.username }}</option>
+                {% endfor %}
+              </select>
+              <small style="color:var(--color-text-muted);font-size:0.75rem;display:block;">Leave as "Myself" to log your own visit.</small>
+            </div>
+          {% endif %}
+
           <div class="form-group">
             <label for="client">Client / Location *</label>
             <input type="text" id="client" name="client" placeholder="e.g. ABC Tech Office, Client Site">
@@ -227,7 +243,6 @@
           <div class="form-group">
             <label for="in_time">Return Time (In) *</label>
             <input type="time" id="in_time" name="in_time" required>
-            <small style="color:var(--color-text-muted);font-size:0.75rem;display:block;">Set the time you returned from the visit.</small>
           </div>
         {% endif %}
 
@@ -341,6 +356,9 @@
                 <td>
                   {% if m.employee_id == request.user.id %}
                     <span style="opacity:0.6;">You</span>
+                  {% elif m.logged_by_id == request.user.id %}
+                    {{ m.employee.get_full_name|default:m.employee.username }}
+                    <span class="badge" style="background:var(--color-primary-light);color:var(--color-primary);font-size:0.7rem;margin-left:4px;">Logged by you</span>
                   {% else %}
                     {{ m.employee.get_full_name|default:m.employee.username }}
                     <span class="badge" style="background:var(--color-primary-light);color:var(--color-primary);font-size:0.7rem;margin-left:4px;">Assisted</span>
@@ -372,7 +390,7 @@
                 </td>
                 <td title="{{ m.completion_notes }}">{{ m.completion_notes|default:"—"|truncatechars:40 }}</td>
                 <td>
-                  {% if m.employee_id == request.user.id %}
+                  {% if m.employee_id == request.user.id or m.logged_by_id == request.user.id %}
                     {% if not m.in_time %}
                       <a href="{% url 'staff_movement_edit' m.id %}" class="btn btn-outline btn-sm">Fill In-Time</a>
                     {% else %}

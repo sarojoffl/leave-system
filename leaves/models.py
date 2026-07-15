@@ -156,6 +156,14 @@ class StaffMovement(models.Model):
         on_delete=models.CASCADE,
         related_name="staff_movements"
     )
+    logged_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="movements_logged_on_behalf",
+        null=True,
+        blank=True,
+        help_text="Set when this record was submitted by someone other than the employee (e.g. logged on their behalf)."
+    )
     date = models.DateField()
     client = models.CharField(max_length=200)
     out_time = models.TimeField()
@@ -189,3 +197,7 @@ class StaffMovement(models.Model):
         return ", ".join(
             a.get_full_name() or a.username for a in self.assistants.all()
         ) or "—"
+
+    @property
+    def logged_on_behalf(self) -> bool:
+        return self.logged_by_id is not None and self.logged_by_id != self.employee_id
