@@ -23,6 +23,36 @@
     outline: none;
     box-shadow: none;
   }
+  .participant-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    margin-bottom: 2px;
+  }
+  .assistant-time-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+  }
+  .assistant-time-row .name {
+    min-width: 160px;
+  }
+  .assistant-time-row input[type="time"]:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .still-out-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.8rem;
+    font-weight: normal;
+    color: var(--color-text-muted);
+    cursor: pointer;
+  }
 </style>
 
 {% if is_manager %}
@@ -155,10 +185,21 @@
               <td style="font-size:0.85rem;color:var(--color-text-muted);">{{ m.assistants_display }}</td>
               <td><span class="badge pending">{{ m.out_time|time:"H:i" }}</span></td>
               <td>
-                {% if m.in_time %}
-                  <span class="badge approved">{{ m.in_time|time:"H:i" }}</span>
-                {% else %}
+                {% if m.uniform_in_time %}
+                  <span class="badge approved">{{ m.uniform_in_time|time:"H:i" }}</span>
+                {% elif m.all_out %}
                   <span class="badge rejected">Out</span>
+                {% else %}
+                  {% for grp_time, names in m.in_time_groups %}
+                    <div class="participant-row">
+                      {% if grp_time %}
+                        <span class="badge approved">{{ grp_time|time:"H:i" }}</span>
+                      {% else %}
+                        <span class="badge rejected">Out</span>
+                      {% endif %}
+                      <span>{{ names|join:", " }}</span>
+                    </div>
+                  {% endfor %}
                 {% endif %}
               </td>
               <td>{{ m.get_purpose_type_display|default:"—" }}</td>
@@ -241,8 +282,8 @@
 
         {% if is_edit %}
           <div class="form-group">
-            <label for="in_time">Return Time (In) *</label>
-            <input type="time" id="in_time" name="in_time" required>
+            <label for="in_time">Your Return Time (In) *</label>
+            <input type="time" id="in_time" name="in_time" value="{{ movement.in_time|time:'H:i' }}" required>
           </div>
         {% endif %}
 
@@ -252,7 +293,7 @@
             <select id="purpose_type" name="purpose_type" required>
             <option value="">— Select purpose —</option>
             {% for value, label in purpose_choices %}
-              <option value="{{ value }}" {% if is_edit and movement.purpose_type == value %}selected{% endif %}>{{ label }}</option>
+              <option value="{{ value }}">{{ label }}</option>
             {% endfor %}
             </select>
           </div>
@@ -272,14 +313,48 @@
                 <option value="{{ value }}" {% if movement.resolution_status == value %}selected{% endif %}>{{ label }}</option>
               {% endfor %}
             </select>
-            <small style="color:var(--color-text-muted);font-size:0.75rem;">Required when filling in the return time for a problem-solving visit.</small>
+            <small style="color:var(--color-text-muted);font-size:0.75rem;">
+              Required when filling in the return time for a problem-solving visit. This is shared for the
+              whole visit — if it's already been answered, feel free to update it if it's changed.
+            </small>
           </div>
         {% endif %}
 
         {% if is_edit %}
           <div class="form-group full">
             <label for="completion_notes">Completion / Return Notes <span style="font-weight:normal;opacity:0.6;">(Optional)</span></label>
-            <textarea id="completion_notes" name="completion_notes" placeholder="Add work completed, pending items, or next steps..."></textarea>
+            <textarea id="completion_notes" name="completion_notes" placeholder="Add work completed, pending items, or next steps...">{{ movement.completion_notes }}</textarea>
+            <small style="color:var(--color-text-muted);font-size:0.75rem;display:block;">Shared for the whole visit — update it if anything's changed since it was last filled in.</small>
+          </div>
+        {% endif %}
+
+        {% if is_edit and is_primary and open_assistant_links %}
+          <div class="form-group full">
+            <label style="display:flex;align-items:center;gap:8px;font-weight:normal;">
+              <input type="checkbox" id="separate_returns" name="separate_returns" value="1">
+              Some assistants returned separately (or are still out)
+            </label>
+            <small style="color:var(--color-text-muted);font-size:0.75rem;display:block;">
+              Leave unchecked to apply your return time to everyone below who's still marked "Out."
+            </small>
+          </div>
+
+          <div class="form-group full" id="separate-returns-group" hidden>
+            {% for link in open_assistant_links %}
+              <div class="assistant-time-row">
+                <span class="name">{{ link.employee.get_full_name|default:link.employee.username }}</span>
+                <input type="time" name="assistant_in_time_{{ link.id }}" placeholder="Same as your time" id="assistant_in_time_{{ link.id }}">
+                <label class="still-out-label">
+                  <input type="checkbox" name="assistant_still_out_{{ link.id }}" value="1"
+                         class="still-out-checkbox" data-target="assistant_in_time_{{ link.id }}">
+                  Still out
+                </label>
+              </div>
+            {% endfor %}
+            <small style="color:var(--color-text-muted);font-size:0.75rem;">
+              For each person: leave the time blank to use your return time, enter their own time if different,
+              or check "Still out" if they haven't returned yet. When this section is open, one of these is required per person.
+            </small>
           </div>
         {% endif %}
 
@@ -299,8 +374,7 @@
             {% for emp in other_employees %}
               <label class="assistant-option" data-name="{{ emp.get_full_name|default:emp.username|lower }}"
                 style="display:flex;align-items:center;gap:6px;padding:6px 12px;border:1.5px solid var(--color-border);border-radius:var(--radius-sm);font-size:0.85rem;cursor:pointer;">
-                <input type="checkbox" name="assistants" value="{{ emp.id }}"
-                  {% if emp.id in selected_assistant_ids %}checked{% endif %}>
+                <input type="checkbox" name="assistants" value="{{ emp.id }}">
                 {{ emp.get_full_name|default:emp.username }}
               </label>
             {% endfor %}
@@ -368,10 +442,20 @@
                 <td style="font-size:0.85rem;color:var(--color-text-muted);">{{ m.assistants_display }}</td>
                 <td><span class="badge pending">{{ m.out_time|time:"H:i" }}</span></td>
                 <td>
-                  {% if m.in_time %}
-                    <span class="badge approved">{{ m.in_time|time:"H:i" }}</span>
+                  {% if m.uniform_in_time %}
+                    <span class="badge approved">{{ m.uniform_in_time|time:"H:i" }}</span>
+                  {% elif m.is_primary_for_me %}
+                    {% if m.in_time %}
+                      <span class="badge approved">{{ m.in_time|time:"H:i" }}</span>
+                    {% else %}
+                      <span class="badge rejected">Out</span>
+                    {% endif %}
                   {% else %}
-                    <span class="badge rejected">Out</span>
+                    {% if m.my_assistant_link.in_time %}
+                      <span class="badge approved">{{ m.my_assistant_link.in_time|time:"H:i" }}</span>
+                    {% else %}
+                      <span class="badge rejected">Out</span>
+                    {% endif %}
                   {% endif %}
                 </td>
                 <td>{{ m.get_purpose_type_display|default:"—" }}</td>
@@ -381,7 +465,7 @@
                     <div title="{{ m.problem_description }}">{{ m.problem_description|default:"—"|truncatechars:40 }}</div>
                     {% if m.resolution_status %}
                       <span class="badge {% if m.resolution_status == 'solved' %}approved{% else %}rejected{% endif %}" style="margin-top:5px;">{{ m.get_resolution_status_display }}</span>
-                    {% elif m.in_time %}
+                    {% elif m.in_time or m.my_assistant_link.in_time %}
                       <span class="badge pending" style="margin-top:5px;">Status missing</span>
                     {% endif %}
                   {% else %}
@@ -390,14 +474,18 @@
                 </td>
                 <td title="{{ m.completion_notes }}">{{ m.completion_notes|default:"—"|truncatechars:40 }}</td>
                 <td>
-                  {% if m.employee_id == request.user.id or m.logged_by_id == request.user.id %}
+                  {% if m.is_primary_for_me %}
                     {% if not m.in_time %}
                       <a href="{% url 'staff_movement_edit' m.id %}" class="btn btn-outline btn-sm">Fill In-Time</a>
                     {% else %}
-                      <span style="color:var(--color-text-muted);font-size:0.85rem;">Completed</span>
+                      <span class="badge approved">Completed</span>
                     {% endif %}
                   {% else %}
-                    <span style="color:var(--color-text-muted);font-size:0.85rem;">—</span>
+                    {% if m.my_assistant_link.in_time %}
+                      <span class="badge approved">Completed</span>
+                    {% else %}
+                      <a href="{% url 'staff_movement_edit' m.id %}" class="btn btn-outline btn-sm">Fill In-Time</a>
+                    {% endif %}
                   {% endif %}
                 </td>
               </tr>
@@ -432,34 +520,24 @@
     }
   }
 
-  // Movement form date (employee view)
   const dateInput = document.getElementById('date');
   if (dateInput) {
     dateInput.addEventListener('change', () => showBs('date', 'date-bs'));
     showBs('date', 'date-bs');
-
     dateInput.addEventListener('click', () => {
-      if (dateInput.showPicker) {
-        try { dateInput.showPicker(); } catch (e) {}
-      }
+      if (dateInput.showPicker) { try { dateInput.showPicker(); } catch (e) {} }
     });
   }
 
-  // Manager filter date
   const filterDateInput = document.getElementById('filter-date');
   if (filterDateInput) {
     filterDateInput.addEventListener('change', () => showBs('filter-date', 'filter-date-bs'));
     showBs('filter-date', 'filter-date-bs');
-
     filterDateInput.addEventListener('click', () => {
-      if (filterDateInput.showPicker) {
-        try { filterDateInput.showPicker(); } catch (e) {}
-      }
+      if (filterDateInput.showPicker) { try { filterDateInput.showPicker(); } catch (e) {} }
     });
   }
 
-  // Out Time (create form): readonly, keeps ticking live until submit —
-  // server is the source of truth, this is just visual feedback.
   const outTimeField = document.getElementById('out_time');
   if (outTimeField) {
     function updateOutTime() {
@@ -470,17 +548,12 @@
     setInterval(updateOutTime, 15000);
   }
 
-  // In Time (edit form): pre-filled with the current time ONCE as a sensible
-  // default, but left fully editable so the user can correct it if they
-  // actually returned earlier and forgot to log it. Does not keep ticking,
-  // so it never overwrites a manual correction.
   const inTimeField = document.getElementById('in_time');
   if (inTimeField && !inTimeField.value) {
     const now = new Date();
     inTimeField.value = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
   }
 
-  // Assist(s) search filter
   const assistantSearch = document.getElementById('assistant-search');
   const assistantOptions = document.querySelectorAll('.assistant-option');
   const assistantCount = document.getElementById('assistant-count');
@@ -512,6 +585,13 @@
   const resolutionGroup = document.getElementById('resolution-status-group');
   const resolutionStatus = document.getElementById('resolution_status');
   const inTime = document.getElementById('in_time');
+  const separateReturns = document.getElementById('separate_returns');
+  const separateGroup = document.getElementById('separate-returns-group');
+  if (separateReturns) {
+    separateReturns.addEventListener('change', () => {
+      separateGroup.hidden = !separateReturns.checked;
+    });
+  }
 
   function updateProblemFields() {
     if (!purposeType) return;
@@ -528,5 +608,16 @@
     if (inTime) inTime.addEventListener('change', updateProblemFields);
     updateProblemFields();
   }
+
+  // "Still out" checkbox: disable & clear the matching time input so the
+  // two controls can't contradict each other, mirroring the server-side check.
+  document.querySelectorAll('.still-out-checkbox').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const t = document.getElementById(cb.dataset.target);
+      if (!t) return;
+      t.disabled = cb.checked;
+      if (cb.checked) t.value = '';
+    });
+  });
 </script>
 {% endblock %}

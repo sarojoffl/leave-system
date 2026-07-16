@@ -3,7 +3,7 @@ from django.utils import timezone
 
 from .models import (
     LeaveType, LeaveRequest, LeaveBalance, PublicHoliday,
-    AttendanceRequest, HolidayWorkRequest, StaffMovement,
+    AttendanceRequest, HolidayWorkRequest, StaffMovement, StaffMovementAssistant,
 )
 
 
@@ -106,6 +106,19 @@ class HolidayWorkRequestAdmin(BaseDayRequestAdmin):
     pass
 
 
+class StaffMovementAssistantInline(admin.TabularInline):
+    """
+    Lets a manager see and, if needed, correct each assistant's own
+    return time — this is the 'separate flow' referenced in the
+    self-service hard lock: once an assistant's in_time is set via the
+    normal employee flow, this admin inline is the only way left to fix it.
+    """
+    model = StaffMovementAssistant
+    extra = 0
+    autocomplete_fields = ("employee",)
+    fields = ("employee", "in_time", "resolution_status", "completion_notes")
+
+
 @admin.register(StaffMovement)
 class StaffMovementAdmin(admin.ModelAdmin):
     list_display = ("employee", "date", "client", "purpose_type", "out_time", "in_time", "resolution_status", "created_at")
@@ -113,4 +126,5 @@ class StaffMovementAdmin(admin.ModelAdmin):
     search_fields = ("employee__username", "employee__first_name", "employee__last_name", "client", "purpose", "problem_description", "completion_notes")
     date_hierarchy = "date"
     readonly_fields = ("created_at",)
-    autocomplete_fields = ("employee",)
+    autocomplete_fields = ("employee", "logged_by")
+    inlines = [StaffMovementAssistantInline]

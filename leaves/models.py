@@ -140,11 +140,16 @@ class HolidayWorkRequest(BaseDayRequest):
         return f"{self.employee.username} - Holiday Work {self.date}"
 
 
+from datetime import time as time_cls
+
+
 class StaffMovement(models.Model):
     PURPOSE_CHOICES = [
         ("problem_solving", "Problem solving"),
         ("goods_bill_delivery", "Goods / bill delivery"),
         ("goods_pickup", "Goods pickup"),
+        ("amc", "AMC"),
+        ("document_delivery", "Document delivery"),
     ]
     RESOLUTION_CHOICES = [
         ("solved", "Solved"),
@@ -175,6 +180,7 @@ class StaffMovement(models.Model):
     completion_notes = models.TextField(blank=True)
     assistants = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
+        through="StaffMovementAssistant",
         related_name="assisted_movements",
         blank=True,
         help_text="Other staff who accompanied this movement"
@@ -193,11 +199,75 @@ class StaffMovement(models.Model):
         return ad_to_bs_display(self.date)
 
     @property
-    def assistants_display(self) -> str:
-        return ", ".join(
-            a.get_full_name() or a.username for a in self.assistants.all()
-        ) or "—"
-
-    @property
     def logged_on_behalf(self) -> bool:
         return self.logged_by_id is not None and self.logged_by_id != self.employee_id
+
+    def _all_in_times(self):
+        """[(display_name, in_time_or_None), ...] for primary + every assistant."""
+        primary_name = self.employee.get_full_name() or self.employee.username
+        result = [(primary_name, self.in_time)]
+        for link in self.assistant_links.all():
+            name = link.employee.get_full_name() or link.employee.username
+            result.append((name, link.in_time))
+        return result
+
+    @property
+    def uniform_in_time(self):
+        """
+        Returns the shared TimeField if EVERY participant (primary + assistants)
+        has the exact same non-null in_time. Returns None otherwise.
+        """
+        times = [t for _, t in self._all_in_times()]
+        if not times:
+            return None
+        first = times[0]
+        if first is not None and all(t == first for t in times):
+            return first
+        return None
+
+    @property
+    def all_out(self) -> bool:
+        return all(t is None for _, t in self._all_in_times())
+
+    @property
+    def in_time_groups(self):
+        """
+        Groups participants by their in_time value, so people who returned
+        together show up on one line instead of repeating the same time.
+        Returns [(time_or_None, [name1, name2, ...]), ...] sorted with
+        filled times first (earliest first), "still out" (None) last.
+        """
+        groups = {}
+        for name, t in self._all_in_times():
+            groups.setdefault(t, []).append(name)
+
+        return sorted(
+            groups.items(),
+            key=lambda kv: (kv[0] is None, kv[0] or time_cls.min)
+        )
+
+    @property
+    def assistants_display(self) -> str:
+        """Names only — the In Time column already shows per-person/grouped times."""
+        names = [
+            link.employee.get_full_name() or link.employee.username
+            for link in self.assistant_links.all()
+        ]
+        return ", ".join(names) or "—"
+
+
+class StaffMovementAssistant(models.Model):
+    """Per-assistant return record. out_time is shared with the parent
+    movement (everyone leaves together); in_time is individual since
+    people can return separately."""
+    movement = models.ForeignKey(StaffMovement, on_delete=models.CASCADE, related_name="assistant_links")
+    employee = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="assistant_movement_links")
+    in_time = models.TimeField(null=True, blank=True)
+    resolution_status = models.CharField(max_length=20, choices=StaffMovement.RESOLUTION_CHOICES, blank=True)
+    completion_notes = models.TextField(blank=True)
+
+    class Meta:
+        unique_together = ("movement", "employee")
+
+    def __str__(self):
+        return f"{self.employee.username} assisting movement #{self.movement_id}"
