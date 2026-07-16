@@ -146,9 +146,9 @@ from datetime import time as time_cls
 class StaffMovement(models.Model):
     PURPOSE_CHOICES = [
         ("problem_solving", "Problem solving"),
+        ("amc", "AMC"),
         ("goods_bill_delivery", "Goods / bill delivery"),
         ("goods_pickup", "Goods pickup"),
-        ("amc", "AMC"),
         ("document_delivery", "Document delivery"),
     ]
     RESOLUTION_CHOICES = [

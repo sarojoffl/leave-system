@@ -1293,7 +1293,7 @@ def export_holiday_work_request_pdf(request, id):
 
 @login_required
 def staff_movement(request):
-    from accounts.utils import get_view_mode
+    from accounts.utils import get_view_mode, exclude_staff_movement_ineligible
     from accounts.models import User
     from django.conf import settings
     from django.db.models import Q
@@ -1332,7 +1332,9 @@ def staff_movement(request):
         if filter_client:
             movements = movements.filter(client__icontains=filter_client)
 
-        employees = User.objects.exclude(role="ceo").order_by("first_name", "username")
+        employees = exclude_staff_movement_ineligible(
+            User.objects.exclude(role="ceo")
+        ).order_by("first_name", "username")
 
         return render(request, "leaves/staff_movement.html", {
             "movements": movements,
@@ -1345,13 +1347,15 @@ def staff_movement(request):
             "is_manager": True,
         })
     else:
-        other_employees = User.objects.exclude(id=request.user.id).exclude(role="ceo").order_by("first_name", "username")
+        other_employees = exclude_staff_movement_ineligible(
+            User.objects.exclude(id=request.user.id).exclude(role="ceo")
+        ).order_by("first_name", "username")
 
         can_log_on_behalf = request.user.username in getattr(settings, "STAFF_MOVEMENT_PROXY_LOGGER_USERNAMES", [])
         proxy_employees = (
-            User.objects.exclude(role="ceo")
-            .exclude(pk=request.user.pk)
-            .order_by("first_name", "username")
+            exclude_staff_movement_ineligible(
+                User.objects.exclude(role="ceo").exclude(pk=request.user.pk)
+            ).order_by("first_name", "username")
             if can_log_on_behalf
             else None
         )
@@ -1383,7 +1387,9 @@ def staff_movement(request):
             target_employee = request.user
             if can_log_on_behalf and on_behalf_of_id:
                 try:
-                    target_employee = User.objects.exclude(role="ceo").get(id=int(on_behalf_of_id))
+                    target_employee = exclude_staff_movement_ineligible(
+                        User.objects.exclude(role="ceo")
+                    ).get(id=int(on_behalf_of_id))
                 except (ValueError, User.DoesNotExist):
                     errors.append("Please select a valid employee to log this visit for.")
 
@@ -1409,7 +1415,9 @@ def staff_movement(request):
                 )
                 if assistant_ids:
                     movement.assistants.set(
-                        User.objects.filter(id__in=assistant_ids).exclude(id=target_employee.id)
+                        exclude_staff_movement_ineligible(
+                            User.objects.filter(id__in=assistant_ids)
+                        ).exclude(id=target_employee.id)
                     )
                 if target_employee == request.user:
                     messages.success(request, "Staff movement record logged successfully.")
@@ -1453,6 +1461,7 @@ def staff_movement(request):
 @login_required
 def staff_movement_edit(request, id):
     from accounts.models import User
+    from accounts.utils import exclude_staff_movement_ineligible
     from django.db.models import Q
 
     movement = get_object_or_404(
@@ -1486,7 +1495,9 @@ def staff_movement_edit(request, id):
         )
         return redirect("staff_movement")
 
-    other_employees = User.objects.exclude(id=request.user.id).exclude(role="ceo").order_by("first_name", "username")
+    other_employees = exclude_staff_movement_ineligible(
+        User.objects.exclude(id=request.user.id).exclude(role="ceo")
+    ).order_by("first_name", "username")
 
     # Primary can still fill (not override) times for assistants who are still blank.
     open_assistant_links = list(movement.assistant_links.filter(in_time__isnull=True)) if is_primary else []
