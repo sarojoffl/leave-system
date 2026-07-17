@@ -1595,11 +1595,15 @@ def staff_movement_edit(request, id):
                 except ValueError:
                     errors.append("Invalid return time format.")
 
-        now = datetime.now().time()
+        # Compare against the record's actual date, not just today's clock —
+        # otherwise a clock-time comparison alone wrongly flags a perfectly
+        # valid past-day time (e.g. 5:30 PM yesterday) as "in the future"
+        # whenever it's currently earlier in the day than that.
+        now_dt = datetime.now()
         if in_time is not None:
             if in_time <= movement.out_time:
                 errors.append("Return time must be later than the departure time.")
-            if in_time > now:
+            if datetime.combine(movement.date, in_time) > now_dt:
                 errors.append("Return time can't be in the future.")
 
         if movement.purpose_type == "problem_solving":
@@ -1642,7 +1646,7 @@ def staff_movement_edit(request, id):
                 if a_time <= movement.out_time:
                     errors.append(f"{name}'s return time must be after departure.")
                     continue
-                if a_time > now:
+                if datetime.combine(movement.date, a_time) > now_dt:
                     errors.append(f"{name}'s return time can't be in the future.")
                     continue
                 assistant_updates[link.id] = a_time
