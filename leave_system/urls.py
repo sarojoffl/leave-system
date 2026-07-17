@@ -10,4 +10,5 @@ urlpatterns = [
 
     path('hr/movement/', leave_views.staff_movement, name='staff_movement'),
     path('hr/movement/<int:id>/edit/', leave_views.staff_movement_edit, name='staff_movement_edit'),
+    path('hr/movement/<int:id>/cancel/', leave_views.staff_movement_cancel, name='staff_movement_cancel'),
 ]

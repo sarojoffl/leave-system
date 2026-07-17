@@ -1732,3 +1732,52 @@ def staff_movement_edit(request, id):
         "purpose_choices": StaffMovement.PURPOSE_CHOICES,
         "resolution_choices": StaffMovement.RESOLUTION_CHOICES,
     })
+
+
+@login_required
+def staff_movement_cancel(request, id):
+    from django.conf import settings
+    from django.db.models import Q
+
+    is_staff_movement_admin = request.user.username in getattr(settings, "STAFF_MOVEMENT_PROXY_LOGGER_USERNAMES", [])
+
+    if is_staff_movement_admin:
+        movement = get_object_or_404(StaffMovement, id=id)
+    else:
+        # Regular users can only cancel movements they are primary on or logged
+        movement = get_object_or_404(
+            StaffMovement.objects.filter(
+                Q(employee=request.user) | Q(logged_by=request.user)
+            ).distinct(),
+            id=id
+        )
+
+    # Check if already completed or cancelled
+    if movement.in_time is not None:
+        messages.error(request, "Cannot cancel a completed movement.")
+        return redirect("staff_movement")
+    if movement.is_cancelled:
+        messages.error(request, "This movement has already been cancelled.")
+        return redirect("staff_movement")
+
+    # Only same-day cancellation for non-admin
+    if not is_staff_movement_admin and movement.date != date.today():
+        messages.error(request, "Cancellation window for this movement has closed.")
+        return redirect("staff_movement")
+
+    if request.method == "POST":
+        reason = request.POST.get("cancellation_reason", "").strip()
+        if not reason:
+            messages.error(request, "Please specify a cancellation reason.")
+            return redirect("staff_movement")
+
+        movement.is_cancelled = True
+        movement.cancellation_reason = reason
+        movement.save()
+
+        # Revert assistant times to null as the visit was cancelled
+        movement.assistant_links.all().update(in_time=None)
+
+        messages.success(request, "Staff movement visit cancelled.")
+
+    return redirect("staff_movement")

@@ -539,7 +539,19 @@
                   {% endif %}
                 </td>
                 <td>
-                  <a href="{% url 'staff_movement_edit' m.id %}" class="btn btn-outline btn-sm">Manage Time</a>
+                  {% if m.is_cancelled %}
+                    <span class="badge" style="background:#fff3cd;color:#856404;border:1px solid #ffc107;display:block;margin-bottom:4px;">Cancelled</span>
+                    {% if m.cancellation_reason %}
+                      <span style="font-size:0.75rem;color:var(--color-text-muted);" title="{{ m.cancellation_reason }}">{{ m.cancellation_reason|truncatechars:30 }}</span>
+                    {% endif %}
+                  {% elif not m.in_time %}
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                      <a href="{% url 'staff_movement_edit' m.id %}" class="btn btn-outline btn-sm">Manage Time</a>
+                      <button type="button" class="btn btn-sm" style="background:#fff3cd;color:#856404;border:1px solid #ffc107;" onclick="openCancelModal({{ m.id }}, '{{ m.client|escapejs }}')">Cancel Visit</button>
+                    </div>
+                  {% else %}
+                    <a href="{% url 'staff_movement_edit' m.id %}" class="btn btn-outline btn-sm">Manage Time</a>
+                  {% endif %}
                 </td>
               </tr>
             {% empty %}
@@ -599,7 +611,9 @@
                 <td style="font-size:0.85rem;color:var(--color-text-muted);">{{ m.assistants_display }}</td>
                 <td><span class="badge pending">{{ m.out_time|time:"H:i" }}</span></td>
                 <td>
-                  {% if m.uniform_in_time %}
+                  {% if m.is_cancelled %}
+                    <span class="badge" style="background:#fff3cd;color:#856404;border:1px solid #ffc107;">Cancelled</span>
+                  {% elif m.uniform_in_time %}
                     <span class="badge approved">{{ m.uniform_in_time|time:"H:i" }}</span>
                   {% elif m.is_primary_for_me %}
                     {% if m.in_time %}
@@ -631,9 +645,17 @@
                 </td>
                 <td title="{{ m.completion_notes }}">{{ m.completion_notes|default:"—"|truncatechars:40 }}</td>
                 <td>
-                  {% if m.is_primary_for_me %}
+                  {% if m.is_cancelled %}
+                    <span class="badge" style="background:#fff3cd;color:#856404;border:1px solid #ffc107;display:block;margin-bottom:4px;">Cancelled</span>
+                    {% if m.cancellation_reason %}
+                      <span style="font-size:0.75rem;color:var(--color-text-muted);" title="{{ m.cancellation_reason }}">{{ m.cancellation_reason|truncatechars:35 }}</span>
+                    {% endif %}
+                  {% elif m.is_primary_for_me %}
                     {% if not m.in_time %}
-                      <a href="{% url 'staff_movement_edit' m.id %}" class="btn btn-outline btn-sm">Fill In-Time</a>
+                      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                        <a href="{% url 'staff_movement_edit' m.id %}" class="btn btn-outline btn-sm">Fill In-Time</a>
+                        <button type="button" class="btn btn-sm" style="background:#fff3cd;color:#856404;border:1px solid #ffc107;" onclick="openCancelModal({{ m.id }}, '{{ m.client|escapejs }}')">Cancel Visit</button>
+                      </div>
                     {% else %}
                       <span class="badge approved">Completed</span>
                     {% endif %}
@@ -660,9 +682,50 @@
 {% endif %}
 {% endblock %}
 
+{% block extra_modals %}
+<!-- ===== Cancel Visit Modal ===== -->
+<div id="cancel-visit-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;">
+  <div style="background:var(--color-surface,#fff);border-radius:12px;padding:2rem;width:min(480px,90vw);box-shadow:0 8px 32px rgba(0,0,0,0.18);">
+    <h3 style="margin:0 0 0.4rem;font-size:1.15rem;color:var(--color-text);">Cancel Visit</h3>
+    <p style="margin:0 0 1.2rem;font-size:0.9rem;color:var(--color-text-muted);">You are cancelling the visit to: <strong id="cancel-modal-client"></strong></p>
+    <form id="cancel-visit-form" method="post" action="">
+      {% csrf_token %}
+      <label for="cancellation_reason" style="display:block;font-weight:600;font-size:0.9rem;margin-bottom:0.35rem;">Reason for Cancellation <span style="color:var(--color-danger,#c00);">*</span></label>
+      <textarea id="cancellation_reason" name="cancellation_reason" rows="3" required
+        placeholder="e.g. Client rescheduled, visit no longer required…"
+        style="width:100%;box-sizing:border-box;border:1px solid var(--color-border,#ddd);border-radius:8px;padding:0.6rem 0.8rem;font-size:0.95rem;resize:vertical;font-family:inherit;"></textarea>
+      <div style="display:flex;gap:0.75rem;justify-content:flex-end;margin-top:1.2rem;">
+        <button type="button" class="btn btn-outline" onclick="closeCancelModal()">Go Back</button>
+        <button type="submit" class="btn" style="background:#856404;color:#fff;">Confirm Cancellation</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
 {% block extra_js %}
 <script>
   const BS_API = "{% url 'ad_to_bs_api' %}";
+
+  // ---- Cancel Visit Modal ----
+  const cancelModal = document.getElementById('cancel-visit-modal');
+  function openCancelModal(movementId, clientName) {
+    document.getElementById('cancel-modal-client').textContent = clientName;
+    document.getElementById('cancel-visit-form').action = `/hr/movement/${movementId}/cancel/`;
+    document.getElementById('cancellation_reason').value = '';
+    cancelModal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+  }
+  function closeCancelModal() {
+    cancelModal.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+  // Close on backdrop click
+  if (cancelModal) {
+    cancelModal.addEventListener('click', function(e) {
+      if (e.target === cancelModal) closeCancelModal();
+    });
+  }
 
   async function showBs(inputId, labelId) {
     const val = document.getElementById(inputId).value;

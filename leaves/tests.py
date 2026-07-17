@@ -2,7 +2,7 @@ from datetime import date, datetime
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
-from leaves.models import LeaveType, LeaveRequest, LeaveBalance, PublicHoliday
+from leaves.models import LeaveType, LeaveRequest, LeaveBalance, PublicHoliday, StaffMovement
 
 User = get_user_model()
 
@@ -587,3 +587,85 @@ class StaffMovementTestCase(TestCase):
             "already out on another movement today"
         )
 
+    def test_employee_can_cancel_movement_with_reason(self):
+        """Cancelling an active movement frees the employee to log a new one."""
+        self.client.login(username="testemployee", password="password123")
+        today_str = date.today().strftime("%Y-%m-%d")
+
+        # Log a movement (leaves the employee marked as 'out')
+        self.client.post(reverse("staff_movement"), {
+            "date": today_str,
+            "client": "Client X",
+            "purpose_type": "goods_pickup",
+        })
+        movement = StaffMovement.objects.filter(
+            employee=self.employee, date=date.today()
+        ).latest("created_at")
+
+        # Cancel the movement with a reason
+        cancel_url = reverse("staff_movement_cancel", args=[movement.id])
+        response = self.client.post(cancel_url, {
+            "cancellation_reason": "Client postponed the meeting."
+        }, follow=True)
+
+        movement.refresh_from_db()
+        self.assertTrue(movement.is_cancelled)
+        self.assertEqual(movement.cancellation_reason, "Client postponed the meeting.")
+
+        # Employee should now be able to log another movement the same day
+        log_response = self.client.post(reverse("staff_movement"), {
+            "date": today_str,
+            "client": "Client Y",
+            "purpose_type": "goods_pickup",
+        })
+        # A redirect means success (no error in response body)
+        self.assertEqual(log_response.status_code, 302)
+
+    def test_cannot_cancel_completed_movement(self):
+        """A movement that already has an in_time cannot be cancelled."""
+        self.client.login(username="testemployee", password="password123")
+        movement = StaffMovement.objects.create(
+            employee=self.employee,
+            date=date.today(),
+            client="Client Z",
+            out_time=datetime.now().time(),
+            in_time=datetime.now().time(),
+            purpose_type="goods_pickup",
+        )
+
+        cancel_url = reverse("staff_movement_cancel", args=[movement.id])
+        self.client.post(cancel_url, {"cancellation_reason": "Not needed."}, follow=True)
+
+        movement.refresh_from_db()
+        # is_cancelled must remain False since the movement was completed
+        self.assertFalse(movement.is_cancelled)
+
+    def test_unauthorized_user_cannot_cancel_movement(self):
+        """A user who did not log the movement cannot cancel it."""
+        # Create another user
+        other_user = User.objects.create_user(
+            username="other_employee",
+            password="password123",
+            role="employee",
+            email="other@company.com",
+        )
+
+        movement = StaffMovement.objects.create(
+            employee=self.employee,
+            date=date.today(),
+            client="Client W",
+            out_time=datetime.now().time(),
+            purpose_type="goods_pickup",
+        )
+
+        self.client.login(username="other_employee", password="password123")
+        cancel_url = reverse("staff_movement_cancel", args=[movement.id])
+        response = self.client.post(cancel_url, {
+            "cancellation_reason": "Trying to cancel someone else's visit."
+        })
+
+        # Should get 404 (get_object_or_404 rejects this user)
+        self.assertEqual(response.status_code, 404)
+
+        movement.refresh_from_db()
+        self.assertFalse(movement.is_cancelled)

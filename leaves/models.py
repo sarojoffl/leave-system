@@ -185,6 +185,8 @@ class StaffMovement(models.Model):
         blank=True,
         help_text="Other staff who accompanied this movement"
     )
+    is_cancelled = models.BooleanField(default=False)
+    cancellation_reason = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -267,10 +269,10 @@ class StaffMovement(models.Model):
         if not employee_ids:
             return set()
         primary_out = cls.objects.filter(
-            employee_id__in=employee_ids, in_time__isnull=True, date=for_date
+            employee_id__in=employee_ids, in_time__isnull=True, date=for_date, is_cancelled=False
         ).values_list("employee_id", flat=True)
         assistant_out = StaffMovementAssistant.objects.filter(
-            employee_id__in=employee_ids, in_time__isnull=True, movement__date=for_date
+            employee_id__in=employee_ids, in_time__isnull=True, movement__date=for_date, movement__is_cancelled=False
         ).values_list("employee_id", flat=True)
         return set(primary_out) | set(assistant_out)
 
