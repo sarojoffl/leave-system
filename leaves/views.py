@@ -1351,7 +1351,11 @@ def staff_movement(request):
             User.objects.exclude(id=request.user.id).exclude(role="ceo")
         ).order_by("first_name", "username")
 
-        can_log_on_behalf = request.user.username in getattr(settings, "STAFF_MOVEMENT_PROXY_LOGGER_USERNAMES", [])
+        # Same username list now grants two things: logging visits on behalf of
+        # others, AND full read/edit authority over every staff movement record
+        # (used to cover people who can't fill their own times in).
+        is_staff_movement_admin = request.user.username in getattr(settings, "STAFF_MOVEMENT_PROXY_LOGGER_USERNAMES", [])
+        can_log_on_behalf = is_staff_movement_admin
         proxy_employees = (
             exclude_staff_movement_ineligible(
                 User.objects.exclude(role="ceo").exclude(pk=request.user.pk)
@@ -1446,7 +1450,7 @@ def staff_movement(request):
             m.my_assistant_link = my_links.get(m.id)
             m.is_primary_for_me = request.user.id in (m.employee_id, m.logged_by_id)
 
-        return render(request, "leaves/staff_movement.html", {
+        context = {
             "movements": movements,
             "is_manager": False,
             "today": today,
@@ -1455,52 +1459,122 @@ def staff_movement(request):
             "resolution_choices": StaffMovement.RESOLUTION_CHOICES,
             "can_log_on_behalf": can_log_on_behalf,
             "proxy_employees": proxy_employees,
-        })
+            "is_staff_movement_admin": is_staff_movement_admin,
+        }
+
+        # Full-visibility admin table — everyone's records, same filter pattern
+        # as the manager view, but reachable without needing manager role.
+        if is_staff_movement_admin:
+            admin_filter_date = request.GET.get("admin_date")
+            admin_filter_employee_id = request.GET.get("admin_employee")
+            admin_filter_client = request.GET.get("admin_client", "").strip()
+            admin_show_all = request.GET.get("admin_all") == "1"
+
+            admin_movements = StaffMovement.objects.all().select_related(
+                "employee", "logged_by"
+            ).prefetch_related("assistant_links__employee")
+
+            if not admin_filter_date and not admin_show_all and not admin_filter_employee_id and not admin_filter_client:
+                admin_filter_date = today.strftime("%Y-%m-%d")
+
+            admin_filter_date_obj = None
+            if admin_filter_date:
+                try:
+                    admin_filter_date_obj = datetime.strptime(admin_filter_date, "%Y-%m-%d").date()
+                    admin_movements = admin_movements.filter(date=admin_filter_date_obj)
+                except ValueError:
+                    pass
+
+            if admin_filter_employee_id:
+                try:
+                    admin_filter_employee_id = int(admin_filter_employee_id)
+                    admin_movements = admin_movements.filter(employee_id=admin_filter_employee_id)
+                except ValueError:
+                    admin_filter_employee_id = None
+
+            if admin_filter_client:
+                admin_movements = admin_movements.filter(client__icontains=admin_filter_client)
+
+            admin_employees = exclude_staff_movement_ineligible(
+                User.objects.exclude(role="ceo")
+            ).order_by("first_name", "username")
+
+            context.update({
+                "admin_movements": admin_movements,
+                "admin_employees": admin_employees,
+                "admin_filter_date": admin_filter_date,
+                "admin_filter_date_obj": admin_filter_date_obj,
+                "admin_filter_employee_id": admin_filter_employee_id,
+                "admin_filter_client": admin_filter_client,
+                "admin_show_all": admin_show_all,
+            })
+
+        return render(request, "leaves/staff_movement.html", context)
 
 
 @login_required
 def staff_movement_edit(request, id):
     from accounts.models import User
     from accounts.utils import exclude_staff_movement_ineligible
+    from django.conf import settings
     from django.db.models import Q
 
-    movement = get_object_or_404(
-        StaffMovement.objects.filter(
-            Q(employee=request.user) | Q(logged_by=request.user) | Q(assistants=request.user)
-        ).distinct().select_related("employee").prefetch_related("assistant_links__employee"),
-        id=id
-    )
+    is_staff_movement_admin = request.user.username in getattr(settings, "STAFF_MOVEMENT_PROXY_LOGGER_USERNAMES", [])
+
+    if is_staff_movement_admin:
+        # Admins can reach and fix any record, not just ones they're party to.
+        movement = get_object_or_404(
+            StaffMovement.objects.select_related("employee", "logged_by").prefetch_related("assistant_links__employee"),
+            id=id
+        )
+    else:
+        movement = get_object_or_404(
+            StaffMovement.objects.filter(
+                Q(employee=request.user) | Q(logged_by=request.user) | Q(assistants=request.user)
+            ).distinct().select_related("employee").prefetch_related("assistant_links__employee"),
+            id=id
+        )
 
     is_primary = request.user.id in (movement.employee_id, movement.logged_by_id)
+    acting_as_primary = is_primary or is_staff_movement_admin
+
     my_assistant_link = None
-    if not is_primary:
+    if not is_primary and not is_staff_movement_admin:
         my_assistant_link = get_object_or_404(StaffMovementAssistant, movement=movement, employee=request.user)
 
-    # Hard lock: once a person's own in_time is set, it's final. No self-correction,
-    # no primary override. Only a manager (separate flow) can fix it after this point.
-    if is_primary:
-        if movement.in_time:
-            messages.error(request, "This record already has a return time and can no longer be edited.")
-            return redirect("staff_movement")
-    else:
-        if my_assistant_link.in_time:
-            messages.error(request, "You've already recorded your return time for this visit and it can no longer be edited.")
-            return redirect("staff_movement")
+    # Hard lock: once a person's own in_time is set, it's final for that person,
+    # and old records close after the day ends. Staff movement admins are exempt
+    # from both — they're the designated fallback for people who can't self-correct.
+    if not is_staff_movement_admin:
+        if is_primary:
+            if movement.in_time:
+                messages.error(request, "This record already has a return time and can no longer be edited.")
+                return redirect("staff_movement")
+        else:
+            if my_assistant_link.in_time:
+                messages.error(request, "You've already recorded your return time for this visit and it can no longer be edited.")
+                return redirect("staff_movement")
 
-    if movement.date != date.today():
-        messages.error(
-            request,
-            "This record is from a previous day, so the self-service correction "
-            "window has closed. Please contact your manager to update it."
-        )
-        return redirect("staff_movement")
+        if movement.date != date.today():
+            messages.error(
+                request,
+                "This record is from a previous day, so the self-service correction "
+                "window has closed. Please contact your manager to update it."
+            )
+            return redirect("staff_movement")
 
     other_employees = exclude_staff_movement_ineligible(
         User.objects.exclude(id=request.user.id).exclude(role="ceo")
     ).order_by("first_name", "username")
 
-    # Primary can still fill (not override) times for assistants who are still blank.
-    open_assistant_links = list(movement.assistant_links.filter(in_time__isnull=True)) if is_primary else []
+    # Admins see and can correct every participant's slot, filled or not.
+    # A regular primary logger can still only fill slots that are blank.
+    if is_staff_movement_admin:
+        open_assistant_links = list(movement.assistant_links.all())
+    elif is_primary:
+        open_assistant_links = list(movement.assistant_links.filter(in_time__isnull=True))
+    else:
+        open_assistant_links = []
 
     if request.method == "POST":
         in_time_str = request.POST.get("in_time")
@@ -1532,10 +1606,10 @@ def staff_movement_edit(request, id):
             if resolution_status not in dict(StaffMovement.RESOLUTION_CHOICES):
                 errors.append("Please select whether the problem was solved.")
 
-        # Validate per-assistant entries typed by the primary (only for still-open ones)
+        # Validate per-assistant entries typed by the primary/admin (only for open ones)
         assistant_updates = {}
         assistant_still_out = set()
-        if is_primary and separate_returns:
+        if acting_as_primary and separate_returns:
             for link in open_assistant_links:
                 name = link.employee.get_full_name() or link.employee.username
                 still_out = request.POST.get(f"assistant_still_out_{link.id}") == "1"
@@ -1550,6 +1624,10 @@ def staff_movement_edit(request, id):
                     continue
 
                 if not val:
+                    if is_staff_movement_admin:
+                        # Admin left this one untouched — whether it already has a
+                        # time or is still blank, don't force a re-entry.
+                        continue
                     # Neither a time nor "still out" was given — ambiguous, must be explicit.
                     errors.append(
                         f"Please enter a return time for {name}, or check 'Still out' if they haven't returned."
@@ -1570,24 +1648,28 @@ def staff_movement_edit(request, id):
                 assistant_updates[link.id] = a_time
 
         if not errors:
-            if is_primary:
+            if acting_as_primary:
                 movement.in_time = in_time
                 movement.resolution_status = resolution_status
                 movement.completion_notes = completion_notes
                 movement.save()
 
-                # Fill defaults only for assistants still blank — never touches an already-set one.
-                # Anyone marked "still out" is left alone (in_time stays None) so they can
-                # close out their own record later from their Movement History.
                 for link in open_assistant_links:
                     if link.id in assistant_still_out:
+                        if is_staff_movement_admin:
+                            # Admin correction: revert this person to "not returned".
+                            link.in_time = None
+                            link.save()
                         continue
-                    link.in_time = assistant_updates.get(link.id, in_time)
-                    link.save()
+                    if link.id in assistant_updates:
+                        link.in_time = assistant_updates[link.id]
+                        link.save()
+                    elif link.in_time is None:
+                        link.in_time = in_time
+                        link.save()
+                    # else: already had a time and admin didn't provide an update —
+                    # leave it untouched rather than silently overwriting it.
             else:
-                # Resolution status / completion notes are a single shared answer for the
-                # whole visit, not per-person — whoever fills them in (primary or any
-                # assistant) updates the one shared value on the movement itself.
                 my_assistant_link.in_time = in_time
                 my_assistant_link.save()
 
@@ -1606,6 +1688,7 @@ def staff_movement_edit(request, id):
         "is_edit": True,
         "is_manager": False,
         "is_primary": is_primary,
+        "is_staff_movement_admin": is_staff_movement_admin,
         "my_assistant_link": my_assistant_link,
         "other_employees": other_employees,
         "open_assistant_links": open_assistant_links,

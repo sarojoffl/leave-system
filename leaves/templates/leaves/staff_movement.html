@@ -55,7 +55,7 @@
   }
 </style>
 
-{% if is_manager %}
+{% if is_manager or is_staff_movement_admin %}
 <style>
   .staff-filters {
     display: flex;
@@ -247,6 +247,14 @@
     </div>
     <form method="post" action="{% if is_edit %}{% url 'staff_movement_edit' movement.id %}{% else %}{% url 'staff_movement' %}{% endif %}" class="card-body">
       {% csrf_token %}
+
+      {% if is_edit and is_staff_movement_admin %}
+        <div style="margin-bottom:16px;padding:10px 14px;background:var(--color-primary-light);border-radius:var(--radius-sm);font-size:0.85rem;color:var(--color-primary);">
+          Editing record for <strong>{{ movement.employee.get_full_name|default:movement.employee.username }}</strong>
+          — {{ movement.client }} on {{ movement.date_bs }} ({{ movement.date|date:"Y-m-d" }})
+        </div>
+      {% endif %}
+
       <div class="form-grid">
         {% if not is_edit %}
           <div class="form-group">
@@ -282,7 +290,7 @@
 
         {% if is_edit %}
           <div class="form-group">
-            <label for="in_time">Your Return Time (In) *</label>
+            <label for="in_time">{% if is_staff_movement_admin %}Return Time (In) *{% else %}Your Return Time (In) *{% endif %}</label>
             <input type="time" id="in_time" name="in_time" value="{{ movement.in_time|time:'H:i' }}" required>
           </div>
         {% endif %}
@@ -328,22 +336,32 @@
           </div>
         {% endif %}
 
-        {% if is_edit and is_primary and open_assistant_links %}
+        {% if is_edit and open_assistant_links %}
+        {% if is_primary or is_staff_movement_admin %}
           <div class="form-group full">
             <label style="display:flex;align-items:center;gap:8px;font-weight:normal;">
-              <input type="checkbox" id="separate_returns" name="separate_returns" value="1">
-              Some assistants returned separately (or are still out)
+              <input type="checkbox" id="separate_returns" name="separate_returns" value="1" {% if is_staff_movement_admin %}checked{% endif %}>
+              {% if is_staff_movement_admin %}
+                Review / adjust each person's return time
+              {% else %}
+                Some assistants returned separately (or are still out)
+              {% endif %}
             </label>
             <small style="color:var(--color-text-muted);font-size:0.75rem;display:block;">
-              Leave unchecked to apply your return time to everyone below who's still marked "Out."
+              {% if is_staff_movement_admin %}
+                Existing times are shown below. Leave a field as-is to keep it unchanged, edit it to correct it,
+                or check "Still out" to clear it back to not-returned.
+              {% else %}
+                Leave unchecked to apply your return time to everyone below who's still marked "Out."
+              {% endif %}
             </small>
           </div>
 
-          <div class="form-group full" id="separate-returns-group" hidden>
+          <div class="form-group full" id="separate-returns-group" {% if not is_staff_movement_admin %}hidden{% endif %}>
             {% for link in open_assistant_links %}
               <div class="assistant-time-row">
                 <span class="name">{{ link.employee.get_full_name|default:link.employee.username }}</span>
-                <input type="time" name="assistant_in_time_{{ link.id }}" placeholder="Same as your time" id="assistant_in_time_{{ link.id }}">
+                <input type="time" name="assistant_in_time_{{ link.id }}" value="{{ link.in_time|time:'H:i' }}" placeholder="Same as your time" id="assistant_in_time_{{ link.id }}">
                 <label class="still-out-label">
                   <input type="checkbox" name="assistant_still_out_{{ link.id }}" value="1"
                          class="still-out-checkbox" data-target="assistant_in_time_{{ link.id }}">
@@ -352,10 +370,15 @@
               </div>
             {% endfor %}
             <small style="color:var(--color-text-muted);font-size:0.75rem;">
-              For each person: leave the time blank to use your return time, enter their own time if different,
-              or check "Still out" if they haven't returned yet. When this section is open, one of these is required per person.
+              {% if is_staff_movement_admin %}
+                For each person: leave the time as shown to keep it, change it to correct it, or check "Still out" to clear it.
+              {% else %}
+                For each person: leave the time blank to use your return time, enter their own time if different,
+                or check "Still out" if they haven't returned yet. When this section is open, one of these is required per person.
+              {% endif %}
             </small>
           </div>
+        {% endif %}
         {% endif %}
 
         {% if not is_edit %}
@@ -396,8 +419,142 @@
     </form>
   </div>
 
-  <!-- ===== Employee View: Movement History ===== -->
-  {% if not is_edit %}
+  <!-- ===== Employee View: Admin Filters (staff movement admins only) ===== -->
+  {% if not is_edit and is_staff_movement_admin %}
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-body" style="padding:16px 20px">
+        <form method="get" class="staff-filters">
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <label style="font-size: 0.75rem; color: var(--color-text-muted); font-weight: 600;">Date</label>
+            <input type="date" id="admin-filter-date" name="admin_date" value="{{ admin_filter_date }}" class="staff-search-input" style="max-width:180px;">
+            <small id="admin-filter-date-bs" style="color:var(--color-primary);font-size:0.7rem;min-height:1.1em;display:block;"></small>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <label style="font-size: 0.75rem; color: var(--color-text-muted); font-weight: 600;">Employee</label>
+            <select name="admin_employee" style="min-width: 180px; padding: 10px 16px; background: var(--input-bg); border: 1.5px solid var(--color-border); border-radius: var(--radius-sm); font-size: 0.88rem; color: var(--color-text); font-family: inherit;">
+              <option value="">— All Employees —</option>
+              {% for emp in admin_employees %}
+                <option value="{{ emp.id }}" {% if admin_filter_employee_id == emp.id %}selected{% endif %}>{{ emp.get_full_name|default:emp.username }}</option>
+              {% endfor %}
+            </select>
+            <small class="filter-spacer" style="font-size:0.7rem;min-height:1.1em;">&nbsp;</small>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <label style="font-size: 0.75rem; color: var(--color-text-muted); font-weight: 600;">Client / Location</label>
+            <input type="text" name="admin_client" value="{{ admin_filter_client }}" placeholder="Search client..." class="staff-search-input">
+            <small class="filter-spacer" style="font-size:0.7rem;min-height:1.1em;">&nbsp;</small>
+          </div>
+
+          <div class="filter-actions" style="display: flex; flex-direction: column; gap: 4px;">
+            <div style="display: flex; gap: 8px;">
+              <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+              {% if not admin_show_all %}
+                <a href="{% url 'staff_movement' %}?admin_all=1" class="btn btn-outline btn-sm">Show All</a>
+              {% else %}
+                <a href="{% url 'staff_movement' %}" class="btn btn-outline btn-sm">Today</a>
+              {% endif %}
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ===== Employee View: Admin Table (all staff movements, everyone) ===== -->
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-header">
+        <span class="card-title">All Staff Movements</span>
+        <span class="card-meta">
+          {% if admin_show_all %}
+            All records
+          {% elif admin_filter_date and not admin_filter_employee_id and not admin_filter_client %}
+            Showing {{ admin_filter_date_obj|to_bs_short }}
+          {% endif %}
+          — {{ admin_movements|length }} record{{ admin_movements|length|pluralize }}
+        </span>
+      </div>
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th>Employee</th>
+              <th>Date (AD / BS)</th>
+              <th>Client / Location</th>
+              <th>Assist(s)</th>
+              <th>Out Time</th>
+              <th>In Time</th>
+              <th>Purpose</th>
+              <th>Problem / Solve Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for m in admin_movements %}
+              <tr>
+                <td>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span class="avatar avatar-sm">{{ m.employee.initials }}</span>
+                    {{ m.employee.get_full_name|default:m.employee.username }}
+                    {% if m.logged_on_behalf %}
+                      <span class="badge" style="background:var(--color-primary-light);color:var(--color-primary);font-size:0.7rem;" title="Logged by {{ m.logged_by.get_full_name|default:m.logged_by.username }}">Proxy-logged</span>
+                    {% endif %}
+                  </div>
+                </td>
+                <td>
+                  {{ m.date|date:"Y-m-d" }}
+                  <span style="display:block;font-size:0.75rem;color:var(--color-primary);">{{ m.date_bs }}</span>
+                </td>
+                <td style="font-weight: 600;">{{ m.client }}</td>
+                <td style="font-size:0.85rem;color:var(--color-text-muted);">{{ m.assistants_display }}</td>
+                <td><span class="badge pending">{{ m.out_time|time:"H:i" }}</span></td>
+                <td>
+                  {% if m.uniform_in_time %}
+                    <span class="badge approved">{{ m.uniform_in_time|time:"H:i" }}</span>
+                  {% elif m.all_out %}
+                    <span class="badge rejected">Out</span>
+                  {% else %}
+                    {% for grp_time, names in m.in_time_groups %}
+                      <div class="participant-row">
+                        {% if grp_time %}
+                          <span class="badge approved">{{ grp_time|time:"H:i" }}</span>
+                        {% else %}
+                          <span class="badge rejected">Out</span>
+                        {% endif %}
+                        <span>{{ names|join:", " }}</span>
+                      </div>
+                    {% endfor %}
+                  {% endif %}
+                </td>
+                <td>{{ m.get_purpose_type_display|default:"—" }}</td>
+                <td>
+                  {% if m.purpose_type == "problem_solving" %}
+                    {% if m.resolution_status %}
+                      <span class="badge {% if m.resolution_status == 'solved' %}approved{% else %}rejected{% endif %}">{{ m.get_resolution_status_display }}</span>
+                    {% else %}
+                      <span class="badge pending">Pending</span>
+                    {% endif %}
+                  {% else %}
+                    <span style="color:var(--color-text-muted);">—</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <a href="{% url 'staff_movement_edit' m.id %}" class="btn btn-outline btn-sm">Manage Time</a>
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="9" class="empty-state">No staff movements logged.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% endif %}
+
+  <!-- ===== Employee View: Movement History (hidden for staff movement admins — they already see everything above) ===== -->
+  {% if not is_edit and not is_staff_movement_admin %}
     <div class="card">
       <div class="card-header">
         <span class="card-title">My Movement History</span>
@@ -535,6 +692,15 @@
     showBs('filter-date', 'filter-date-bs');
     filterDateInput.addEventListener('click', () => {
       if (filterDateInput.showPicker) { try { filterDateInput.showPicker(); } catch (e) {} }
+    });
+  }
+
+  const adminFilterDateInput = document.getElementById('admin-filter-date');
+  if (adminFilterDateInput) {
+    adminFilterDateInput.addEventListener('change', () => showBs('admin-filter-date', 'admin-filter-date-bs'));
+    showBs('admin-filter-date', 'admin-filter-date-bs');
+    adminFilterDateInput.addEventListener('click', () => {
+      if (adminFilterDateInput.showPicker) { try { adminFilterDateInput.showPicker(); } catch (e) {} }
     });
   }
 
