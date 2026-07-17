@@ -255,6 +255,25 @@ class StaffMovement(models.Model):
         ]
         return ", ".join(names) or "—"
 
+    @classmethod
+    def get_currently_out_employee_ids(cls, employee_ids, for_date):
+        """
+        Of the given employee ids, returns the subset who are already 'out'
+        on an unresolved movement for for_date — either as primary
+        (in_time null) or as an assistant on someone else's movement
+        (their StaffMovementAssistant.in_time null).
+        """
+        employee_ids = list(employee_ids)
+        if not employee_ids:
+            return set()
+        primary_out = cls.objects.filter(
+            employee_id__in=employee_ids, in_time__isnull=True, date=for_date
+        ).values_list("employee_id", flat=True)
+        assistant_out = StaffMovementAssistant.objects.filter(
+            employee_id__in=employee_ids, in_time__isnull=True, movement__date=for_date
+        ).values_list("employee_id", flat=True)
+        return set(primary_out) | set(assistant_out)
+
 
 class StaffMovementAssistant(models.Model):
     """Per-assistant return record. out_time is shared with the parent

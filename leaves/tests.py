@@ -233,70 +233,107 @@ class LeaveSystemTestCase(TestCase):
         self.assertEqual(self.balance.used, 0.0)
 
 
-class CSVExportTestCase(TestCase):
-    """Tests for CSV export endpoints under My Leaves."""
+class PDFExportTestCase(TestCase):
+    """Tests for PDF export endpoints under My Leaves."""
 
     def setUp(self):
         self.employee = User.objects.create_user(
-            username="csvuser",
+            username="pdfuser",
             password="password123",
             role="employee",
-            email="csvuser@company.com"
+            email="pdfuser@company.com"
         )
         self.client = Client()
-        self.client.login(username="csvuser", password="password123")
+        self.client.login(username="pdfuser", password="password123")
 
-    def test_export_my_attendance_csv_returns_csv(self):
+    def test_export_attendance_request_pdf_returns_pdf(self):
         """
-        Verify that the attendance CSV export endpoint returns a 200 response
-        with the correct content-type and header row.
+        Verify that the attendance PDF export endpoint returns a 200 response
+        with the correct content-type.
         """
         from leaves.models import AttendanceRequest
-        AttendanceRequest.objects.create(
+        req = AttendanceRequest.objects.create(
             employee=self.employee,
             date=date(2026, 6, 1),
             reason="Late login",
             status="approved"
         )
-        response = self.client.get(reverse("export_my_attendance_csv"))
+        response = self.client.get(reverse("export_attendance_request_pdf", args=[req.id]))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response["Content-Type"], "text/csv")
-        content = b"".join(response.streaming_content) if hasattr(response, "streaming_content") else response.content
-        decoded = content.decode("utf-8")
-        self.assertIn("Date (AD)", decoded)
-        self.assertIn("Date (BS)", decoded)
-        self.assertIn("Reason", decoded)
-        self.assertIn("Late login", decoded)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertTrue(response.content.startswith(b"%PDF"))
 
-    def test_export_my_holiday_work_csv_returns_csv(self):
+    def test_export_holiday_work_request_pdf_returns_pdf(self):
         """
-        Verify that the holiday work CSV export endpoint returns a 200 response
-        with the correct content-type and header row.
+        Verify that the holiday work PDF export endpoint returns a 200 response
+        with the correct content-type.
         """
         from leaves.models import HolidayWorkRequest
-        HolidayWorkRequest.objects.create(
+        req = HolidayWorkRequest.objects.create(
             employee=self.employee,
             date=date(2026, 6, 5),
             reason="Office delivery",
             status="approved"
         )
-        response = self.client.get(reverse("export_my_holiday_work_csv"))
+        response = self.client.get(reverse("export_holiday_work_request_pdf", args=[req.id]))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response["Content-Type"], "text/csv")
-        content = b"".join(response.streaming_content) if hasattr(response, "streaming_content") else response.content
-        decoded = content.decode("utf-8")
-        self.assertIn("Date (AD)", decoded)
-        self.assertIn("Date (BS)", decoded)
-        self.assertIn("Reason", decoded)
-        self.assertIn("Office delivery", decoded)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertTrue(response.content.startswith(b"%PDF"))
+
+    def test_export_leave_request_pdf_returns_pdf(self):
+        """
+        Verify that the leave request PDF export endpoint returns a 200 response
+        with the correct content-type.
+        """
+        from leaves.models import LeaveType, LeaveRequest
+        leave_type = LeaveType.objects.create(name="Annual Leave")
+        req = LeaveRequest.objects.create(
+            employee=self.employee,
+            leave_type=leave_type,
+            start_date=date(2026, 6, 10),
+            end_date=date(2026, 6, 12),
+            reason="Family event",
+            status="approved"
+        )
+        response = self.client.get(reverse("export_leave_pdf", args=[req.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertTrue(response.content.startswith(b"%PDF"))
 
     def test_export_endpoints_require_login(self):
         """
         Verify that the export endpoints require authentication.
         """
+        from leaves.models import AttendanceRequest, HolidayWorkRequest, LeaveType, LeaveRequest
+        att = AttendanceRequest.objects.create(
+            employee=self.employee,
+            date=date(2026, 6, 1),
+            reason="Late login",
+            status="approved"
+        )
+        hol = HolidayWorkRequest.objects.create(
+            employee=self.employee,
+            date=date(2026, 6, 5),
+            reason="Office delivery",
+            status="approved"
+        )
+        leave_type = LeaveType.objects.create(name="Annual Leave")
+        lv = LeaveRequest.objects.create(
+            employee=self.employee,
+            leave_type=leave_type,
+            start_date=date(2026, 6, 10),
+            end_date=date(2026, 6, 12),
+            reason="Family event",
+            status="approved"
+        )
+
         self.client.logout()
-        for url_name in ["export_my_attendance_csv", "export_my_holiday_work_csv"]:
-            response = self.client.get(reverse(url_name))
+        for url_name, arg in [
+            ("export_attendance_request_pdf", att.id),
+            ("export_holiday_work_request_pdf", hol.id),
+            ("export_leave_pdf", lv.id),
+        ]:
+            response = self.client.get(reverse(url_name, args=[arg]))
             self.assertEqual(response.status_code, 302)
             self.assertIn("/accounts/login/", response["Location"])
 
@@ -327,72 +364,86 @@ class StaffMovementTestCase(TestCase):
         self.client.login(username="testemployee", password="password123")
         
         # Log new movement
+        today_str = date.today().strftime("%Y-%m-%d")
         response = self.client.post(reverse("staff_movement"), {
-            "date": "2026-07-10",
+            "date": today_str,
             "client": "Google Office",
-            "out_time": "10:30",
             "purpose_type": "goods_bill_delivery",
             "purpose": "Technical Demo"
         })
         self.assertRedirects(response, reverse("staff_movement"))
         
         from leaves.models import StaffMovement
+        from datetime import timedelta
         movement = StaffMovement.objects.get(client="Google Office")
         self.assertEqual(movement.employee, self.employee)
         self.assertEqual(movement.purpose, "Technical Demo")
         self.assertIsNone(movement.in_time)
 
-        # Fill in return time (edit)
+        # Set out_time programmatically to 10 minutes ago so we can return in the past
+        now_dt = datetime.now()
+        movement.out_time = (now_dt - timedelta(minutes=10)).time()
+        movement.save()
+
+        # Fill in return time (edit) - 5 minutes ago
+        in_time_str = (now_dt - timedelta(minutes=5)).strftime("%H:%M")
         response_edit = self.client.post(reverse("staff_movement_edit", args=[movement.id]), {
-            "date": "2026-07-10",
+            "date": today_str,
             "client": "Google Office",
-            "out_time": "10:30",
-            "in_time": "12:45",
+            "in_time": in_time_str,
             "purpose_type": "goods_bill_delivery",
             "purpose": "Technical Demo Completed",
             "completion_notes": "Technical Demo Completed"
         })
         self.assertRedirects(response_edit, reverse("staff_movement"))
         movement.refresh_from_db()
-        self.assertEqual(movement.in_time.strftime("%H:%M"), "12:45")
+        self.assertEqual(movement.in_time.strftime("%H:%M"), in_time_str)
         self.assertEqual(movement.purpose, "Technical Demo")
         self.assertEqual(movement.completion_notes, "Technical Demo Completed")
 
     def test_problem_movement_requires_description_and_solve_status_on_return(self):
         self.client.login(username="testemployee", password="password123")
+        today_str = date.today().strftime("%Y-%m-%d")
 
         response = self.client.post(reverse("staff_movement"), {
-            "date": "2026-07-10",
+            "date": today_str,
             "client": "Client Site",
-            "out_time": "10:30",
             "purpose_type": "problem_solving",
         })
         self.assertContains(response, "Please describe the problem being addressed.")
 
         response = self.client.post(reverse("staff_movement"), {
-            "date": "2026-07-10",
+            "date": today_str,
             "client": "Client Site",
-            "out_time": "10:30",
             "purpose_type": "problem_solving",
             "problem_description": "Internet is not working",
         })
         self.assertRedirects(response, reverse("staff_movement"))
 
         from leaves.models import StaffMovement
+        from datetime import timedelta
         movement = StaffMovement.objects.get(client="Client Site")
+        
+        # Set out_time programmatically to 10 minutes ago
+        now_dt = datetime.now()
+        movement.out_time = (now_dt - timedelta(minutes=10)).time()
+        movement.save()
+
+        in_time_str = (now_dt - timedelta(minutes=5)).strftime("%H:%M")
+
         response = self.client.post(reverse("staff_movement_edit", args=[movement.id]), {
-            "date": "2026-07-10",
+            "date": today_str,
             "client": "Client Site",
-            "in_time": "12:45",
+            "in_time": in_time_str,
             "purpose_type": "problem_solving",
             "problem_description": "Internet is not working",
         })
         self.assertContains(response, "Please select whether the problem was solved.")
 
         response = self.client.post(reverse("staff_movement_edit", args=[movement.id]), {
-            "date": "2026-07-10",
+            "date": today_str,
             "client": "Client Site",
-            "in_time": "12:45",
+            "in_time": in_time_str,
             "purpose_type": "problem_solving",
             "problem_description": "Internet is not working",
             "resolution_status": "solved",
@@ -404,34 +455,42 @@ class StaffMovementTestCase(TestCase):
     def test_return_time_must_be_filled_later_and_after_departure(self):
         self.client.login(username="testemployee", password="password123")
         from leaves.models import StaffMovement
+        from datetime import timedelta
+        today_str = date.today().strftime("%Y-%m-%d")
+
+        now_dt = datetime.now()
+        out_time_obj = (now_dt - timedelta(minutes=10)).time()
+        out_time_str = out_time_obj.strftime("%H:%M")
 
         movement = StaffMovement.objects.create(
             employee=self.employee,
-            date=date(2026, 7, 10),
+            date=date.today(),
             client="Client Site",
-            out_time=datetime.strptime("10:30", "%H:%M").time(),
+            out_time=out_time_obj,
             purpose_type="goods_pickup",
         )
 
         response = self.client.post(reverse("staff_movement_edit", args=[movement.id]), {
-            "date": "2026-07-10",
+            "date": today_str,
             "client": "Client Site",
             "purpose_type": "goods_pickup",
         })
         self.assertContains(response, "Please enter the return time.")
 
         response = self.client.post(reverse("staff_movement_edit", args=[movement.id]), {
-            "date": "2026-07-10",
+            "date": today_str,
             "client": "Client Site",
-            "in_time": "10:30",
+            "in_time": out_time_str,
             "purpose_type": "goods_pickup",
         })
         self.assertContains(response, "Return time must be later than the departure time")
 
+        # Create a time 1 minute before out_time
+        before_out_time_str = (datetime.combine(date.today(), out_time_obj) - timedelta(minutes=1)).strftime("%H:%M")
         response = self.client.post(reverse("staff_movement_edit", args=[movement.id]), {
-            "date": "2026-07-10",
+            "date": today_str,
             "client": "Client Site",
-            "in_time": "10:29",
+            "in_time": before_out_time_str,
             "purpose_type": "goods_pickup",
         })
         self.assertContains(response, "Return time must be later than the departure time")
@@ -471,3 +530,60 @@ class StaffMovementTestCase(TestCase):
         self.assertEqual(response_filter.status_code, 200)
         self.assertContains(response_filter, "Microsoft Office")
         self.assertNotContains(response_filter, "Google Office")
+
+    def test_block_movement_if_already_out(self):
+        self.client.login(username="testemployee", password="password123")
+        today_str = date.today().strftime("%Y-%m-%d")
+
+        # Log first movement
+        self.client.post(reverse("staff_movement"), {
+            "date": today_str,
+            "client": "Client A",
+            "purpose_type": "goods_pickup",
+        })
+
+        # Try to log second movement on the same day without returning
+        response = self.client.post(reverse("staff_movement"), {
+            "date": today_str,
+            "client": "Client B",
+            "purpose_type": "goods_pickup",
+        })
+        self.assertContains(
+            response,
+            "is already logged as out on another movement today and must return first."
+        )
+
+    def test_block_movement_if_assistant_already_out(self):
+        # Create another employee to act as assistant
+        assistant = User.objects.create_user(
+            username="assistant_user",
+            password="password123",
+            role="employee",
+            email="assistant@company.com"
+        )
+        
+        # Log a movement for the assistant so they are currently out
+        from leaves.models import StaffMovement
+        StaffMovement.objects.create(
+            employee=assistant,
+            date=date.today(),
+            client="Assistant Client",
+            out_time=datetime.now().time(),
+            purpose_type="goods_pickup",
+        )
+
+        # Log in as testemployee and try to log a movement with assistant_user as assistant
+        self.client.login(username="testemployee", password="password123")
+        today_str = date.today().strftime("%Y-%m-%d")
+
+        response = self.client.post(reverse("staff_movement"), {
+            "date": today_str,
+            "client": "Google Office",
+            "purpose_type": "goods_bill_delivery",
+            "assistants": [assistant.id]
+        })
+        self.assertContains(
+            response,
+            "already out on another movement today"
+        )
+

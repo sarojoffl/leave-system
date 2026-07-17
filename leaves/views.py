@@ -1404,6 +1404,38 @@ def staff_movement(request):
                 except ValueError:
                     errors.append("Invalid date format.")
 
+            # Parse assistant ids up front so we can validate against them.
+            assistant_id_ints = []
+            if not errors:
+                try:
+                    assistant_id_ints = [int(a) for a in assistant_ids]
+                except ValueError:
+                    errors.append("Invalid assistant selection.")
+
+            # Block logging a movement for anyone (primary or assistant) who is
+            # already out on another unresolved movement for the same date.
+            if not errors:
+                check_ids = set(assistant_id_ints)
+                check_ids.add(target_employee.id)
+                out_ids = StaffMovement.get_currently_out_employee_ids(check_ids, movement_date)
+
+                if target_employee.id in out_ids:
+                    errors.append(
+                        f"{target_employee.get_full_name() or target_employee.username} "
+                        "is already logged as out on another movement today and must return first."
+                    )
+
+                conflicting_ids = out_ids - {target_employee.id}
+                if conflicting_ids:
+                    conflicting_names = ", ".join(
+                        u.get_full_name() or u.username
+                        for u in User.objects.filter(id__in=conflicting_ids)
+                    )
+                    errors.append(
+                        f"{conflicting_names} already out on another movement today "
+                        "and can't be added as assist(s)."
+                    )
+
             if not errors:
                 movement = StaffMovement.objects.create(
                     employee=target_employee,
@@ -1417,10 +1449,10 @@ def staff_movement(request):
                     problem_description=problem_description,
                     resolution_status="",
                 )
-                if assistant_ids:
+                if assistant_id_ints:
                     movement.assistants.set(
                         exclude_staff_movement_ineligible(
-                            User.objects.filter(id__in=assistant_ids)
+                            User.objects.filter(id__in=assistant_id_ints)
                         ).exclude(id=target_employee.id)
                     )
                 if target_employee == request.user:
