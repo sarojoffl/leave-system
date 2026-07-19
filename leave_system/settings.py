@@ -171,12 +171,6 @@ if not DEBUG:
     SECURE_HSTS_PRELOAD = True
 
 
-# Session settings
-SESSION_COOKIE_AGE = 900
-SESSION_SAVE_EVERY_REQUEST = True
-SESSION_EXPIRE_AT_BROWSER_CLOSE = True
-
-
 # Custom settings for Staff Movement feature
 STAFF_MOVEMENT_PROXY_LOGGER_USERNAMES = ["saroj2"]
 

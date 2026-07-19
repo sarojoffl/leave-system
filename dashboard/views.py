@@ -234,12 +234,42 @@ def dashboard(request):
 
     balance = LeaveBalance.objects.filter(employee=user).first()
 
-    recent_leaves = [{
-        "type": l.leave_type.name,
-        "date_range": l.date_range,
-        "days": l.days,
-        "status": l.get_status_display(),
-    } for l in LeaveRequest.objects.filter(employee=user).select_related("leave_type")[:5]]
+    leave_qs = LeaveRequest.objects.filter(employee=user).select_related("leave_type").order_by("-created_at")[:5]
+    attendance_qs = AttendanceRequest.objects.filter(employee=user).order_by("-created_at")[:5]
+    holiday_qs = HolidayWorkRequest.objects.filter(employee=user).order_by("-created_at")[:5]
+
+    recent_requests = sorted(
+        [
+            {
+                "category": "Leave",
+                "type": l.leave_type.name,
+                "date_range": l.date_range,
+                "days": l.days,
+                "status": l.get_status_display(),
+                "created_at": l.created_at,
+            } for l in leave_qs
+        ] + [
+            {
+                "category": "Attendance",
+                "type": "Attendance",
+                "date_range": str(a.date),
+                "days": None,
+                "status": a.get_status_display(),
+                "created_at": a.created_at,
+            } for a in attendance_qs
+        ] + [
+            {
+                "category": "Holiday Work",
+                "type": "Holiday Work",
+                "date_range": str(h.date),
+                "days": None,
+                "status": h.get_status_display(),
+                "created_at": h.created_at,
+            } for h in holiday_qs
+        ],
+        key=lambda r: r["created_at"],
+        reverse=True,
+    )[:5]
 
     fiscal_start = get_fiscal_year_start(today)
     days_taken = sum(
@@ -324,7 +354,7 @@ def dashboard(request):
         "balance_percent":     balance.percent if balance else 0,
         "overflow_percent":    overflow_percent,
         "days_taken":          days_taken,
-        "recent_leaves":       recent_leaves,
+        "recent_requests":     recent_requests,
         "own_pending_count":         own_pending_count,
         "own_leave_pending":         own_leave_pending,
         "own_attendance_pending":    own_attendance_pending,

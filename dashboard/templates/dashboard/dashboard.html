@@ -83,23 +83,29 @@
     <div class="card-header"><span class="card-title">Recent Requests</span></div>
     <div class="table-responsive">
       <table>
-        <thead><tr><th>Type</th><th>Dates</th><th>Days</th><th>Status</th></tr></thead>
+        <thead><tr><th>Category</th><th>Type</th><th>Dates</th><th>Days</th><th>Status</th></tr></thead>
         <tbody>
-          {% for l in recent_leaves %}
+          {% for r in recent_requests %}
             <tr>
-              <td>{{ l.type }}</td>
-              <td>{{ l.date_range }}</td>
-              <td>{{ l.days|floatformat:"-1" }}</td>
               <td>
-                {% if l.status == "Approved" %}<span class="badge approved">Approved</span>
-                {% elif l.status == "Pending" %}<span class="badge pending">Pending</span>
-                {% elif l.status == "Rejected" %}<span class="badge rejected">Rejected</span>
-                {% else %}<span class="badge cancelled">{{ l.status }}</span>
+                {% if r.category == "Leave" %}<span class="badge" style="background:#ebf4ff;color:#3182ce;">Leave</span>
+                {% elif r.category == "Attendance" %}<span class="badge" style="background:#faf5ff;color:#805ad5;">Attendance</span>
+                {% else %}<span class="badge" style="background:#fffaf0;color:#dd6b20;">Holiday Work</span>
+                {% endif %}
+              </td>
+              <td>{{ r.type }}</td>
+              <td>{{ r.date_range }}</td>
+              <td>{% if r.days %}{{ r.days|floatformat:"-1" }}{% else %}—{% endif %}</td>
+              <td>
+                {% if r.status == "Approved" %}<span class="badge approved">Approved</span>
+                {% elif r.status == "Pending" %}<span class="badge pending">Pending</span>
+                {% elif r.status == "Rejected" %}<span class="badge rejected">Rejected</span>
+                {% else %}<span class="badge cancelled">{{ r.status }}</span>
                 {% endif %}
               </td>
             </tr>
           {% empty %}
-            <tr><td colspan="4" class="empty-state">No leave requests yet.</td></tr>
+            <tr><td colspan="5" class="empty-state">No requests yet.</td></tr>
           {% endfor %}
         </tbody>
       </table>

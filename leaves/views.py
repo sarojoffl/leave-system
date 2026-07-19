@@ -1044,10 +1044,12 @@ def _apply_day_request(request, model, success_msg, tab_key, label):
         if errors:
             for e in errors:
                 messages.error(request, e)
-        else:
-            obj = model.objects.create(employee=request.user, date=req_date, reason=reason)
-            messages.success(request, success_msg)
-            send_day_request_notification_email(obj, 'requested', label)
+            return redirect(f"{reverse('apply_leave')}?tab={tab_key}")
+
+        obj = model.objects.create(employee=request.user, date=req_date, reason=reason)
+        messages.success(request, success_msg)
+        send_day_request_notification_email(obj, 'requested', label)
+        return redirect("my_leaves")
 
     return redirect(f"{reverse('apply_leave')}?tab={tab_key}")
 

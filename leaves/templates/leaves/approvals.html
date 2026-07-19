@@ -38,7 +38,7 @@
               <td>{{ a.from_date|to_bs_short }}</td>
               <td>{{ a.to_date|to_bs_short }}</td>
               <td>{{ a.days|floatformat:"-1" }}</td>
-              <td>{{ a.reason|truncatechars:40 }}</td>
+              <td>{{ a.reason }}</td>
               <td>{{ a.applied_on|to_bs_short }}</td>
               <td>
                 <div class="flex-actions">
@@ -108,7 +108,7 @@
             <tr>
               <td><span class="avatar avatar-sm">{{ a.employee_initials }}</span>{{ a.employee_name }}</td>
               <td>{{ a.date|to_bs_short }}</td>
-              <td>{{ a.reason|truncatechars:50 }}</td>
+              <td>{{ a.reason }}</td>
               <td>{{ a.applied_on|to_bs_short }}</td>
               <td>
                 <div class="flex-actions">
@@ -169,7 +169,7 @@
             <tr>
               <td><span class="avatar avatar-sm">{{ h.employee_initials }}</span>{{ h.employee_name }}</td>
               <td>{{ h.date|to_bs_short }}</td>
-              <td>{{ h.reason|truncatechars:50 }}</td>
+              <td>{{ h.reason }}</td>
               <td>{{ h.applied_on|to_bs_short }}</td>
               <td>
                 <div class="flex-actions">
