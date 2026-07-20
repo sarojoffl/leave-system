@@ -1433,7 +1433,9 @@ def staff_movement(request):
         if filter_employee_id:
             try:
                 filter_employee_id = int(filter_employee_id)
-                movements = movements.filter(employee_id=filter_employee_id)
+                movements = movements.filter(
+                    Q(employee_id=filter_employee_id) | Q(assistants__id=filter_employee_id)
+                ).distinct()
             except ValueError:
                 filter_employee_id = None
 
@@ -1640,7 +1642,9 @@ def staff_movement(request):
             if admin_filter_employee_id:
                 try:
                     admin_filter_employee_id = int(admin_filter_employee_id)
-                    admin_movements = admin_movements.filter(employee_id=admin_filter_employee_id)
+                    admin_movements = admin_movements.filter(
+                        Q(employee_id=admin_filter_employee_id) | Q(assistants__id=admin_filter_employee_id)
+                    ).distinct()
                 except ValueError:
                     admin_filter_employee_id = None
 

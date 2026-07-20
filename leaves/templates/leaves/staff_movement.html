@@ -185,7 +185,12 @@
               <td style="font-size:0.85rem;color:var(--color-text-muted);">{{ m.assistants_display }}</td>
               <td><span class="badge pending">{{ m.out_time|time:"H:i" }}</span></td>
               <td>
-                {% if m.uniform_in_time %}
+                {% if m.is_cancelled %}
+                  <span class="badge" style="background:#fff3cd;color:#856404;border:1px solid #ffc107;">Cancelled</span>
+                  {% if m.cancellation_reason %}
+                    <span style="display:block;font-size:0.75rem;color:var(--color-text-muted);" title="{{ m.cancellation_reason }}">{{ m.cancellation_reason|truncatechars:30 }}</span>
+                  {% endif %}
+                {% elif m.uniform_in_time %}
                   <span class="badge approved">{{ m.uniform_in_time|time:"H:i" }}</span>
                 {% elif m.all_out %}
                   <span class="badge rejected">Out</span>
@@ -259,7 +264,8 @@
         {% if not is_edit %}
           <div class="form-group">
             <label for="date">Date *</label>
-            <input type="date" id="date" name="date" value="{{ today|date:'Y-m-d' }}">
+            <input type="date" id="date" value="{{ today|date:'Y-m-d' }}" disabled class="out-time-field">
+            <input type="hidden" name="date" value="{{ today|date:'Y-m-d' }}">
             <small id="date-bs" style="color:var(--color-primary);font-size:0.75rem;min-height:1.2em;display:block;"></small>
           </div>
 
@@ -511,7 +517,12 @@
                 <td style="font-size:0.85rem;color:var(--color-text-muted);">{{ m.assistants_display }}</td>
                 <td><span class="badge pending">{{ m.out_time|time:"H:i" }}</span></td>
                 <td>
-                  {% if m.uniform_in_time %}
+                  {% if m.is_cancelled %}
+                    <span class="badge" style="background:#fff3cd;color:#856404;border:1px solid #ffc107;">Cancelled</span>
+                    {% if m.cancellation_reason %}
+                      <span style="display:block;font-size:0.75rem;color:var(--color-text-muted);" title="{{ m.cancellation_reason }}">{{ m.cancellation_reason|truncatechars:30 }}</span>
+                    {% endif %}
+                  {% elif m.uniform_in_time %}
                     <span class="badge approved">{{ m.uniform_in_time|time:"H:i" }}</span>
                   {% elif m.all_out %}
                     <span class="badge rejected">Out</span>
@@ -545,10 +556,7 @@
                 <td title="{{ m.completion_notes }}">{{ m.completion_notes|default:"—"|truncatechars:50 }}</td>
                 <td>
                   {% if m.is_cancelled %}
-                    <span class="badge" style="background:#fff3cd;color:#856404;border:1px solid #ffc107;display:block;margin-bottom:4px;">Cancelled</span>
-                    {% if m.cancellation_reason %}
-                      <span style="font-size:0.75rem;color:var(--color-text-muted);" title="{{ m.cancellation_reason }}">{{ m.cancellation_reason|truncatechars:30 }}</span>
-                    {% endif %}
+                    <span style="color:var(--color-text-muted);">—</span>
                   {% elif not m.in_time %}
                     <div style="display:flex;gap:6px;flex-wrap:wrap;">
                       <a href="{% url 'staff_movement_edit' m.id %}" class="btn btn-outline btn-sm">Manage Time</a>
@@ -684,6 +692,9 @@
                 <td>
                   {% if m.is_cancelled %}
                     <span class="badge" style="background:#fff3cd;color:#856404;border:1px solid #ffc107;">Cancelled</span>
+                    {% if m.cancellation_reason %}
+                      <span style="display:block;font-size:0.75rem;color:var(--color-text-muted);" title="{{ m.cancellation_reason }}">{{ m.cancellation_reason|truncatechars:30 }}</span>
+                    {% endif %}
                   {% elif m.uniform_in_time %}
                     <span class="badge approved">{{ m.uniform_in_time|time:"H:i" }}</span>
                   {% elif m.is_primary_for_me %}
@@ -717,10 +728,7 @@
                 <td title="{{ m.completion_notes }}">{{ m.completion_notes|default:"—"|truncatechars:40 }}</td>
                 <td>
                   {% if m.is_cancelled %}
-                    <span class="badge" style="background:#fff3cd;color:#856404;border:1px solid #ffc107;display:block;margin-bottom:4px;">Cancelled</span>
-                    {% if m.cancellation_reason %}
-                      <span style="font-size:0.75rem;color:var(--color-text-muted);" title="{{ m.cancellation_reason }}">{{ m.cancellation_reason|truncatechars:35 }}</span>
-                    {% endif %}
+                    <span style="color:var(--color-text-muted);">—</span>
                   {% elif m.is_primary_for_me %}
                     {% if not m.in_time %}
                       <div style="display:flex;gap:6px;flex-wrap:wrap;">
