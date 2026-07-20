@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+from urllib import request
 
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
@@ -414,6 +415,10 @@ def manager_dashboard(request):
         ).exclude(employee=request.user)
     )
 
+    comp_off_days_this_fy = HolidayWorkRequest.objects.filter(
+            status="approved", date__gte=fiscal_start,
+        ).exclude(employee=request.user).count() * 2
+
     from django.db.models import Count
     emp_ids = list(employees.values_list('id', flat=True))
 
@@ -509,6 +514,7 @@ def manager_dashboard(request):
         "pending_attendance_count":  pending_attendance_count,
         "pending_holiday_count":     pending_holiday_count,
         "days_taken_this_fy":        days_taken_this_fy,
+        "comp_off_days_this_fy":     comp_off_days_this_fy,
         "needs_attention":           needs_attention,
         "upcoming_leaves":           upcoming_leaves,
         "calendar_bs_month_label":   f"{bs_month_name(bs_m)} {bs_y}",

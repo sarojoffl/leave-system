@@ -978,14 +978,120 @@ def _get_reports_data(today=None):
     return department_usage, leave_type_breakdown, monthly_trend
 
 
+# ---------------------------------------------------------------------------
+# Comp-off (holiday work compensation) — 1 approved holiday-work day = 2 days
+# ---------------------------------------------------------------------------
+
+def _get_comp_off_data(today=None):
+    from leaves.bs_convert import ad_to_bs, bs_month_name
+
+    today = today or date.today()
+    bs_y_today, bs_m_today, _ = ad_to_bs(today)
+
+    approved = HolidayWorkRequest.objects.filter(status="approved").select_related("employee")
+
+    monthly_map = {m: 0 for m in range(1, 13)}
+    per_employee = {}
+
+    for h in approved:
+        bs_y, bs_m, _ = ad_to_bs(h.date)
+        if bs_y == bs_y_today:
+            monthly_map[bs_m] += 1
+
+        entry = per_employee.setdefault(h.employee_id, {
+            "name": h.employee.get_full_name() or h.employee.username,
+            "holiday_days": 0,
+            "unpaid_count": 0,
+        })
+        entry["holiday_days"] += 1
+        if not h.comp_off_paid:
+            entry["unpaid_count"] += 1
+
+    max_days = max(monthly_map.values()) or 1
+    comp_off_monthly_trend = [{
+        "label": bs_month_name(m)[:3],
+        "holiday_days": monthly_map[m],
+        "comp_off_days": monthly_map[m] * 2,
+        "bar_height": round((monthly_map[m] / max_days) * 100),
+        "is_current": m == bs_m_today,
+    } for m in range(1, 13)]
+
+    comp_off_by_employee = sorted([
+        {
+            "name": v["name"],
+            "holiday_days": v["holiday_days"],
+            "comp_off_days": v["holiday_days"] * 2,
+            "unpaid_days": v["unpaid_count"] * 2,
+        }
+        for v in per_employee.values()
+    ], key=lambda x: -x["holiday_days"])
+
+    total_comp_off_days = sum(v["holiday_days"] for v in per_employee.values()) * 2
+
+    return comp_off_monthly_trend, comp_off_by_employee, total_comp_off_days
+
+
 @manager_required
 def reports(request):
     department_usage, leave_type_breakdown, monthly_trend = _get_reports_data()
+    comp_off_monthly_trend, comp_off_by_employee, total_comp_off_days = _get_comp_off_data()
+
+    comp_off_filter = request.GET.get("comp_off", "unpaid")
+    comp_off_qs = (
+        HolidayWorkRequest.objects.filter(status="approved")
+        .select_related("employee")
+        .order_by("-date")
+    )
+    if comp_off_filter == "unpaid":
+        comp_off_qs = comp_off_qs.filter(comp_off_paid=False)
+    elif comp_off_filter == "paid":
+        comp_off_qs = comp_off_qs.filter(comp_off_paid=True)
+
+    comp_off_records = [{
+        "id": h.id,
+        "employee_name": h.employee.get_full_name() or h.employee.username,
+        "date": h.date,
+        "date_bs": h.date_bs,
+        "comp_off_days": 2,
+        "paid": h.comp_off_paid,
+        "paid_at": h.comp_off_paid_at,
+    } for h in comp_off_qs]
+
     return render(request, "leaves/reports.html", {
         "department_usage": department_usage,
         "leave_type_breakdown": leave_type_breakdown,
         "monthly_trend": monthly_trend,
+        "comp_off_monthly_trend": comp_off_monthly_trend,
+        "comp_off_by_employee": comp_off_by_employee,
+        "comp_off_records": comp_off_records,
+        "comp_off_filter": comp_off_filter,
+        "total_comp_off_days": total_comp_off_days,
     })
+
+
+@manager_required
+@require_POST
+def toggle_comp_off_paid(request, id):
+    holiday_work = get_object_or_404(HolidayWorkRequest, id=id, status="approved")
+
+    if holiday_work.comp_off_paid:
+        holiday_work.comp_off_paid = False
+        holiday_work.comp_off_paid_at = None
+        holiday_work.comp_off_paid_by = None
+        msg = "marked as unpaid"
+    else:
+        holiday_work.comp_off_paid = True
+        holiday_work.comp_off_paid_at = timezone.now()
+        holiday_work.comp_off_paid_by = request.user
+        msg = "marked as paid"
+
+    holiday_work.save(update_fields=["comp_off_paid", "comp_off_paid_at", "comp_off_paid_by"])
+
+    employee_name = holiday_work.employee.get_full_name() or holiday_work.employee.username
+    messages.success(request, f"Comp-off for {employee_name} ({holiday_work.date}) {msg}.")
+
+    filter_param = request.POST.get("comp_off_filter", "unpaid")
+    return redirect(f"{reverse('reports')}?comp_off={filter_param}")
 
 
 @manager_required
@@ -1484,6 +1590,17 @@ def staff_movement(request):
             m.my_assistant_link = my_links.get(m.id)
             m.is_primary_for_me = request.user.id in (m.employee_id, m.logged_by_id)
 
+        # "Who's Out in Field Today" — today's active (still-out, not cancelled)
+        # movements for all staff. Shown to every employee as a read-only toggle panel.
+        today_field_movements = list(
+            StaffMovement.objects.filter(
+                date=today,
+                is_cancelled=False,
+                in_time__isnull=True,
+            ).select_related("employee").prefetch_related("assistant_links__employee")
+            .order_by("out_time")
+        )
+
         context = {
             "movements": movements,
             "is_manager": False,
@@ -1494,6 +1611,7 @@ def staff_movement(request):
             "can_log_on_behalf": can_log_on_behalf,
             "proxy_employees": proxy_employees,
             "is_staff_movement_admin": is_staff_movement_admin,
+            "today_field_movements": today_field_movements,
         }
 
         # Full-visibility admin table — everyone's records, same filter pattern

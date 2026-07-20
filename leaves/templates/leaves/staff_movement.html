@@ -485,7 +485,9 @@
               <th>Out Time</th>
               <th>In Time</th>
               <th>Purpose</th>
+              <th>Additional Notes</th>
               <th>Problem / Solve Status</th>
+              <th>Completion Notes</th>
               <th>Action</th>
             </tr>
           </thead>
@@ -527,17 +529,20 @@
                   {% endif %}
                 </td>
                 <td>{{ m.get_purpose_type_display|default:"—" }}</td>
+                <td title="{{ m.purpose }}">{{ m.purpose|default:"—"|truncatechars:50 }}</td>
                 <td>
                   {% if m.purpose_type == "problem_solving" %}
+                    <div title="{{ m.problem_description }}">{{ m.problem_description|default:"—"|truncatechars:50 }}</div>
                     {% if m.resolution_status %}
-                      <span class="badge {% if m.resolution_status == 'solved' %}approved{% else %}rejected{% endif %}">{{ m.get_resolution_status_display }}</span>
-                    {% else %}
-                      <span class="badge pending">Pending</span>
+                      <span class="badge {% if m.resolution_status == 'solved' %}approved{% else %}rejected{% endif %}" style="margin-top:5px;">{{ m.get_resolution_status_display }}</span>
+                    {% elif m.in_time %}
+                      <span class="badge pending" style="margin-top:5px;">Status missing</span>
                     {% endif %}
                   {% else %}
                     <span style="color:var(--color-text-muted);">—</span>
                   {% endif %}
                 </td>
+                <td title="{{ m.completion_notes }}">{{ m.completion_notes|default:"—"|truncatechars:50 }}</td>
                 <td>
                   {% if m.is_cancelled %}
                     <span class="badge" style="background:#fff3cd;color:#856404;border:1px solid #ffc107;display:block;margin-bottom:4px;">Cancelled</span>
@@ -556,11 +561,77 @@
               </tr>
             {% empty %}
               <tr>
-                <td colspan="9" class="empty-state">No staff movements logged.</td>
+                <td colspan="11" class="empty-state">No staff movements logged.</td>
               </tr>
             {% endfor %}
           </tbody>
         </table>
+      </div>
+    </div>
+  {% endif %}
+
+  <!-- ===== Employee View: Who's Out in Field Today (toggle) ===== -->
+  {% if not is_edit and not is_staff_movement_admin %}
+    <div style="margin-bottom: 20px;">
+      <button type="button" id="field-toggle-btn" onclick="toggleFieldPanel()"
+        class="btn btn-outline btn-sm"
+        style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem;">
+        <svg id="field-chevron" fill="none" stroke="currentColor" stroke-width="2.2"
+          viewBox="0 0 24 24" width="15" height="15"
+          style="transition: transform 0.25s ease; flex-shrink: 0;">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+        <span>
+          Who's Out in Field Today
+          {% if today_field_movements %}
+            <span style="display:inline-flex;align-items:center;justify-content:center;
+              background:var(--color-primary);color:#fff;border-radius:999px;
+              font-size:0.7rem;font-weight:700;min-width:18px;height:18px;
+              padding:0 5px;margin-left:4px;">{{ today_field_movements|length }}</span>
+          {% endif %}
+        </span>
+      </button>
+
+      <div id="field-panel" hidden style="margin-top: 10px;">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Out in Field Today</span>
+            <span class="card-meta">{{ today|date:"Y-m-d" }} — {{ today_field_movements|length }} active movement{{ today_field_movements|length|pluralize }}</span>
+          </div>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Employee</th>
+                  <th>Client / Location</th>
+                  <th>Out Since</th>
+                  <th>Assist(s)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for m in today_field_movements %}
+                  <tr>
+                    <td>
+                      <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="avatar avatar-sm">{{ m.employee.initials }}</span>
+                        {{ m.employee.get_full_name|default:m.employee.username }}
+                      </div>
+                    </td>
+                    <td style="font-weight: 600;">{{ m.client }}</td>
+                    <td><span class="badge pending">{{ m.out_time|time:"H:i" }}</span></td>
+                    <td style="font-size:0.85rem;color:var(--color-text-muted);">
+                      {{ m.assistants_display|default:"—" }}
+                    </td>
+                  </tr>
+                {% empty %}
+                  <tr>
+                    <td colspan="4" class="empty-state">Everyone is in the office right now.</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   {% endif %}
@@ -706,6 +777,21 @@
 {% block extra_js %}
 <script>
   const BS_API = "{% url 'ad_to_bs_api' %}";
+
+  // ---- Who's Out in Field Today toggle ----
+  function toggleFieldPanel() {
+    const panel   = document.getElementById('field-panel');
+    const chevron = document.getElementById('field-chevron');
+    if (!panel) return;
+    const isHidden = panel.hasAttribute('hidden');
+    if (isHidden) {
+      panel.removeAttribute('hidden');
+      chevron.style.transform = 'rotate(180deg)';
+    } else {
+      panel.setAttribute('hidden', '');
+      chevron.style.transform = 'rotate(0deg)';
+    }
+  }
 
   // ---- Cancel Visit Modal ----
   const cancelModal = document.getElementById('cancel-visit-modal');

@@ -33,6 +33,11 @@
     <div class="stat-value">{{ days_taken_this_fy|floatformat:"-1" }}</div>
     <div class="stat-sub">this fiscal year</div>
   </div>
+  <div class="stat-card">
+    <div class="stat-label">Comp-off Earned (Team)</div>
+    <div class="stat-value">{{ comp_off_days_this_fy|floatformat:"-1" }}</div>
+    <div class="stat-sub">this fiscal year · <a href="{% url 'reports' %}#comp-off">view details</a></div>
+  </div>
 </div>
 
 <div class="two-col">

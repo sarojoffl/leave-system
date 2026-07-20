@@ -136,6 +136,13 @@ class AttendanceRequest(BaseDayRequest):
 
 
 class HolidayWorkRequest(BaseDayRequest):
+    comp_off_paid = models.BooleanField(default=False)
+    comp_off_paid_at = models.DateTimeField(null=True, blank=True)
+    comp_off_paid_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name="comp_off_marked_paid",
+    )
+
     def __str__(self):
         return f"{self.employee.username} - Holiday Work {self.date}"
 

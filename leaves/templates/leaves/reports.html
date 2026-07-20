@@ -70,4 +70,92 @@
     <div class="trend-note">Days of leave taken per month across the team</div>
   </div>
 </div>
+
+<div id="comp-off"></div>
+
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">Comp-off Summary</span>
+    <span class="card-meta">{{ total_comp_off_days|floatformat:"-1" }} total days earned this fiscal year</span>
+  </div>
+  <div class="card-body">
+    <div class="trend-chart">
+      {% for m in comp_off_monthly_trend %}
+        <div class="trend-col">
+          <div class="trend-bar {% if m.is_current %}current{% endif %}"
+               style="height:{{ m.bar_height }}%;"
+               title="{{ m.label }}: {{ m.holiday_days }} holiday day{{ m.holiday_days|pluralize }} → {{ m.comp_off_days }} comp-off day{{ m.comp_off_days|pluralize }}"></div>
+          <div class="trend-label {% if m.is_current %}current{% endif %}">{{ m.label }}</div>
+        </div>
+      {% endfor %}
+    </div>
+    <div class="trend-note">Holiday work days worked per BS month — each day earns 2 comp-off days</div>
+  </div>
+</div>
+
+<div class="two-col">
+  <div class="card">
+    <div class="card-header"><span class="card-title">Comp-off by Employee</span></div>
+    <div class="table-responsive">
+      <table>
+        <thead><tr><th>Employee</th><th>Holiday Days Worked</th><th>Comp-off Earned</th><th>Unpaid</th></tr></thead>
+        <tbody>
+          {% for e in comp_off_by_employee %}
+            <tr>
+              <td>{{ e.name }}</td>
+              <td>{{ e.holiday_days }}</td>
+              <td>{{ e.comp_off_days }}</td>
+              <td>
+                {% if e.unpaid_days %}<span class="badge pending">{{ e.unpaid_days }} days</span>
+                {% else %}<span class="badge approved">All settled</span>{% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4" class="empty-state">No holiday work recorded yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><span class="card-title">Comp-off Payout Records</span></div>
+    <div class="tabs" style="padding:0 1rem;">
+      <a href="?comp_off=unpaid#comp-off" class="tab {% if comp_off_filter == 'unpaid' %}active{% endif %}">Unpaid</a>
+      <a href="?comp_off=paid#comp-off" class="tab {% if comp_off_filter == 'paid' %}active{% endif %}">Paid</a>
+      <a href="?comp_off=all#comp-off" class="tab {% if comp_off_filter == 'all' %}active{% endif %}">All</a>
+    </div>
+    <div class="table-responsive">
+      <table>
+        <thead><tr><th>Employee</th><th>Date</th><th>Days</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody>
+          {% for r in comp_off_records %}
+            <tr>
+              <td>{{ r.employee_name }}</td>
+              <td>{{ r.date_bs }}</td>
+              <td>{{ r.comp_off_days }}</td>
+              <td>
+                {% if r.paid %}<span class="badge approved">Paid</span>
+                {% else %}<span class="badge pending">Unpaid</span>{% endif %}
+              </td>
+              <td>
+                <form method="post" action="{% url 'toggle_comp_off_paid' r.id %}" style="display:inline;">
+                  {% csrf_token %}
+                  <input type="hidden" name="comp_off_filter" value="{{ comp_off_filter }}">
+                  {% if r.paid %}
+                    <button type="submit" class="btn btn-outline btn-sm" style="padding:0.25rem 0.5rem;font-size:0.75rem;border-radius:6px;">Mark Unpaid</button>
+                  {% else %}
+                    <button type="submit" class="btn btn-success btn-sm" style="padding:0.25rem 0.5rem;font-size:0.75rem;border-radius:6px;">Mark Paid</button>
+                  {% endif %}
+                </form>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="5" class="empty-state">No records for this filter.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
 {% endblock %}
