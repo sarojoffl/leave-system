@@ -1625,3 +1625,15 @@ textarea {
 
 [data-theme="dark"] .theme-toggle-icon-sun { opacity: 0; }
 [data-theme="dark"] .theme-toggle-icon-moon { opacity: 1; }
+
+/* Clickable cell for viewing full text in modal */
+.clickable-cell {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-radius: var(--radius-sm);
+}
+.clickable-cell:hover {
+  color: var(--color-primary);
+  background-color: var(--color-primary-dark);
+}
+

@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initTypeTabs();
   initLeaveTabs();
   initThemeToggle();
+  initGlobalDetailModal();
 });
 
 /* ------------------------------------------
@@ -216,3 +217,42 @@ document.addEventListener('submit', (e) => {
     if (!confirm('Cancel this leave request?')) e.preventDefault();
   }
 });
+
+/* ------------------------------------------
+   Global Detail Modal for Truncated Text
+ ------------------------------------------- */
+function initGlobalDetailModal() {
+  const modal = document.getElementById('global-detail-modal');
+  if (!modal) return;
+
+  const titleEl = document.getElementById('global-detail-title');
+  const contentEl = document.getElementById('global-detail-content');
+
+  document.addEventListener('click', (e) => {
+    const trigger = e.target.closest('[data-full-text]');
+    if (trigger) {
+      const fullText = trigger.getAttribute('data-full-text');
+      if (!fullText || fullText.trim() === '—' || fullText.trim() === '') return;
+      
+      const title = trigger.getAttribute('data-modal-title') || 'Details';
+      
+      titleEl.textContent = title;
+      contentEl.textContent = fullText;
+      modal.classList.add('open');
+    }
+  });
+
+  window.closeGlobalDetailModal = () => {
+    modal.classList.remove('open');
+  };
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeGlobalDetailModal();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal.classList.contains('open')) {
+      closeGlobalDetailModal();
+    }
+  });
+}

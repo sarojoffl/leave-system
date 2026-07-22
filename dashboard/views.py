@@ -321,20 +321,20 @@ def dashboard(request):
         holiday_map=holiday_map, leave_map=user_leave_map, is_manager=False,
     )
 
-    team_leaves = (
-        LeaveRequest.objects.filter(
-            status="approved",
-            start_date__lt=bs_month_after_ad,
-            end_date__gte=bs_month_start_ad,
-        )
-        .exclude(employee=user)
-        .select_related("employee", "leave_type")
+    team_leaves_today = (
+            LeaveRequest.objects.filter(
+                status="approved",
+                start_date__lte=today,
+                end_date__gte=today,
+            )
+            .exclude(employee=user)
+            .select_related("employee", "leave_type")
     )
-    team_on_leave_this_month = [{
+    team_on_leave_today = [{
         "name": l.employee.get_full_name() or l.employee.username,
         "dates": l.date_range,
         "type": l.leave_type.name,
-    } for l in team_leaves]
+    } for l in team_leaves_today]
 
     public_holidays = PublicHoliday.objects.filter(
         date__gte=bs_month_start_ad,
@@ -366,7 +366,7 @@ def dashboard(request):
         "calendar_ad_month_label":   build_ad_label(bs_month_start_ad, bs_month_end_ad),
         "calendar_weeks":            weeks,
         "public_holidays":           public_holidays,
-        "team_on_leave_this_month":  team_on_leave_this_month,
+        "team_on_leave_today":  team_on_leave_today,
         "prev_url":          prev_url,
         "next_url":          next_url,
         "prev_params":       prev_params or "",

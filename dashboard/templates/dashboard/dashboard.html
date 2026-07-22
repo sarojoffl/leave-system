@@ -140,17 +140,17 @@
     </div>
     <div class="card">
       <div class="card-header">
-        <span class="card-title">Team on Leave — {{ calendar_bs_month_label }}</span>
-        <span class="card-meta">{{ team_on_leave_this_month|length }} member{{ team_on_leave_this_month|length|pluralize }}</span>
+        <span class="card-title">Team on Leave Today</span>
+        <span class="card-meta">{{ team_on_leave_today|length }} member{{ team_on_leave_today|length|pluralize }}</span>
       </div>
       <div class="table-responsive">
         <table>
           <thead><tr><th>Name</th><th>Dates</th><th>Type</th></tr></thead>
           <tbody>
-            {% for t in team_on_leave_this_month %}
+            {% for t in team_on_leave_today %}
               <tr><td>{{ t.name }}</td><td>{{ t.dates }}</td><td>{{ t.type }}</td></tr>
             {% empty %}
-              <tr><td colspan="3" class="empty-state">No team leaves scheduled this month.</td></tr>
+              <tr><td colspan="3" class="empty-state">No team leaves scheduled for today.</td></tr>
             {% endfor %}
           </tbody>
         </table>

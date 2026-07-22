@@ -188,7 +188,7 @@
                 {% if m.is_cancelled %}
                   <span class="badge" style="background:#fff3cd;color:#856404;border:1px solid #ffc107;">Cancelled</span>
                   {% if m.cancellation_reason %}
-                    <span style="display:block;font-size:0.75rem;color:var(--color-text-muted);" title="{{ m.cancellation_reason }}">{{ m.cancellation_reason|truncatechars:30 }}</span>
+                    <span class="clickable-cell" style="display:block;font-size:0.75rem;color:var(--color-text-muted);" title="{{ m.cancellation_reason }}" data-full-text="{{ m.cancellation_reason }}" data-modal-title="Cancellation Reason">{{ m.cancellation_reason|truncatechars:30 }}</span>
                   {% endif %}
                 {% elif m.uniform_in_time %}
                   <span class="badge approved">{{ m.uniform_in_time|time:"H:i" }}</span>
@@ -208,10 +208,10 @@
                 {% endif %}
               </td>
               <td>{{ m.get_purpose_type_display|default:"—" }}</td>
-              <td title="{{ m.purpose }}">{{ m.purpose|default:"—"|truncatechars:50 }}</td>
+              <td class="clickable-cell" title="{{ m.purpose }}" data-full-text="{{ m.purpose }}" data-modal-title="Additional Notes">{{ m.purpose|default:"—"|truncatechars:50 }}</td>
               <td>
                 {% if m.purpose_type == "problem_solving" %}
-                  <div title="{{ m.problem_description }}">{{ m.problem_description|default:"—"|truncatechars:50 }}</div>
+                  <div class="clickable-cell" title="{{ m.problem_description }}" data-full-text="{{ m.problem_description }}" data-modal-title="Problem Description">{{ m.problem_description|default:"—"|truncatechars:50 }}</div>
                   {% if m.resolution_status %}
                     <span class="badge {% if m.resolution_status == 'solved' %}approved{% else %}rejected{% endif %}" style="margin-top:5px;">{{ m.get_resolution_status_display }}</span>
                   {% elif m.in_time %}
@@ -221,7 +221,7 @@
                   <span style="color:var(--color-text-muted);">—</span>
                 {% endif %}
               </td>
-              <td title="{{ m.completion_notes }}">{{ m.completion_notes|default:"—"|truncatechars:50 }}</td>
+              <td class="clickable-cell" title="{{ m.completion_notes }}" data-full-text="{{ m.completion_notes }}" data-modal-title="Completion Notes">{{ m.completion_notes|default:"—"|truncatechars:50 }}</td>
             </tr>
           {% empty %}
             <tr>
@@ -520,7 +520,7 @@
                   {% if m.is_cancelled %}
                     <span class="badge" style="background:#fff3cd;color:#856404;border:1px solid #ffc107;">Cancelled</span>
                     {% if m.cancellation_reason %}
-                      <span style="display:block;font-size:0.75rem;color:var(--color-text-muted);" title="{{ m.cancellation_reason }}">{{ m.cancellation_reason|truncatechars:30 }}</span>
+                      <span class="clickable-cell" style="display:block;font-size:0.75rem;color:var(--color-text-muted);" title="{{ m.cancellation_reason }}" data-full-text="{{ m.cancellation_reason }}" data-modal-title="Cancellation Reason">{{ m.cancellation_reason|truncatechars:30 }}</span>
                     {% endif %}
                   {% elif m.uniform_in_time %}
                     <span class="badge approved">{{ m.uniform_in_time|time:"H:i" }}</span>
@@ -540,10 +540,10 @@
                   {% endif %}
                 </td>
                 <td>{{ m.get_purpose_type_display|default:"—" }}</td>
-                <td title="{{ m.purpose }}">{{ m.purpose|default:"—"|truncatechars:50 }}</td>
+                <td class="clickable-cell" title="{{ m.purpose }}" data-full-text="{{ m.purpose }}" data-modal-title="Additional Notes">{{ m.purpose|default:"—"|truncatechars:50 }}</td>
                 <td>
                   {% if m.purpose_type == "problem_solving" %}
-                    <div title="{{ m.problem_description }}">{{ m.problem_description|default:"—"|truncatechars:50 }}</div>
+                    <div class="clickable-cell" title="{{ m.problem_description }}" data-full-text="{{ m.problem_description }}" data-modal-title="Problem Description">{{ m.problem_description|default:"—"|truncatechars:50 }}</div>
                     {% if m.resolution_status %}
                       <span class="badge {% if m.resolution_status == 'solved' %}approved{% else %}rejected{% endif %}" style="margin-top:5px;">{{ m.get_resolution_status_display }}</span>
                     {% elif m.in_time %}
@@ -553,7 +553,7 @@
                     <span style="color:var(--color-text-muted);">—</span>
                   {% endif %}
                 </td>
-                <td title="{{ m.completion_notes }}">{{ m.completion_notes|default:"—"|truncatechars:50 }}</td>
+                <td class="clickable-cell" title="{{ m.completion_notes }}" data-full-text="{{ m.completion_notes }}" data-modal-title="Completion Notes">{{ m.completion_notes|default:"—"|truncatechars:50 }}</td>
                 <td>
                   {% if m.is_cancelled %}
                     <span style="color:var(--color-text-muted);">—</span>
@@ -693,7 +693,7 @@
                   {% if m.is_cancelled %}
                     <span class="badge" style="background:#fff3cd;color:#856404;border:1px solid #ffc107;">Cancelled</span>
                     {% if m.cancellation_reason %}
-                      <span style="display:block;font-size:0.75rem;color:var(--color-text-muted);" title="{{ m.cancellation_reason }}">{{ m.cancellation_reason|truncatechars:30 }}</span>
+                      <span class="clickable-cell" style="display:block;font-size:0.75rem;color:var(--color-text-muted);" title="{{ m.cancellation_reason }}" data-full-text="{{ m.cancellation_reason }}" data-modal-title="Cancellation Reason">{{ m.cancellation_reason|truncatechars:30 }}</span>
                     {% endif %}
                   {% elif m.uniform_in_time %}
                     <span class="badge approved">{{ m.uniform_in_time|time:"H:i" }}</span>
@@ -712,10 +712,10 @@
                   {% endif %}
                 </td>
                 <td>{{ m.get_purpose_type_display|default:"—" }}</td>
-                <td title="{{ m.purpose }}">{{ m.purpose|default:"—"|truncatechars:40 }}</td>
+                <td class="clickable-cell" title="{{ m.purpose }}" data-full-text="{{ m.purpose }}" data-modal-title="Additional Notes">{{ m.purpose|default:"—"|truncatechars:40 }}</td>
                 <td>
                   {% if m.purpose_type == "problem_solving" %}
-                    <div title="{{ m.problem_description }}">{{ m.problem_description|default:"—"|truncatechars:40 }}</div>
+                    <div class="clickable-cell" title="{{ m.problem_description }}" data-full-text="{{ m.problem_description }}" data-modal-title="Problem Description">{{ m.problem_description|default:"—"|truncatechars:40 }}</div>
                     {% if m.resolution_status %}
                       <span class="badge {% if m.resolution_status == 'solved' %}approved{% else %}rejected{% endif %}" style="margin-top:5px;">{{ m.get_resolution_status_display }}</span>
                     {% elif m.in_time or m.my_assistant_link.in_time %}
@@ -725,7 +725,7 @@
                     <span style="color:var(--color-text-muted);">—</span>
                   {% endif %}
                 </td>
-                <td title="{{ m.completion_notes }}">{{ m.completion_notes|default:"—"|truncatechars:40 }}</td>
+                <td class="clickable-cell" title="{{ m.completion_notes }}" data-full-text="{{ m.completion_notes }}" data-modal-title="Completion Notes">{{ m.completion_notes|default:"—"|truncatechars:40 }}</td>
                 <td>
                   {% if m.is_cancelled %}
                     <span style="color:var(--color-text-muted);">—</span>

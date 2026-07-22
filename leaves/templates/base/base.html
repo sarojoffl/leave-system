@@ -156,6 +156,22 @@
   </div>
 </div>
 
+<!-- Global Detail Modal -->
+<div class="modal-bg" id="global-detail-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="global-detail-title">Details</span>
+      <button class="modal-close" onclick="closeGlobalDetailModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="global-detail-content" style="white-space: pre-wrap; font-size: 0.95rem; line-height: 1.5; color: var(--color-text); word-break: break-word;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="closeGlobalDetailModal()">Close</button>
+    </div>
+  </div>
+</div>
+
 <script src="{% static 'js/main.js' %}"></script>
 {% block extra_modals %}{% endblock %}
 {% block extra_js %}{% endblock %}
