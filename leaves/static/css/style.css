@@ -1631,9 +1631,14 @@ textarea {
   cursor: pointer;
   transition: all 0.2s ease;
   border-radius: var(--radius-sm);
+  text-decoration: underline dotted var(--color-text-light);
+  text-underline-offset: 3px;
+  -webkit-tap-highlight-color: transparent; /* remove default mobile tap highlight */
 }
-.clickable-cell:hover {
+.clickable-cell:hover,
+.clickable-cell:active {
   color: var(--color-primary);
   background-color: var(--color-primary-dark);
+  text-decoration-color: var(--color-primary);
 }
 
