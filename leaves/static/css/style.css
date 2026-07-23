@@ -1628,17 +1628,23 @@ textarea {
 
 /* Clickable cell for viewing full text in modal */
 .clickable-cell {
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border-radius: var(--radius-sm);
-  text-decoration: underline dotted var(--color-text-light);
-  text-underline-offset: 3px;
   -webkit-tap-highlight-color: transparent; /* remove default mobile tap highlight */
 }
-.clickable-cell:hover,
-.clickable-cell:active {
+
+/* Read more link styling */
+.read-more-link {
   color: var(--color-primary);
-  background-color: var(--color-primary-dark);
-  text-decoration-color: var(--color-primary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-left: 6px;
+  cursor: pointer;
+  display: inline-block;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+.read-more-link:hover,
+.read-more-link:active {
+  color: var(--color-primary-light);
+  text-decoration: underline;
 }
 

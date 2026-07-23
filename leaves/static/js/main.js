@@ -228,12 +228,37 @@ function initGlobalDetailModal() {
   const titleEl = document.getElementById('global-detail-title');
   const contentEl = document.getElementById('global-detail-content');
 
+  // Dynamically append "Read more" links to cells where text is truncated
+  document.querySelectorAll('[data-full-text]').forEach(el => {
+    const fullText = el.getAttribute('data-full-text');
+    const currentText = el.textContent.trim();
+    
+    if (fullText && currentText && fullText.trim() !== '—') {
+      const isTruncated = currentText.endsWith('...') || (fullText.length > currentText.length);
+      
+      if (isTruncated) {
+        // Create the Read More link
+        const link = document.createElement('span');
+        link.className = 'read-more-link';
+        link.textContent = 'Read more';
+        el.appendChild(link);
+      }
+    }
+  });
+
   document.addEventListener('click', (e) => {
+    const isLink = e.target.classList.contains('read-more-link');
     const trigger = e.target.closest('[data-full-text]');
-    if (trigger) {
+    
+    if (trigger && (isLink || trigger.classList.contains('clickable-cell'))) {
       const fullText = trigger.getAttribute('data-full-text');
       if (!fullText || fullText.trim() === '—' || fullText.trim() === '') return;
       
+      // Verify it's actually truncated
+      const currentText = trigger.textContent.trim().replace('Read more', '').trim();
+      const isTruncated = currentText.endsWith('...') || (fullText.length > currentText.length);
+      if (!isTruncated) return;
+
       const title = trigger.getAttribute('data-modal-title') || 'Details';
       
       titleEl.textContent = title;
