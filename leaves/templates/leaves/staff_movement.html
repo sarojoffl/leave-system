@@ -235,6 +235,8 @@
 
 {% else %}
 
+
+
   <!-- ===== Employee View: Back link (edit mode only) ===== -->
   {% if is_edit %}
     <div style="margin-bottom: 16px;">
@@ -246,6 +248,39 @@
   {% endif %}
 
   <!-- ===== Employee View: Log / Edit Form ===== -->
+  {% if not is_edit and active_movements and not is_staff_movement_admin %}
+  <!-- Employee has an active visit — show a focused prompt instead of the log form (proxy loggers bypass this) -->
+  <div class="card" style="margin-bottom: 20px; overflow: hidden; border: 1px solid var(--color-focus-glow);">
+    <!-- Coloured top strip -->
+    <div style="height: 4px; background: linear-gradient(90deg, var(--color-primary), var(--color-primary-light));"></div>
+    <div class="card-header" style="border-bottom: 1px solid var(--color-border);">
+      <span class="card-title">Log Client Visit / Movement</span>
+      <span class="badge" style="margin-left: auto; background: var(--color-primary-dark); color: var(--color-primary);">Active Visit</span>
+    </div>
+    <div class="card-body" style="display:flex;align-items:center;justify-content:space-between;gap:20px;padding:24px 28px;flex-wrap:wrap;">
+      <div style="display:flex;align-items:center;gap:16px;">
+        <!-- Icon -->
+        <div style="width:44px;height:44px;border-radius:50%;background:var(--color-primary-dark);border:1px solid var(--color-focus-glow);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <svg width="20" height="20" fill="none" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+          </svg>
+        </div>
+        <div>
+          <div style="font-weight:600;font-size:0.95rem;color:var(--color-text);margin-bottom:3px;">
+            Visit in progress — <span style="color:var(--color-primary);">{{ active_movements.0.client }}</span>
+          </div>
+          <div style="font-size:0.82rem;color:var(--color-text-muted);">
+            Departed at {{ active_movements.0.out_time|time:"H:i" }}. Log your return time to unlock the form.
+          </div>
+        </div>
+      </div>
+      <a href="{% url 'staff_movement_edit' active_movements.0.id %}" class="btn btn-sm" style="background:var(--color-primary-dark);color:var(--color-primary);border:1px solid var(--color-focus-glow);font-weight:600;white-space:nowrap;transition:var(--transition);">
+        Log Return Time
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="margin-left:5px;vertical-align:middle;"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      </a>
+    </div>
+  </div>
+  {% else %}
   <div class="card" style="margin-bottom: 20px;">
     <div class="card-header">
       <span class="card-title">{% if is_edit %}Edit Movement Record{% else %}Log Client Visit / Movement{% endif %}</span>
@@ -424,6 +459,7 @@
       </div>
     </form>
   </div>
+  {% endif %}
 
   <!-- ===== Employee View: Admin Filters (staff movement admins only) ===== -->
   {% if not is_edit and is_staff_movement_admin %}
@@ -670,7 +706,7 @@
           </thead>
           <tbody>
             {% for m in movements %}
-              <tr>
+              <tr {% if forloop.counter > 5 %}class="history-row-hidden" style="display:none;"{% endif %}>
                 <td>
                   {{ m.date|date:"Y-m-d" }}
                   <span style="display:block;font-size:0.75rem;color:var(--color-primary);">{{ m.date_bs }}</span>
@@ -726,15 +762,24 @@
                   {% endif %}
                 </td>
                 <td class="clickable-cell" title="{{ m.completion_notes }}" data-full-text="{{ m.completion_notes }}" data-modal-title="Completion Notes">{{ m.completion_notes|default:"—"|truncatechars:40 }}</td>
-                <td>
+                <td style="position:relative;">
                   {% if m.is_cancelled %}
                     <span style="color:var(--color-text-muted);">—</span>
                   {% elif m.is_primary_for_me %}
                     {% if not m.in_time %}
-                      <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                        <a href="{% url 'staff_movement_edit' m.id %}" class="btn btn-outline btn-sm">Fill In-Time</a>
-                        <button type="button" class="btn btn-sm" style="background:#fff3cd;color:#856404;border:1px solid #ffc107;" onclick="openCancelModal({{ m.id }}, '{{ m.client|escapejs }}')">Cancel Visit</button>
-                      </div>
+                      {% if m.date < today %}
+                        <span class="badge" style="background:var(--color-border);color:var(--color-text-muted);" title="Self-service correction window closed. Contact manager.">Locked</span>
+                      {% else %}
+                        <!-- Option 3: Primary button + styled cancel pill -->
+                        <div style="display:flex;flex-direction:column;align-items:flex-start;gap:5px;">
+                          <a href="{% url 'staff_movement_edit' m.id %}" class="btn btn-outline btn-sm" style="white-space:nowrap;">Log Return</a>
+                          <button type="button" onclick="openCancelModal({{ m.id }}, '{{ m.client|escapejs }}')"
+                            class="cancel-pill-btn">
+                            <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="flex-shrink:0;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                            Cancel
+                          </button>
+                        </div>
+                      {% endif %}
                     {% else %}
                       <span class="badge approved">Completed</span>
                     {% endif %}
@@ -742,7 +787,12 @@
                     {% if m.my_assistant_link.in_time %}
                       <span class="badge approved">Completed</span>
                     {% else %}
-                      <a href="{% url 'staff_movement_edit' m.id %}" class="btn btn-outline btn-sm">Fill In-Time</a>
+                      {% if m.date < today %}
+                        <span class="badge" style="background:var(--color-border);color:var(--color-text-muted);" title="Self-service correction window closed. Contact manager.">Locked</span>
+                      {% else %}
+                        <!-- Assistants: Log Return only, no cancel -->
+                        <a href="{% url 'staff_movement_edit' m.id %}" class="btn btn-outline btn-sm" style="white-space:nowrap;">Log Return</a>
+                      {% endif %}
                     {% endif %}
                   {% endif %}
                 </td>
@@ -755,6 +805,11 @@
           </tbody>
         </table>
       </div>
+      {% if movements|length > 5 %}
+        <div style="display:flex;justify-content:center;padding:12px;border-top:1px solid var(--color-border);">
+          <button type="button" class="btn btn-outline btn-sm" id="toggle-history-btn" onclick="toggleFullHistory()" data-showing-all="false">Show All History</button>
+        </div>
+      {% endif %}
     </div>
   {% endif %}
 
@@ -799,6 +854,36 @@
       panel.setAttribute('hidden', '');
       chevron.style.transform = 'rotate(0deg)';
     }
+  }
+
+  // ---- Kebab Menu ----
+  function closeAllKebabs() {
+    document.querySelectorAll('.kebab-menu').forEach(m => m.setAttribute('hidden', ''));
+  }
+  function toggleKebab(btn) {
+    const menu = btn.nextElementSibling;
+    const isHidden = menu.hasAttribute('hidden');
+    closeAllKebabs();
+    if (isHidden) menu.removeAttribute('hidden');
+  }
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.kebab-wrapper')) closeAllKebabs();
+  });
+
+  // ---- Toggle History Rows ----
+  function toggleFullHistory() {
+    const hiddenRows = document.querySelectorAll('.history-row-hidden');
+    const btn = document.getElementById('toggle-history-btn');
+    if (!btn) return;
+    
+    const isShowingAll = btn.dataset.showingAll === 'true';
+    
+    hiddenRows.forEach(row => {
+      row.style.display = isShowingAll ? 'none' : '';
+    });
+    
+    btn.textContent = isShowingAll ? 'Show All History' : 'Show Recent Only';
+    btn.dataset.showingAll = isShowingAll ? 'false' : 'true';
   }
 
   // ---- Cancel Visit Modal ----

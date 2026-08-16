@@ -1588,9 +1588,20 @@ def staff_movement(request):
                 movement__in=movements, employee=request.user
             )
         }
+        active_movements = []
         for m in movements:
             m.my_assistant_link = my_links.get(m.id)
             m.is_primary_for_me = request.user.id in (m.employee_id, m.logged_by_id)
+            
+            # Active movement alert only applies to today's active movements
+            if m.date == today and not m.is_cancelled:
+                is_active = False
+                if m.is_primary_for_me:
+                    is_active = (m.in_time is None)
+                else:
+                    is_active = (m.my_assistant_link and m.my_assistant_link.in_time is None)
+                if is_active:
+                    active_movements.append(m)
 
         # "Who's Out in Field Today" — today's active (still-out, not cancelled)
         # movements for all staff. Shown to every employee as a read-only toggle panel.
@@ -1605,6 +1616,7 @@ def staff_movement(request):
 
         context = {
             "movements": movements,
+            "active_movements": active_movements,
             "is_manager": False,
             "today": today,
             "other_employees": other_employees,
