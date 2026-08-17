@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Staff Movement Service Report - {{ filter_client|default:"Summary" }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 12px;
+      color: #111827;
+      background: #fff;
+      padding: 30px;
+      line-height: 1.5;
+    }
+    @page {
+      size: A4 portrait;
+      margin: 15mm;
+    }
+
+    /* Screen control bar */
+    .screen-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #f3f4f6;
+      border: 1px solid #e5e7eb;
+      padding: 12px 20px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+    }
+    .screen-controls button {
+      background: #0091b3;
+      color: #fff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .screen-controls button:hover {
+      background: #007a97;
+    }
+
+    @media print {
+      .screen-controls {
+        display: none !important;
+      }
+      body {
+        padding: 0;
+      }
+    }
+
+    /* Report Layout */
+    .report-title {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: #111827;
+      margin-bottom: 6px;
+    }
+    .report-subtitle {
+      font-size: 12px;
+      color: #4b5563;
+      margin-bottom: 20px;
+    }
+
+    .meta-card {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      padding: 12px 16px;
+      margin-bottom: 24px;
+    }
+    .meta-item {
+      display: flex;
+      flex-direction: column;
+    }
+    .meta-label {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: #6b7280;
+      margin-bottom: 2px;
+    }
+    .meta-value {
+      font-size: 12px;
+      font-weight: 600;
+      color: #111827;
+    }
+
+    /* Table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 30px;
+    }
+    th, td {
+      border: 1px solid #d1d5db;
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #f3f4f6;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #374151;
+      letter-spacing: 0.5px;
+    }
+    tr:nth-child(even) {
+      background: #fafafa;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+    .badge-solved {
+      background: #dcfce7;
+      color: #15803d;
+    }
+    .badge-not-solved {
+      background: #fee2e2;
+      color: #b91c1c;
+    }
+    .badge-pending {
+      background: #fef3c7;
+      color: #b45309;
+    }
+
+    /* Signature Section */
+    .signature-container {
+      margin-top: 50px;
+      display: flex;
+      justify-content: space-between;
+      page-break-inside: avoid;
+    }
+    .signature-box {
+      width: 240px;
+      text-align: center;
+    }
+    .signature-line {
+      border-bottom: 1.5px solid #111827;
+      height: 45px;
+      margin-bottom: 8px;
+    }
+    .signature-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #111827;
+    }
+    .signature-detail {
+      font-size: 11px;
+      color: #4b5563;
+      margin-top: 6px;
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Screen controls -->
+  <div class="screen-controls">
+    <div>
+      <strong>Staff Movement Service Report</strong> — Preview Mode
+    </div>
+    <button onclick="window.print()">Print / Save as PDF</button>
+  </div>
+
+  <!-- Header -->
+  <div class="report-title">Staff Movement &amp; Service Report</div>
+  <div class="report-subtitle">Official log of field visits and client service completion</div>
+
+  <!-- Meta Summary -->
+  <div class="meta-card">
+    <div class="meta-item">
+      <span class="meta-label">Client / Company</span>
+      <span class="meta-value">{{ filter_client|default:"All Clients" }}</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">Staff Member</span>
+      <span class="meta-value">
+        {% if selected_employee %}
+          {{ selected_employee.get_full_name|default:selected_employee.username }}
+        {% else %}
+          All Staff
+        {% endif %}
+      </span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">Report Period</span>
+      <span class="meta-value">
+        {% if filter_date_from_obj and filter_date_to_obj %}
+          {{ filter_date_from_obj|date:"Y-m-d" }} to {{ filter_date_to_obj|date:"Y-m-d" }}
+          <br><span style="font-size:10px;color:#4b5563;font-weight:normal;">({{ filter_date_from_bs }} to {{ filter_date_to_bs }})</span>
+        {% elif filter_date_from_obj %}
+          From {{ filter_date_from_obj|date:"Y-m-d" }} ({{ filter_date_from_bs }})
+        {% elif filter_date_to_obj %}
+          Until {{ filter_date_to_obj|date:"Y-m-d" }} ({{ filter_date_to_bs }})
+        {% elif filter_date_obj %}
+          {{ filter_date_obj|date:"Y-m-d" }} ({{ filter_date_bs }})
+        {% else %}
+          Full Period
+        {% endif %}
+      </span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">Total Visits</span>
+      <span class="meta-value">{{ movements|length }} visit{{ movements|length|pluralize }}</span>
+    </div>
+  </div>
+
+  <!-- Main Movements Table -->
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 30px;">#</th>
+        <th style="width: 85px;">Date (AD/BS)</th>
+        <th style="width: 120px;">Staff Member(s)</th>
+        <th style="width: 100px;">Client &amp; Contact</th>
+        <th style="width: 80px;">Out / In</th>
+        <th style="width: 90px;">Purpose</th>
+        <th>Job Completion Notes</th>
+        <th style="width: 70px;">Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for m in movements %}
+        <tr>
+          <td>{{ forloop.counter }}</td>
+          <td>
+            {{ m.date|date:"Y-m-d" }}
+            <br>
+            <span style="color: #6b7280; font-size: 10px;">{{ m.date_bs }}</span>
+          </td>
+          <td>
+            <strong>{{ m.employee.get_full_name|default:m.employee.username }}</strong>
+            {% if m.assistants_display %}
+              <div style="color: #4b5563; font-size: 10px; margin-top: 2px;">
+                Assists: {{ m.assistants_display }}
+              </div>
+            {% endif %}
+          </td>
+          <td>
+            <strong>{{ m.client }}</strong>
+            {% if m.work_done_for %}
+              <div style="color: #0091b3; font-size: 10px; margin-top: 2px;">
+                For: {{ m.work_done_for }}
+              </div>
+            {% endif %}
+          </td>
+          <td>
+            Out: {{ m.out_time|time:"H:i" }}
+            <br>
+            In: {{ m.in_time|time:"H:i"|default:"—" }}
+          </td>
+          <td>
+            {{ m.get_purpose_type_display|default:m.purpose_type|default:"—" }}
+          </td>
+          <td>
+            {% if m.problem_description %}
+              <div style="margin-bottom: 4px;"><strong>Problem:</strong> {{ m.problem_description }}</div>
+            {% endif %}
+            {{ m.completion_notes|default:m.purpose|default:"—" }}
+          </td>
+          <td>
+            {% if m.is_cancelled %}
+              <span class="badge badge-not-solved">Cancelled</span>
+            {% elif m.resolution_status == 'solved' %}
+              <span class="badge badge-solved">Solved</span>
+            {% elif m.resolution_status == 'not_solved' %}
+              <span class="badge badge-not-solved">Not Solved</span>
+            {% elif m.in_time %}
+              <span class="badge badge-solved">Completed</span>
+            {% else %}
+              <span class="badge badge-pending">Out</span>
+            {% endif %}
+          </td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="8" style="text-align: center; padding: 20px; color: #6b7280;">No staff movement records found for the selected filter.</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Signature Section -->
+  <div class="signature-container">
+    <div class="signature-box">
+      <div class="signature-line"></div>
+      <div class="signature-title">Received By</div>
+      <div class="signature-detail">Name: ______________________</div>
+      <div class="signature-detail">Date: ______________________</div>
+    </div>
+    <div class="signature-box">
+      <div class="signature-line"></div>
+      <div class="signature-title">Prepared By</div>
+      <div class="signature-detail">Name: ______________________</div>
+      <div class="signature-detail">Date: ______________________</div>
+    </div>
+  </div>
+
+  <script>
+    // Auto-trigger print dialog after page loads
+    window.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => {
+        window.print();
+      }, 500);
+    });
+  </script>
+
+</body>
+</html>

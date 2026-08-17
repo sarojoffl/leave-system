@@ -186,6 +186,7 @@ class StaffMovement(models.Model):
     purpose = models.TextField(blank=True)
     problem_description = models.TextField(blank=True)
     resolution_status = models.CharField(max_length=20, choices=RESOLUTION_CHOICES, blank=True)
+    work_done_for = models.CharField(max_length=200, blank=True, help_text="Contact person or department at client site")
     completion_notes = models.TextField(blank=True)
     assistants = models.ManyToManyField(
         settings.AUTH_USER_MODEL,

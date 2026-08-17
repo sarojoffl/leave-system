@@ -393,12 +393,14 @@ class StaffMovementTestCase(TestCase):
             "in_time": in_time_str,
             "purpose_type": "goods_bill_delivery",
             "purpose": "Technical Demo Completed",
+            "work_done_for": "Mr. Larry Page",
             "completion_notes": "Technical Demo Completed"
         })
         self.assertRedirects(response_edit, reverse("staff_movement"))
         movement.refresh_from_db()
         self.assertEqual(movement.in_time.strftime("%H:%M"), in_time_str)
         self.assertEqual(movement.purpose, "Technical Demo")
+        self.assertEqual(movement.work_done_for, "Mr. Larry Page")
         self.assertEqual(movement.completion_notes, "Technical Demo Completed")
 
     def test_problem_movement_requires_description_and_solve_status_on_return(self):
@@ -437,6 +439,8 @@ class StaffMovementTestCase(TestCase):
             "in_time": in_time_str,
             "purpose_type": "problem_solving",
             "problem_description": "Internet is not working",
+            "work_done_for": "IT Manager",
+            "completion_notes": "Reconfigured router",
         })
         self.assertContains(response, "Please select whether the problem was solved.")
 
@@ -447,6 +451,8 @@ class StaffMovementTestCase(TestCase):
             "purpose_type": "problem_solving",
             "problem_description": "Internet is not working",
             "resolution_status": "solved",
+            "work_done_for": "IT Manager",
+            "completion_notes": "Reconfigured router",
         })
         self.assertRedirects(response, reverse("staff_movement"))
         movement.refresh_from_db()
@@ -482,6 +488,8 @@ class StaffMovementTestCase(TestCase):
             "client": "Client Site",
             "in_time": out_time_str,
             "purpose_type": "goods_pickup",
+            "work_done_for": "Contact Person",
+            "completion_notes": "Picked up goods",
         })
         self.assertContains(response, "Return time must be later than the departure time")
 
@@ -492,6 +500,8 @@ class StaffMovementTestCase(TestCase):
             "client": "Client Site",
             "in_time": before_out_time_str,
             "purpose_type": "goods_pickup",
+            "work_done_for": "Contact Person",
+            "completion_notes": "Picked up goods",
         })
         self.assertContains(response, "Return time must be later than the departure time")
 
@@ -669,3 +679,49 @@ class StaffMovementTestCase(TestCase):
 
         movement.refresh_from_db()
         self.assertFalse(movement.is_cancelled)
+
+    def test_work_done_for_saving_and_pdf_export(self):
+        from datetime import timedelta
+        self.client.login(username="testemployee", password="password123")
+        today_str = date.today().strftime("%Y-%m-%d")
+        now_dt = datetime.now()
+        out_time = (now_dt - timedelta(minutes=10)).time()
+        in_time_str = (now_dt - timedelta(minutes=2)).strftime("%H:%M")
+
+        movement = StaffMovement.objects.create(
+            employee=self.employee,
+            date=date.today(),
+            client="ABC Tech Office",
+            out_time=out_time,
+            purpose_type="amc",
+        )
+
+        response = self.client.post(reverse("staff_movement_edit", args=[movement.id]), {
+            "date": today_str,
+            "client": "ABC Tech Office",
+            "in_time": in_time_str,
+            "purpose_type": "amc",
+            "work_done_for": "Mr. Sharma (Finance)",
+            "completion_notes": "Serviced printers and router.",
+        })
+        self.assertRedirects(response, reverse("staff_movement"))
+        movement.refresh_from_db()
+        self.assertEqual(movement.work_done_for, "Mr. Sharma (Finance)")
+        self.assertEqual(movement.completion_notes, "Serviced printers and router.")
+
+        # Test PDF export access - non-manager should be denied/redirected
+        pdf_url = reverse("staff_movement_export_pdf") + "?client=ABC"
+        response_pdf = self.client.get(pdf_url)
+        self.assertRedirects(response_pdf, reverse("staff_movement"))
+
+        # Test PDF export access - manager should succeed
+        self.client.login(username="testmanager", password="password123")
+        # Switch session view_mode to manager
+        session = self.client.session
+        session['view_mode'] = 'manager'
+        session.save()
+
+        response_pdf_manager = self.client.get(pdf_url)
+        self.assertEqual(response_pdf_manager.status_code, 200)
+        self.assertContains(response_pdf_manager, "Staff Movement &amp; Service Report")
+        self.assertContains(response_pdf_manager, "Mr. Sharma (Finance)")

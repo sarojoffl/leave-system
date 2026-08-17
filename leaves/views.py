@@ -1411,6 +1411,8 @@ def staff_movement(request):
 
     if is_manager:
         filter_date = request.GET.get("date")
+        filter_date_from = request.GET.get("date_from")
+        filter_date_to = request.GET.get("date_to")
         filter_employee_id = request.GET.get("employee")
         filter_client = request.GET.get("client", "").strip()
         show_all = request.GET.get("all") == "1"
@@ -1419,14 +1421,39 @@ def staff_movement(request):
             "employee", "logged_by"
         ).prefetch_related("assistant_links__employee")
 
-        if not filter_date and not show_all and not filter_employee_id and not filter_client:
-            filter_date = today.strftime("%Y-%m-%d")
+        if not filter_date and not filter_date_from and not filter_date_to and not show_all and not filter_employee_id and not filter_client:
+            filter_date_from = today.strftime("%Y-%m-%d")
+            filter_date_to = today.strftime("%Y-%m-%d")
+
+        from leaves.bs_convert import ad_to_bs_display
 
         filter_date_obj = None
+        filter_date_bs = ""
         if filter_date:
             try:
                 filter_date_obj = datetime.strptime(filter_date, "%Y-%m-%d").date()
                 movements = movements.filter(date=filter_date_obj)
+                filter_date_bs = ad_to_bs_display(filter_date_obj)
+            except ValueError:
+                pass
+
+        filter_date_from_obj = None
+        filter_date_from_bs = ""
+        if filter_date_from:
+            try:
+                filter_date_from_obj = datetime.strptime(filter_date_from, "%Y-%m-%d").date()
+                movements = movements.filter(date__gte=filter_date_from_obj)
+                filter_date_from_bs = ad_to_bs_display(filter_date_from_obj)
+            except ValueError:
+                pass
+
+        filter_date_to_obj = None
+        filter_date_to_bs = ""
+        if filter_date_to:
+            try:
+                filter_date_to_obj = datetime.strptime(filter_date_to, "%Y-%m-%d").date()
+                movements = movements.filter(date__lte=filter_date_to_obj)
+                filter_date_to_bs = ad_to_bs_display(filter_date_to_obj)
             except ValueError:
                 pass
 
@@ -1451,6 +1478,13 @@ def staff_movement(request):
             "employees": employees,
             "filter_date": filter_date,
             "filter_date_obj": filter_date_obj,
+            "filter_date_bs": filter_date_bs,
+            "filter_date_from": filter_date_from,
+            "filter_date_from_obj": filter_date_from_obj,
+            "filter_date_from_bs": filter_date_from_bs,
+            "filter_date_to": filter_date_to,
+            "filter_date_to_obj": filter_date_to_obj,
+            "filter_date_to_bs": filter_date_to_bs,
             "filter_employee_id": filter_employee_id,
             "filter_client": filter_client,
             "show_all": show_all,
@@ -1747,6 +1781,7 @@ def staff_movement_edit(request, id):
     if request.method == "POST":
         in_time_str = request.POST.get("in_time")
         resolution_status = request.POST.get("resolution_status", "").strip()
+        work_done_for = request.POST.get("work_done_for", "").strip()
         completion_notes = request.POST.get("completion_notes", "").strip()
         separate_returns = request.POST.get("separate_returns") == "1"
 
@@ -1773,6 +1808,9 @@ def staff_movement_edit(request, id):
                 errors.append("Return time must be later than the departure time.")
             if datetime.combine(movement.date, in_time) > now_dt:
                 errors.append("Return time can't be in the future.")
+
+        if not completion_notes:
+            errors.append("Please enter completion / return notes.")
 
         if movement.purpose_type == "problem_solving":
             if resolution_status not in dict(StaffMovement.RESOLUTION_CHOICES):
@@ -1823,6 +1861,8 @@ def staff_movement_edit(request, id):
             if acting_as_primary:
                 movement.in_time = in_time
                 movement.resolution_status = resolution_status
+                if work_done_for:
+                    movement.work_done_for = work_done_for
                 movement.completion_notes = completion_notes
                 movement.save()
 
@@ -1845,9 +1885,11 @@ def staff_movement_edit(request, id):
                 my_assistant_link.in_time = in_time
                 my_assistant_link.save()
 
+                if work_done_for:
+                    movement.work_done_for = work_done_for
                 movement.resolution_status = resolution_status
                 movement.completion_notes = completion_notes
-                movement.save(update_fields=["resolution_status", "completion_notes"])
+                movement.save()
 
             messages.success(request, "Staff movement record updated successfully.")
             return redirect("staff_movement")
@@ -1917,3 +1959,100 @@ def staff_movement_cancel(request, id):
         messages.success(request, "Staff movement visit cancelled.")
 
     return redirect("staff_movement")
+
+
+@login_required
+def staff_movement_export_pdf(request):
+    from accounts.models import User
+    from accounts.utils import exclude_staff_movement_ineligible, get_view_mode
+    from django.db.models import Q
+
+    is_manager = get_view_mode(request) == 'manager' and request.user.has_management_access
+    if not is_manager:
+        messages.error(request, "Permission denied. Company report export is only available in Manager View.")
+        return redirect("staff_movement")
+
+    filter_date = request.GET.get("date")
+    filter_date_from = request.GET.get("date_from")
+    filter_date_to = request.GET.get("date_to")
+    filter_employee_id = request.GET.get("employee")
+    filter_client = request.GET.get("client", "").strip()
+    show_all = request.GET.get("all") == "1"
+
+    movements = StaffMovement.objects.all().select_related(
+        "employee", "logged_by"
+    ).prefetch_related("assistant_links__employee")
+
+    if not filter_date and not filter_date_from and not filter_date_to and not show_all and not filter_employee_id and not filter_client:
+        today = date.today()
+        filter_date_from = today.strftime("%Y-%m-%d")
+        filter_date_to = today.strftime("%Y-%m-%d")
+
+    from leaves.bs_convert import ad_to_bs_display
+
+    filter_date_obj = None
+    filter_date_bs = ""
+    if filter_date:
+        try:
+            filter_date_obj = datetime.strptime(filter_date, "%Y-%m-%d").date()
+            movements = movements.filter(date=filter_date_obj)
+            filter_date_bs = ad_to_bs_display(filter_date_obj)
+        except ValueError:
+            pass
+
+    filter_date_from_obj = None
+    filter_date_from_bs = ""
+    if filter_date_from:
+        try:
+            filter_date_from_obj = datetime.strptime(filter_date_from, "%Y-%m-%d").date()
+            movements = movements.filter(date__gte=filter_date_from_obj)
+            filter_date_from_bs = ad_to_bs_display(filter_date_from_obj)
+        except ValueError:
+            pass
+
+    filter_date_to_obj = None
+    filter_date_to_bs = ""
+    if filter_date_to:
+        try:
+            filter_date_to_obj = datetime.strptime(filter_date_to, "%Y-%m-%d").date()
+            movements = movements.filter(date__lte=filter_date_to_obj)
+            filter_date_to_bs = ad_to_bs_display(filter_date_to_obj)
+        except ValueError:
+            pass
+
+    if filter_employee_id:
+        try:
+            filter_employee_id = int(filter_employee_id)
+            movements = movements.filter(
+                Q(employee_id=filter_employee_id) | Q(assistants__id=filter_employee_id)
+            ).distinct()
+        except ValueError:
+            filter_employee_id = None
+
+    if filter_client:
+        movements = movements.filter(client__icontains=filter_client)
+
+    selected_employee = None
+    if filter_employee_id:
+        selected_employee = User.objects.filter(pk=filter_employee_id).first()
+
+    today_ad = date.today()
+    today_bs = ad_to_bs_display(today_ad)
+
+    context = {
+        "movements": movements,
+        "filter_client": filter_client,
+        "filter_date": filter_date,
+        "filter_date_obj": filter_date_obj,
+        "filter_date_bs": filter_date_bs,
+        "filter_date_from": filter_date_from,
+        "filter_date_from_obj": filter_date_from_obj,
+        "filter_date_from_bs": filter_date_from_bs,
+        "filter_date_to": filter_date_to,
+        "filter_date_to_obj": filter_date_to_obj,
+        "filter_date_to_bs": filter_date_to_bs,
+        "selected_employee": selected_employee,
+        "today_ad": today_ad,
+        "today_bs": today_bs,
+    }
+    return render(request, "leaves/staff_movement_pdf.html", context)
