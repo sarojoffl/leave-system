@@ -218,14 +218,14 @@
                 {% elif m.uniform_in_time %}
                   <span class="badge approved">{{ m.uniform_in_time|time:"H:i" }}</span>
                 {% elif m.all_out %}
-                  <span class="badge rejected">Out</span>
+                  <a href="{% url 'staff_movement_edit' m.id %}" class="badge rejected" style="text-decoration:none;cursor:pointer;" title="Click to mark return">Out</a>
                 {% else %}
                   {% for grp_time, names in m.in_time_groups %}
                     <div class="participant-row">
                       {% if grp_time %}
                         <span class="badge approved">{{ grp_time|time:"H:i" }}</span>
                       {% else %}
-                        <span class="badge rejected">Out</span>
+                        <a href="{% url 'staff_movement_edit' m.id %}" class="badge rejected" style="text-decoration:none;cursor:pointer;" title="Click to mark return">Out</a>
                       {% endif %}
                       <span>{{ names|join:", " }}</span>
                     </div>
@@ -596,14 +596,14 @@
                   {% elif m.uniform_in_time %}
                     <span class="badge approved">{{ m.uniform_in_time|time:"H:i" }}</span>
                   {% elif m.all_out %}
-                    <span class="badge rejected">Out</span>
+                    <a href="{% url 'staff_movement_edit' m.id %}" class="badge rejected" style="text-decoration:none;cursor:pointer;" title="Click to mark return">Out</a>
                   {% else %}
                     {% for grp_time, names in m.in_time_groups %}
                       <div class="participant-row">
                         {% if grp_time %}
                           <span class="badge approved">{{ grp_time|time:"H:i" }}</span>
                         {% else %}
-                          <span class="badge rejected">Out</span>
+                          <a href="{% url 'staff_movement_edit' m.id %}" class="badge rejected" style="text-decoration:none;cursor:pointer;" title="Click to mark return">Out</a>
                         {% endif %}
                         <span>{{ names|join:", " }}</span>
                       </div>

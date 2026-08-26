@@ -725,3 +725,55 @@ class StaffMovementTestCase(TestCase):
         self.assertEqual(response_pdf_manager.status_code, 200)
         self.assertContains(response_pdf_manager, "Staff Movement &amp; Service Report")
         self.assertContains(response_pdf_manager, "Mr. Sharma (Finance)")
+
+    def test_reports_bs_trend_and_employee_stats(self):
+        from leaves.bs_convert import ad_to_bs, bs_month_name
+        self.client.login(username="testmanager", password="password123")
+        session = self.client.session
+        session['view_mode'] = 'manager'
+        session.save()
+
+        today = date.today()
+        bs_y, bs_m, _ = ad_to_bs(today)
+
+        leave_type = LeaveType.objects.create(name="Annual Leave")
+        LeaveRequest.objects.create(
+            employee=self.employee,
+            leave_type=leave_type,
+            start_date=today,
+            end_date=today,
+            reason="Test leave for stats",
+            status="approved",
+        )
+
+        response = self.client.get(reverse("reports"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f"Monthly Leave Trend — {bs_y}")
+        self.assertContains(response, f"Employee Leave Stats — {bs_month_name(bs_m)} {bs_y}")
+
+        # Test month navigation
+        nav_url = f"{reverse('reports')}?stats_month=1&stats_year={bs_y}"
+        response_nav = self.client.get(nav_url)
+        self.assertEqual(response_nav.status_code, 200)
+        self.assertContains(response_nav, f"Employee Leave Stats — Baisakh {bs_y}")
+
+    def test_staff_movement_reports_tab(self):
+        self.client.login(username="testmanager", password="password123")
+        session = self.client.session
+        session['view_mode'] = 'manager'
+        session.save()
+
+        # Create a sample staff movement
+        StaffMovement.objects.create(
+            employee=self.employee,
+            date=date.today(),
+            client="Global Tech Office",
+            out_time=datetime.now().time(),
+            purpose_type="amc",
+        )
+
+        response = self.client.get(reverse("reports") + "?tab=movement")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Staff Movement Reports")
+        self.assertContains(response, "Monthly Staff Movement Trend")
+        self.assertContains(response, "Global Tech Office")

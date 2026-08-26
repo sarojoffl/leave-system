@@ -3,9 +3,11 @@ from calendar import month_name
 from datetime import date, datetime
 from io import BytesIO
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
 from django.core.mail import send_mail
 from django.db import transaction
 from django.db.models import F, Sum
@@ -956,26 +958,44 @@ def _get_reports_data(today=None):
             "pending": qs.filter(status="pending").count(),
         })
 
-    # Monthly trend — one query, aggregate in Python
+    # Monthly trend — aggregate working leave days by exact BS month
+    from leaves.bs_convert import ad_to_bs, bs_month_name
+    from datetime import timedelta
+
+    bs_y_today, bs_m_today, _ = ad_to_bs(today)
+
     monthly_qs = LeaveRequest.objects.filter(
         status="approved",
-        start_date__year=today.year,
     ).only("start_date", "end_date")
     monthly_days_map = {m: 0 for m in range(1, 13)}
+
+    from leaves.models import PublicHoliday
+    holidays = set(PublicHoliday.objects.values_list("date", flat=True))
+
     for l in monthly_qs:
-        monthly_days_map[l.start_date.month] = monthly_days_map.get(l.start_date.month, 0) + l.days
+        curr = l.start_date
+        while curr <= l.end_date:
+            if curr.weekday() != 5 and curr not in holidays:
+                try:
+                    bs_y, bs_m, _ = ad_to_bs(curr)
+                    if bs_y == bs_y_today:
+                        monthly_days_map[bs_m] = monthly_days_map.get(bs_m, 0) + 1
+                except (ValueError, AttributeError):
+                    pass
+            curr += timedelta(days=1)
+
     monthly_days = [monthly_days_map[m] for m in range(1, 13)]
 
     max_days = max(monthly_days) or 1
     monthly_trend = [{
-        "label": month_name[m][:3],
+        "label": bs_month_name(m)[:3],
         "days": monthly_days[m - 1],
         "bar_height": round((monthly_days[m - 1] / max_days) * 100),
-        "is_current": m == today.month,
-        "is_future": m > today.month,
+        "is_current": m == bs_m_today,
+        "is_future": m > bs_m_today,
     } for m in range(1, 13)]
 
-    return department_usage, leave_type_breakdown, monthly_trend
+    return department_usage, leave_type_breakdown, monthly_trend, bs_y_today
 
 
 # ---------------------------------------------------------------------------
@@ -1031,10 +1051,278 @@ def _get_comp_off_data(today=None):
     return comp_off_monthly_trend, comp_off_by_employee, total_comp_off_days
 
 
+def _get_monthly_employee_leave_stats(bs_year, bs_month):
+    from leaves.bs_convert import ad_to_bs, bs_month_name
+    from datetime import timedelta
+    from leaves.models import PublicHoliday
+
+    approved_leaves = (
+        LeaveRequest.objects.filter(status="approved")
+        .select_related("employee", "leave_type")
+        .order_by("employee__first_name", "employee__username")
+    )
+
+    holidays = set(PublicHoliday.objects.values_list("date", flat=True))
+    per_emp_map = {}
+
+    for l in approved_leaves:
+        curr = l.start_date
+        while curr <= l.end_date:
+            if curr.weekday() != 5 and curr not in holidays:
+                try:
+                    bs_y, bs_m, _ = ad_to_bs(curr)
+                except (ValueError, AttributeError):
+                    curr += timedelta(days=1)
+                    continue
+
+                if bs_y == bs_year and bs_m == bs_month:
+                    emp_id = l.employee_id
+                    if emp_id not in per_emp_map:
+                        per_emp_map[emp_id] = {
+                            "name": l.employee.get_full_name() or l.employee.username,
+                            "total_days": 0,
+                            "type_breakdown": {},
+                        }
+                    per_emp_map[emp_id]["total_days"] += 1
+                    lt_name = l.leave_type.name
+                    per_emp_map[emp_id]["type_breakdown"][lt_name] = (
+                        per_emp_map[emp_id]["type_breakdown"].get(lt_name, 0) + 1
+                    )
+            curr += timedelta(days=1)
+
+    emp_leave_stats = []
+    for emp_id, data in per_emp_map.items():
+        breakdown_str_parts = [
+            f"{lt}: {d if d % 1 != 0 else int(d)}"
+            for lt, d in data["type_breakdown"].items()
+        ]
+        emp_leave_stats.append({
+            "name": data["name"],
+            "total_days": data["total_days"],
+            "breakdown_str": ", ".join(breakdown_str_parts),
+        })
+
+    emp_leave_stats.sort(key=lambda x: -x["total_days"])
+
+    if bs_month == 1:
+        prev_month, prev_year = 12, bs_year - 1
+    else:
+        prev_month, prev_year = bs_month - 1, bs_year
+
+    if bs_month == 12:
+        next_month, next_year = 1, bs_year + 1
+    else:
+        next_month, next_year = bs_month + 1, bs_year
+
+    return {
+        "emp_leave_stats": emp_leave_stats,
+        "stats_bs_year": bs_year,
+        "stats_bs_month": bs_month,
+        "stats_bs_month_name": bs_month_name(bs_month),
+        "prev_month": prev_month,
+        "prev_year": prev_year,
+        "next_month": next_month,
+        "next_year": next_year,
+    }
+
+
 @manager_required
+def employee_leave_stats_api(request):
+    today = date.today()
+    from leaves.bs_convert import ad_to_bs
+    bs_y_today, bs_m_today, _ = ad_to_bs(today)
+
+    try:
+        stats_bs_month = int(request.GET.get("stats_month", bs_m_today))
+        if stats_bs_month < 1 or stats_bs_month > 12:
+            stats_bs_month = bs_m_today
+    except ValueError:
+        stats_bs_month = bs_m_today
+
+    try:
+        stats_bs_year = int(request.GET.get("stats_year", bs_y_today))
+    except ValueError:
+        stats_bs_year = bs_y_today
+
+    stats_data = _get_monthly_employee_leave_stats(stats_bs_year, stats_bs_month)
+    return JsonResponse(stats_data)
+
+
+def _get_staff_movement_reports_data(bs_year, bs_month):
+    from leaves.bs_convert import ad_to_bs, bs_month_name
+
+    movements = StaffMovement.objects.filter(is_cancelled=False).select_related("employee").prefetch_related("assistant_links__employee")
+
+    monthly_counts = {m: 0 for m in range(1, 13)}
+    month_movements = []
+
+    for m in movements:
+        try:
+            bs_y, bs_m, _ = ad_to_bs(m.date)
+        except (ValueError, AttributeError):
+            continue
+
+        if bs_y == bs_year:
+            monthly_counts[bs_m] += 1
+            if bs_m == bs_month:
+                month_movements.append(m)
+
+    max_visits = max(monthly_counts.values()) or 1
+    movement_monthly_trend = [{
+        "label": bs_month_name(m)[:3],
+        "visits": monthly_counts[m],
+        "bar_height": round((monthly_counts[m] / max_visits) * 100),
+        "is_current": m == bs_month,
+    } for m in range(1, 13)]
+
+    purpose_labels = dict(StaffMovement.PURPOSE_CHOICES)
+    purpose_counts = {}
+    for m in month_movements:
+        p_type = m.purpose_type or "other"
+        p_label = purpose_labels.get(p_type, "Other / Custom")
+        purpose_counts[p_label] = purpose_counts.get(p_label, 0) + 1
+
+    purpose_breakdown = sorted([
+        {"name": k, "count": v} for k, v in purpose_counts.items()
+    ], key=lambda x: -x["count"])
+
+    client_counts = {}
+    for m in month_movements:
+        client_name = m.client.strip()
+        if client_name:
+            client_counts[client_name] = client_counts.get(client_name, 0) + 1
+
+    top_clients = sorted([
+        {"client": k, "count": v} for k, v in client_counts.items()
+    ], key=lambda x: -x["count"])[:10]
+
+    per_emp_map = {}
+    for m in month_movements:
+        # Count primary employee
+        emp_id = m.employee_id
+        if emp_id not in per_emp_map:
+            per_emp_map[emp_id] = {
+                "name": m.employee.get_full_name() or m.employee.username,
+                "total_visits": 0,
+                "completed_visits": 0,
+            }
+        per_emp_map[emp_id]["total_visits"] += 1
+        if m.in_time is not None:
+            per_emp_map[emp_id]["completed_visits"] += 1
+
+        # Count each assistant as well
+        for asst in m.assistant_links.all():
+            asst_id = asst.employee_id
+            if asst_id not in per_emp_map:
+                per_emp_map[asst_id] = {
+                    "name": asst.employee.get_full_name() or asst.employee.username,
+                    "total_visits": 0,
+                    "completed_visits": 0,
+                }
+            per_emp_map[asst_id]["total_visits"] += 1
+            if asst.in_time is not None:
+                per_emp_map[asst_id]["completed_visits"] += 1
+
+    employee_movement_stats = sorted([
+        {
+            "name": data["name"],
+            "total_visits": data["total_visits"],
+            "completed_visits": data["completed_visits"],
+        }
+        for data in per_emp_map.values()
+    ], key=lambda x: -x["total_visits"])
+
+    total_month_visits = len(month_movements)
+
+    if bs_month == 1:
+        mov_prev_month, mov_prev_year = 12, bs_year - 1
+    else:
+        mov_prev_month, mov_prev_year = bs_month - 1, bs_year
+
+    if bs_month == 12:
+        mov_next_month, mov_next_year = 1, bs_year + 1
+    else:
+        mov_next_month, mov_next_year = bs_month + 1, bs_year
+
+    return {
+        "movement_monthly_trend": movement_monthly_trend,
+        "purpose_breakdown": purpose_breakdown,
+        "top_clients": top_clients,
+        "employee_movement_stats": employee_movement_stats,
+        "total_month_visits": total_month_visits,
+        "movement_bs_year": bs_year,
+        "movement_bs_month": bs_month,
+        "movement_bs_month_name": bs_month_name(bs_month),
+        "mov_prev_month": mov_prev_month,
+        "mov_prev_year": mov_prev_year,
+        "mov_next_month": mov_next_month,
+        "mov_next_year": mov_next_year,
+    }
+
+
+@login_required
+def movement_stats_api(request):
+    is_staff_movement_admin = request.user.username in getattr(settings, "STAFF_MOVEMENT_PROXY_LOGGER_USERNAMES", [])
+    if not (request.user.has_management_access or is_staff_movement_admin):
+        raise PermissionDenied("You don't have permission to view staff movement stats.")
+
+    today = date.today()
+    from leaves.bs_convert import ad_to_bs
+    bs_y_today, bs_m_today, _ = ad_to_bs(today)
+
+    try:
+        mov_month = int(request.GET.get("mov_month", bs_m_today))
+        if mov_month < 1 or mov_month > 12:
+            mov_month = bs_m_today
+    except ValueError:
+        mov_month = bs_m_today
+
+    try:
+        mov_year = int(request.GET.get("mov_year", bs_y_today))
+    except ValueError:
+        mov_year = bs_y_today
+
+    mov_data = _get_staff_movement_reports_data(mov_year, mov_month)
+    return JsonResponse(mov_data)
+
+
+@login_required
 def reports(request):
-    department_usage, leave_type_breakdown, monthly_trend = _get_reports_data()
+    is_staff_movement_admin = request.user.username in getattr(settings, "STAFF_MOVEMENT_PROXY_LOGGER_USERNAMES", [])
+    can_view_leave_reports = request.user.has_management_access
+    can_view_movement_reports = can_view_leave_reports or is_staff_movement_admin
+
+    if not can_view_movement_reports:
+        raise PermissionDenied("You don't have permission to access reports.")
+
+    active_tab = request.GET.get("tab")
+    if not active_tab:
+        active_tab = "leave" if can_view_leave_reports else "movement"
+    elif active_tab == "leave" and not can_view_leave_reports:
+        active_tab = "movement"
+    elif active_tab not in ("leave", "movement"):
+        active_tab = "leave" if can_view_leave_reports else "movement"
+
+    department_usage, leave_type_breakdown, monthly_trend, bs_year = _get_reports_data()
     comp_off_monthly_trend, comp_off_by_employee, total_comp_off_days = _get_comp_off_data()
+
+    today = date.today()
+    from leaves.bs_convert import ad_to_bs
+    bs_y_today, bs_m_today, _ = ad_to_bs(today)
+
+    try:
+        stats_bs_month = int(request.GET.get("stats_month", bs_m_today))
+        if stats_bs_month < 1 or stats_bs_month > 12:
+            stats_bs_month = bs_m_today
+    except ValueError:
+        stats_bs_month = bs_m_today
+
+    try:
+        stats_bs_year = int(request.GET.get("stats_year", bs_y_today))
+    except ValueError:
+        stats_bs_year = bs_y_today
+
+    stats_data = _get_monthly_employee_leave_stats(stats_bs_year, stats_bs_month)
 
     comp_off_filter = request.GET.get("comp_off", "unpaid")
     comp_off_qs = (
@@ -1057,16 +1345,38 @@ def reports(request):
         "paid_at": h.comp_off_paid_at,
     } for h in comp_off_qs]
 
-    return render(request, "leaves/reports.html", {
+    try:
+        mov_bs_month = int(request.GET.get("mov_month", bs_m_today))
+        if mov_bs_month < 1 or mov_bs_month > 12:
+            mov_bs_month = bs_m_today
+    except ValueError:
+        mov_bs_month = bs_m_today
+
+    try:
+        mov_bs_year = int(request.GET.get("mov_year", bs_y_today))
+    except ValueError:
+        mov_bs_year = bs_y_today
+
+    movement_reports_data = _get_staff_movement_reports_data(mov_bs_year, mov_bs_month)
+
+    ctx = {
+        "active_tab": active_tab,
+        "can_view_leave_reports": can_view_leave_reports,
+        "can_view_movement_reports": can_view_movement_reports,
         "department_usage": department_usage,
         "leave_type_breakdown": leave_type_breakdown,
         "monthly_trend": monthly_trend,
+        "bs_year": bs_year,
         "comp_off_monthly_trend": comp_off_monthly_trend,
         "comp_off_by_employee": comp_off_by_employee,
         "comp_off_records": comp_off_records,
         "comp_off_filter": comp_off_filter,
         "total_comp_off_days": total_comp_off_days,
-    })
+    }
+    ctx.update(stats_data)
+    ctx.update(movement_reports_data)
+
+    return render(request, "leaves/reports.html", ctx)
 
 
 @manager_required
@@ -1097,7 +1407,7 @@ def toggle_comp_off_paid(request, id):
 @manager_required
 def export_reports_pdf(request):
     today = date.today()
-    department_usage, leave_type_breakdown, monthly_trend = _get_reports_data(today)
+    department_usage, leave_type_breakdown, monthly_trend, bs_year = _get_reports_data(today)
 
     sections = [
         (
@@ -1111,7 +1421,7 @@ def export_reports_pdf(request):
             [[lt["name"], lt["requests"], lt["days_taken"], lt["pending"]] for lt in leave_type_breakdown],
         ),
         (
-            f"Monthly Leave Trend — {today.year}",
+            f"Monthly Leave Trend — {bs_year}",
             ["Month", "Days Taken"],
             [[m["label"], m["days"]] for m in monthly_trend],
         ),

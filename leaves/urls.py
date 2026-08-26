@@ -28,4 +28,6 @@ urlpatterns = [
     path("employee/<int:employee_id>/export/", views.export_employee_pdf, name="export_employee_pdf"),
 
     path("api/ad-to-bs/", views.ad_to_bs_api, name="ad_to_bs_api"),
+    path("api/leave-stats/", views.employee_leave_stats_api, name="employee_leave_stats_api"),
+    path("api/movement-stats/", views.movement_stats_api, name="movement_stats_api"),
 ]

@@ -4,158 +4,462 @@
 {% block page_title %}Reports & Analytics{% endblock %}
 
 {% block content %}
-<div class="flex-actions" style="justify-content: flex-end; margin-bottom: 16px;">
-  <a href="{% url 'export_reports' %}" class="btn btn-outline btn-sm">⬇ Export PDF</a>
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+  <div class="tabs" style="margin: 0;">
+    {% if can_view_leave_reports %}
+      <a href="?tab=leave" class="tab {% if active_tab == 'leave' %}active{% endif %}">Leave Reports</a>
+    {% endif %}
+    <a href="?tab=movement" class="tab {% if active_tab == 'movement' %}active{% endif %}">Staff Movement Reports</a>
+  </div>
+  {% if active_tab == 'leave' and can_view_leave_reports %}
+    <a href="{% url 'export_reports' %}" class="btn btn-outline btn-sm">⬇ Export PDF</a>
+  {% endif %}
 </div>
 
-<div class="two-col">
+{% if active_tab == 'leave' and can_view_leave_reports %}
+  <!-- ===== LEAVE REPORTS TAB ===== -->
+  <div class="two-col">
+    <div class="card">
+      <div class="card-header"><span class="card-title">Department-wise Leave Usage</span></div>
+      <div class="table-responsive">
+        <table>
+          <thead><tr><th>Department</th><th>Employees</th><th>Total Days</th><th>Avg per Person</th></tr></thead>
+          <tbody>
+            {% for d in department_usage %}
+              <tr>
+                <td>{{ d.name }}</td>
+                <td>{{ d.employees }}</td>
+                <td>{{ d.total_days|floatformat:"-1" }}</td>
+                <td>{{ d.avg_per_person }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="4" class="empty-state">No department data available.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><span class="card-title">Leave Type Breakdown</span></div>
+      <div class="table-responsive">
+        <table>
+          <thead><tr><th>Leave Type</th><th>Requests</th><th>Days Taken</th><th>Pending</th></tr></thead>
+          <tbody>
+            {% for lt in leave_type_breakdown %}
+              <tr>
+                <td>{{ lt.name }}</td>
+                <td>{{ lt.requests }}</td>
+                <td>{{ lt.days_taken|floatformat:"-1" }}</td>
+                <td>{{ lt.pending }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="4" class="empty-state">No leave type data available.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <div class="card">
-    <div class="card-header"><span class="card-title">Department-wise Leave Usage</span></div>
+    <div class="card-header">
+      <span class="card-title">Monthly Leave Trend — {{ bs_year }}</span>
+    </div>
+    <div class="card-body">
+      <div class="trend-chart">
+        {% for m in monthly_trend %}
+          <div class="trend-col">
+            <div class="trend-bar {% if m.is_current %}current{% elif m.is_future %}future{% endif %}"
+                 style="height:{{ m.bar_height }}%;"
+                 title="{{ m.label }}: {{ m.days|floatformat:'-1' }} days"></div>
+            <div class="trend-label {% if m.is_current %}current{% endif %}">{{ m.label }}</div>
+          </div>
+        {% endfor %}
+      </div>
+      <div class="trend-note">Days of leave taken per BS month across the team</div>
+    </div>
+  </div>
+
+  <div id="employee-leave-stats"></div>
+  <div class="card">
+    <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+      <span class="card-title" id="stats-card-title">Employee Leave Stats — {{ stats_bs_month_name }} {{ stats_bs_year }}</span>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <button type="button" id="stats-prev-btn" data-month="{{ prev_month }}" data-year="{{ prev_year }}" class="btn btn-outline btn-sm" style="padding:4px 12px; font-size:0.8rem;">← Prev Month</button>
+        <button type="button" id="stats-next-btn" data-month="{{ next_month }}" data-year="{{ next_year }}" class="btn btn-outline btn-sm" style="padding:4px 12px; font-size:0.8rem;">Next Month →</button>
+      </div>
+    </div>
     <div class="table-responsive">
       <table>
-        <thead><tr><th>Department</th><th>Employees</th><th>Total Days</th><th>Avg per Person</th></tr></thead>
-        <tbody>
-          {% for d in department_usage %}
+        <thead>
+          <tr>
+            <th>Employee</th>
+            <th>Total Leave Days</th>
+            <th>Leave Breakdown</th>
+          </tr>
+        </thead>
+        <tbody id="stats-tbody">
+          {% for s in emp_leave_stats %}
             <tr>
-              <td>{{ d.name }}</td>
-              <td>{{ d.employees }}</td>
-              <td>{{ d.total_days|floatformat:"-1" }}</td>
-              <td>{{ d.avg_per_person }}</td>
+              <td style="font-weight:600;">{{ s.name }}</td>
+              <td><span class="badge pending" style="font-size:0.82rem; font-weight:600;">{{ s.total_days|floatformat:"-1" }} day{{ s.total_days|pluralize }}</span></td>
+              <td style="color:var(--color-text-muted); font-size:0.85rem;">{{ s.breakdown_str }}</td>
             </tr>
           {% empty %}
-            <tr><td colspan="4" class="empty-state">No department data available.</td></tr>
+            <tr>
+              <td colspan="3" class="empty-state">No leaves taken in {{ stats_bs_month_name }} {{ stats_bs_year }}.</td>
+            </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   </div>
 
+  <script>
+  document.addEventListener("DOMContentLoaded", function() {
+    const prevBtn = document.getElementById("stats-prev-btn");
+    const nextBtn = document.getElementById("stats-next-btn");
+    const titleEl = document.getElementById("stats-card-title");
+    const tbodyEl = document.getElementById("stats-tbody");
+
+    function loadLeaveStats(month, year) {
+      tbodyEl.style.transition = "opacity 0.15s ease";
+      tbodyEl.style.opacity = "0.4";
+
+      fetch("{% url 'employee_leave_stats_api' %}?stats_month=" + month + "&stats_year=" + year)
+        .then(response => response.json())
+        .then(data => {
+          titleEl.textContent = "Employee Leave Stats — " + data.stats_bs_month_name + " " + data.stats_bs_year;
+
+          prevBtn.setAttribute("data-month", data.prev_month);
+          prevBtn.setAttribute("data-year", data.prev_year);
+
+          nextBtn.setAttribute("data-month", data.next_month);
+          nextBtn.setAttribute("data-year", data.next_year);
+
+          tbodyEl.innerHTML = "";
+          if (data.emp_leave_stats.length === 0) {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `<td colspan="3" class="empty-state">No leaves taken in ${data.stats_bs_month_name} ${data.stats_bs_year}.</td>`;
+            tbodyEl.appendChild(tr);
+          } else {
+            data.emp_leave_stats.forEach(s => {
+              const tr = document.createElement("tr");
+              const dayLabel = s.total_days === 1 ? " day" : " days";
+              tr.innerHTML = `
+                <td style="font-weight:600;">${s.name}</td>
+                <td><span class="badge pending" style="font-size:0.82rem; font-weight:600;">${s.total_days}${dayLabel}</span></td>
+                <td style="color:var(--color-text-muted); font-size:0.85rem;">${s.breakdown_str}</td>
+              `;
+              tbodyEl.appendChild(tr);
+            });
+          }
+          tbodyEl.style.opacity = "1";
+        })
+        .catch(err => {
+          console.error("Failed to load leave stats:", err);
+          tbodyEl.style.opacity = "1";
+        });
+    }
+
+    if (prevBtn && nextBtn) {
+      prevBtn.addEventListener("click", function() {
+        loadLeaveStats(this.getAttribute("data-month"), this.getAttribute("data-year"));
+      });
+      nextBtn.addEventListener("click", function() {
+        loadLeaveStats(this.getAttribute("data-month"), this.getAttribute("data-year"));
+      });
+    }
+  });
+  </script>
+
+  <div id="comp-off"></div>
+
   <div class="card">
-    <div class="card-header"><span class="card-title">Leave Type Breakdown</span></div>
+    <div class="card-header">
+      <span class="card-title">Comp-off Summary</span>
+      <span class="card-meta">{{ total_comp_off_days|floatformat:"-1" }} total days earned this fiscal year</span>
+    </div>
+    <div class="card-body">
+      <div class="trend-chart">
+        {% for m in comp_off_monthly_trend %}
+          <div class="trend-col">
+            <div class="trend-bar {% if m.is_current %}current{% endif %}"
+                 style="height:{{ m.bar_height }}%;"
+                 title="{{ m.label }}: {{ m.holiday_days }} holiday day{{ m.holiday_days|pluralize }} → {{ m.comp_off_days }} comp-off day{{ m.comp_off_days|pluralize }}"></div>
+            <div class="trend-label {% if m.is_current %}current{% endif %}">{{ m.label }}</div>
+          </div>
+        {% endfor %}
+      </div>
+      <div class="trend-note">Holiday work days worked per BS month — each day earns 2 comp-off days</div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="card">
+      <div class="card-header"><span class="card-title">Comp-off by Employee</span></div>
+      <div class="table-responsive">
+        <table>
+          <thead><tr><th>Employee</th><th>Holiday Days Worked</th><th>Comp-off Earned</th><th>Unpaid</th></tr></thead>
+          <tbody>
+            {% for e in comp_off_by_employee %}
+              <tr>
+                <td>{{ e.name }}</td>
+                <td>{{ e.holiday_days }}</td>
+                <td>{{ e.comp_off_days }}</td>
+                <td>
+                  {% if e.unpaid_days %}<span class="badge pending">{{ e.unpaid_days }} days</span>
+                  {% else %}<span class="badge approved">All settled</span>{% endif %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="4" class="empty-state">No holiday work recorded yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><span class="card-title">Comp-off Payout Records</span></div>
+      <div class="tabs" style="padding:0 1rem;">
+        <a href="?comp_off=unpaid#comp-off" class="tab {% if comp_off_filter == 'unpaid' %}active{% endif %}">Unpaid</a>
+        <a href="?comp_off=paid#comp-off" class="tab {% if comp_off_filter == 'paid' %}active{% endif %}">Paid</a>
+        <a href="?comp_off=all#comp-off" class="tab {% if comp_off_filter == 'all' %}active{% endif %}">All</a>
+      </div>
+      <div class="table-responsive">
+        <table>
+          <thead><tr><th>Employee</th><th>Date</th><th>Days</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody>
+            {% for r in comp_off_records %}
+              <tr>
+                <td>{{ r.employee_name }}</td>
+                <td>{{ r.date_bs }}</td>
+                <td>{{ r.comp_off_days }}</td>
+                <td>
+                  {% if r.paid %}<span class="badge approved">Paid</span>
+                  {% else %}<span class="badge pending">Unpaid</span>{% endif %}
+                </td>
+                <td>
+                  <form method="post" action="{% url 'toggle_comp_off_paid' r.id %}" style="display:inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="comp_off_filter" value="{{ comp_off_filter }}">
+                    {% if r.paid %}
+                      <button type="submit" class="btn btn-outline btn-sm" style="padding:0.25rem 0.5rem;font-size:0.75rem;border-radius:6px;">Mark Unpaid</button>
+                    {% else %}
+                      <button type="submit" class="btn btn-success btn-sm" style="padding:0.25rem 0.5rem;font-size:0.75rem;border-radius:6px;">Mark Paid</button>
+                    {% endif %}
+                  </form>
+                </td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="5" class="empty-state">No records for this filter.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+{% else %}
+
+  <!-- ===== STAFF MOVEMENT REPORTS TAB ===== -->
+  <div class="card" style="margin-bottom:20px;">
+    <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+      <div>
+        <span class="card-title" id="mov-card-title">Staff Movement Reports — {{ movement_bs_month_name }} {{ movement_bs_year }}</span>
+        <span class="card-meta" id="mov-card-meta" style="margin-left:10px;">{{ total_month_visits }} visit{{ total_month_visits|pluralize }} in {{ movement_bs_month_name }} {{ movement_bs_year }}</span>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <button type="button" id="mov-prev-btn" data-month="{{ mov_prev_month }}" data-year="{{ mov_prev_year }}" class="btn btn-outline btn-sm" style="padding:4px 12px; font-size:0.8rem;">← Prev Month</button>
+        <button type="button" id="mov-next-btn" data-month="{{ mov_next_month }}" data-year="{{ mov_next_year }}" class="btn btn-outline btn-sm" style="padding:4px 12px; font-size:0.8rem;">Next Month →</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Monthly Staff Movement Trend — {{ movement_bs_year }}</span>
+    </div>
+    <div class="card-body">
+      <div class="trend-chart" id="mov-trend-chart">
+        {% for m in movement_monthly_trend %}
+          <div class="trend-col">
+            <div class="trend-bar {% if m.is_current %}current{% endif %}"
+                 style="height:{{ m.bar_height }}%;"
+                 title="{{ m.label }}: {{ m.visits }} visit{{ m.visits|pluralize }}"></div>
+            <div class="trend-label {% if m.is_current %}current{% endif %}">{{ m.label }}</div>
+          </div>
+        {% endfor %}
+      </div>
+      <div class="trend-note">Total completed &amp; active field visits per BS month</div>
+    </div>
+  </div>
+
+  <div class="two-col">
+    <div class="card">
+      <div class="card-header"><span class="card-title">Visit Purpose Breakdown</span></div>
+      <div class="table-responsive">
+        <table>
+          <thead><tr><th>Purpose Category</th><th>Total Visits</th></tr></thead>
+          <tbody id="mov-purpose-tbody">
+            {% for p in purpose_breakdown %}
+              <tr>
+                <td style="font-weight:600;">{{ p.name }}</td>
+                <td><span class="badge approved" style="font-size:0.82rem; font-weight:600;">{{ p.count }} visit{{ p.count|pluralize }}</span></td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="2" class="empty-state">No visit purpose data for {{ movement_bs_month_name }} {{ movement_bs_year }}.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><span class="card-title">Top Visited Clients</span></div>
+      <div class="table-responsive">
+        <table>
+          <thead><tr><th>Client / Location</th><th>Visits Recorded</th></tr></thead>
+          <tbody id="mov-client-tbody">
+            {% for c in top_clients %}
+              <tr>
+                <td style="font-weight:600;">{{ c.client }}</td>
+                <td><span class="badge pending" style="font-size:0.82rem; font-weight:600;">{{ c.count }} visit{{ c.count|pluralize }}</span></td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="2" class="empty-state">No client visit records for {{ movement_bs_month_name }} {{ movement_bs_year }}.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><span class="card-title">Staff Field Activity</span></div>
     <div class="table-responsive">
       <table>
-        <thead><tr><th>Leave Type</th><th>Requests</th><th>Days Taken</th><th>Pending</th></tr></thead>
-        <tbody>
-          {% for lt in leave_type_breakdown %}
+        <thead><tr><th>Staff Member</th><th>Total Visits Logged</th><th>Completed Visits</th></tr></thead>
+        <tbody id="mov-emp-tbody">
+          {% for e in employee_movement_stats %}
             <tr>
-              <td>{{ lt.name }}</td>
-              <td>{{ lt.requests }}</td>
-              <td>{{ lt.days_taken|floatformat:"-1" }}</td>
-              <td>{{ lt.pending }}</td>
+              <td style="font-weight:600;">{{ e.name }}</td>
+              <td>{{ e.total_visits }}</td>
+              <td><span class="badge approved" style="font-weight:600;">{{ e.completed_visits }} completed</span></td>
             </tr>
           {% empty %}
-            <tr><td colspan="4" class="empty-state">No leave type data available.</td></tr>
+            <tr><td colspan="3" class="empty-state">No staff activity logged in {{ movement_bs_month_name }} {{ movement_bs_year }}.</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   </div>
-</div>
 
-<div class="card">
-  <div class="card-header">
-    <span class="card-title">Monthly Leave Trend — {% now "Y" %}</span>
-  </div>
-  <div class="card-body">
-    <div class="trend-chart">
-      {% for m in monthly_trend %}
-        <div class="trend-col">
-          <div class="trend-bar {% if m.is_current %}current{% elif m.is_future %}future{% endif %}"
-               style="height:{{ m.bar_height }}%;"
-               title="{{ m.label }}: {{ m.days|floatformat:'-1' }} days"></div>
-          <div class="trend-label {% if m.is_current %}current{% endif %}">{{ m.label }}</div>
-        </div>
-      {% endfor %}
-    </div>
-    <div class="trend-note">Days of leave taken per month across the team</div>
-  </div>
-</div>
+  <script>
+  document.addEventListener("DOMContentLoaded", function() {
+    const movPrevBtn = document.getElementById("mov-prev-btn");
+    const movNextBtn = document.getElementById("mov-next-btn");
+    const movTitleEl = document.getElementById("mov-card-title");
+    const movMetaEl = document.getElementById("mov-card-meta");
 
-<div id="comp-off"></div>
+    const movPurposeTbody = document.getElementById("mov-purpose-tbody");
+    const movClientTbody = document.getElementById("mov-client-tbody");
+    const movEmpTbody = document.getElementById("mov-emp-tbody");
+    const movTrendChart = document.getElementById("mov-trend-chart");
 
-<div class="card">
-  <div class="card-header">
-    <span class="card-title">Comp-off Summary</span>
-    <span class="card-meta">{{ total_comp_off_days|floatformat:"-1" }} total days earned this fiscal year</span>
-  </div>
-  <div class="card-body">
-    <div class="trend-chart">
-      {% for m in comp_off_monthly_trend %}
-        <div class="trend-col">
-          <div class="trend-bar {% if m.is_current %}current{% endif %}"
-               style="height:{{ m.bar_height }}%;"
-               title="{{ m.label }}: {{ m.holiday_days }} holiday day{{ m.holiday_days|pluralize }} → {{ m.comp_off_days }} comp-off day{{ m.comp_off_days|pluralize }}"></div>
-          <div class="trend-label {% if m.is_current %}current{% endif %}">{{ m.label }}</div>
-        </div>
-      {% endfor %}
-    </div>
-    <div class="trend-note">Holiday work days worked per BS month — each day earns 2 comp-off days</div>
-  </div>
-</div>
+    function loadMovementStats(month, year) {
+      if (!movPurposeTbody) return;
+      movPurposeTbody.style.opacity = "0.4";
+      movClientTbody.style.opacity = "0.4";
+      movEmpTbody.style.opacity = "0.4";
 
-<div class="two-col">
-  <div class="card">
-    <div class="card-header"><span class="card-title">Comp-off by Employee</span></div>
-    <div class="table-responsive">
-      <table>
-        <thead><tr><th>Employee</th><th>Holiday Days Worked</th><th>Comp-off Earned</th><th>Unpaid</th></tr></thead>
-        <tbody>
-          {% for e in comp_off_by_employee %}
-            <tr>
-              <td>{{ e.name }}</td>
-              <td>{{ e.holiday_days }}</td>
-              <td>{{ e.comp_off_days }}</td>
-              <td>
-                {% if e.unpaid_days %}<span class="badge pending">{{ e.unpaid_days }} days</span>
-                {% else %}<span class="badge approved">All settled</span>{% endif %}
-              </td>
-            </tr>
-          {% empty %}
-            <tr><td colspan="4" class="empty-state">No holiday work recorded yet.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
+      fetch("{% url 'movement_stats_api' %}?mov_month=" + month + "&mov_year=" + year)
+        .then(response => response.json())
+        .then(data => {
+          const monthYearStr = data.movement_bs_month_name + " " + data.movement_bs_year;
+          movTitleEl.textContent = "Staff Movement Reports — " + monthYearStr;
+          movMetaEl.textContent = data.total_month_visits + " visit" + (data.total_month_visits === 1 ? "" : "s") + " in " + monthYearStr;
 
-  <div class="card">
-    <div class="card-header"><span class="card-title">Comp-off Payout Records</span></div>
-    <div class="tabs" style="padding:0 1rem;">
-      <a href="?comp_off=unpaid#comp-off" class="tab {% if comp_off_filter == 'unpaid' %}active{% endif %}">Unpaid</a>
-      <a href="?comp_off=paid#comp-off" class="tab {% if comp_off_filter == 'paid' %}active{% endif %}">Paid</a>
-      <a href="?comp_off=all#comp-off" class="tab {% if comp_off_filter == 'all' %}active{% endif %}">All</a>
-    </div>
-    <div class="table-responsive">
-      <table>
-        <thead><tr><th>Employee</th><th>Date</th><th>Days</th><th>Status</th><th>Action</th></tr></thead>
-        <tbody>
-          {% for r in comp_off_records %}
-            <tr>
-              <td>{{ r.employee_name }}</td>
-              <td>{{ r.date_bs }}</td>
-              <td>{{ r.comp_off_days }}</td>
-              <td>
-                {% if r.paid %}<span class="badge approved">Paid</span>
-                {% else %}<span class="badge pending">Unpaid</span>{% endif %}
-              </td>
-              <td>
-                <form method="post" action="{% url 'toggle_comp_off_paid' r.id %}" style="display:inline;">
-                  {% csrf_token %}
-                  <input type="hidden" name="comp_off_filter" value="{{ comp_off_filter }}">
-                  {% if r.paid %}
-                    <button type="submit" class="btn btn-outline btn-sm" style="padding:0.25rem 0.5rem;font-size:0.75rem;border-radius:6px;">Mark Unpaid</button>
-                  {% else %}
-                    <button type="submit" class="btn btn-success btn-sm" style="padding:0.25rem 0.5rem;font-size:0.75rem;border-radius:6px;">Mark Paid</button>
-                  {% endif %}
-                </form>
-              </td>
-            </tr>
-          {% empty %}
-            <tr><td colspan="5" class="empty-state">No records for this filter.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-</div>
+          movPrevBtn.setAttribute("data-month", data.mov_prev_month);
+          movPrevBtn.setAttribute("data-year", data.mov_prev_year);
+
+          movNextBtn.setAttribute("data-month", data.mov_next_month);
+          movNextBtn.setAttribute("data-year", data.mov_next_year);
+
+          // Update trend chart
+          if (movTrendChart && data.movement_monthly_trend) {
+            movTrendChart.innerHTML = "";
+            data.movement_monthly_trend.forEach(m => {
+              const col = document.createElement("div");
+              col.className = "trend-col";
+              col.innerHTML = `
+                <div class="trend-bar ${m.is_current ? 'current' : ''}" style="height:${m.bar_height}%;" title="${m.label}: ${m.visits} visit${m.visits === 1 ? '' : 's'}"></div>
+                <div class="trend-label ${m.is_current ? 'current' : ''}">${m.label}</div>
+              `;
+              movTrendChart.appendChild(col);
+            });
+          }
+
+          // Purpose Tbody
+          movPurposeTbody.innerHTML = "";
+          if (data.purpose_breakdown.length === 0) {
+            movPurposeTbody.innerHTML = `<tr><td colspan="2" class="empty-state">No visit purpose data for ${monthYearStr}.</td></tr>`;
+          } else {
+            data.purpose_breakdown.forEach(p => {
+              const tr = document.createElement("tr");
+              tr.innerHTML = `<td style="font-weight:600;">${p.name}</td><td><span class="badge approved" style="font-size:0.82rem; font-weight:600;">${p.count} visit${p.count === 1 ? '' : 's'}</span></td>`;
+              movPurposeTbody.appendChild(tr);
+            });
+          }
+
+          // Client Tbody
+          movClientTbody.innerHTML = "";
+          if (data.top_clients.length === 0) {
+            movClientTbody.innerHTML = `<tr><td colspan="2" class="empty-state">No client visit records for ${monthYearStr}.</td></tr>`;
+          } else {
+            data.top_clients.forEach(c => {
+              const tr = document.createElement("tr");
+              tr.innerHTML = `<td style="font-weight:600;">${c.client}</td><td><span class="badge pending" style="font-size:0.82rem; font-weight:600;">${c.count} visit${c.count === 1 ? '' : 's'}</span></td>`;
+              movClientTbody.appendChild(tr);
+            });
+          }
+
+          // Emp Tbody
+          movEmpTbody.innerHTML = "";
+          if (data.employee_movement_stats.length === 0) {
+            movEmpTbody.innerHTML = `<tr><td colspan="3" class="empty-state">No staff activity logged in ${monthYearStr}.</td></tr>`;
+          } else {
+            data.employee_movement_stats.forEach(e => {
+              const tr = document.createElement("tr");
+              tr.innerHTML = `<td style="font-weight:600;">${e.name}</td><td>${e.total_visits}</td><td><span class="badge approved" style="font-weight:600;">${e.completed_visits} completed</span></td>`;
+              movEmpTbody.appendChild(tr);
+            });
+          }
+
+          movPurposeTbody.style.opacity = "1";
+          movClientTbody.style.opacity = "1";
+          movEmpTbody.style.opacity = "1";
+        })
+        .catch(err => {
+          console.error("Failed to load movement stats:", err);
+          movPurposeTbody.style.opacity = "1";
+          movClientTbody.style.opacity = "1";
+          movEmpTbody.style.opacity = "1";
+        });
+    }
+
+    if (movPrevBtn && movNextBtn) {
+      movPrevBtn.addEventListener("click", function() {
+        loadMovementStats(this.getAttribute("data-month"), this.getAttribute("data-year"));
+      });
+      movNextBtn.addEventListener("click", function() {
+        loadMovementStats(this.getAttribute("data-month"), this.getAttribute("data-year"));
+      });
+    }
+  });
+  </script>
+
+{% endif %}
 {% endblock %}
