@@ -286,6 +286,46 @@ class StaffMovement(models.Model):
         ).values_list("employee_id", flat=True)
         return set(primary_out) | set(assistant_out)
 
+    def get_stops_list(self):
+        """
+        Returns a list of dictionaries representing each stop/destination.
+        If structured StaffMovementStop records exist, returns those.
+        Otherwise falls back to single client/location fields on the movement.
+        """
+        stops_qs = list(self.stops.all())
+        if stops_qs:
+            return [
+                {
+                    "id": s.id,
+                    "order": s.order,
+                    "client": s.client,
+                    "work_done_for": s.work_done_for,
+                    "purpose_type": s.purpose_type or self.purpose_type,
+                    "purpose_type_display": s.get_purpose_type_display() if s.purpose_type else self.get_purpose_type_display(),
+                    "completion_notes": s.completion_notes,
+                    "problem_description": s.problem_description,
+                    "resolution_status": s.resolution_status,
+                }
+                for s in stops_qs
+            ]
+        return [
+            {
+                "id": None,
+                "order": 1,
+                "client": self.client,
+                "work_done_for": self.work_done_for,
+                "purpose_type": self.purpose_type,
+                "purpose_type_display": self.get_purpose_type_display(),
+                "completion_notes": self.completion_notes,
+                "problem_description": self.problem_description,
+                "resolution_status": self.resolution_status,
+            }
+        ]
+
+    @property
+    def has_multiple_stops(self) -> bool:
+        return self.stops.count() > 1
+
 
 class StaffMovementAssistant(models.Model):
     """Per-assistant return record. out_time is shared with the parent
@@ -302,3 +342,21 @@ class StaffMovementAssistant(models.Model):
 
     def __str__(self):
         return f"{self.employee.username} assisting movement #{self.movement_id}"
+
+
+class StaffMovementStop(models.Model):
+    """Per-destination/stop item within a StaffMovement trip."""
+    movement = models.ForeignKey(StaffMovement, on_delete=models.CASCADE, related_name="stops")
+    order = models.PositiveIntegerField(default=1)
+    client = models.CharField(max_length=200)
+    work_done_for = models.CharField(max_length=200, blank=True, help_text="Contact person or department at client site")
+    purpose_type = models.CharField(max_length=30, choices=StaffMovement.PURPOSE_CHOICES, blank=True)
+    completion_notes = models.TextField(blank=True, help_text="Completion notes for this specific client")
+    problem_description = models.TextField(blank=True)
+    resolution_status = models.CharField(max_length=20, choices=StaffMovement.RESOLUTION_CHOICES, blank=True)
+
+    class Meta:
+        ordering = ["order", "id"]
+
+    def __str__(self):
+        return f"Stop #{self.order}: {self.client} for movement #{self.movement_id}"

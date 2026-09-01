@@ -3,7 +3,7 @@ from django.utils import timezone
 
 from .models import (
     LeaveType, LeaveRequest, LeaveBalance, PublicHoliday,
-    AttendanceRequest, HolidayWorkRequest, StaffMovement, StaffMovementAssistant,
+    AttendanceRequest, HolidayWorkRequest, StaffMovement, StaffMovementAssistant, StaffMovementStop,
 )
 
 
@@ -106,6 +106,13 @@ class HolidayWorkRequestAdmin(BaseDayRequestAdmin):
     pass
 
 
+class StaffMovementStopInline(admin.TabularInline):
+    model = StaffMovementStop
+    extra = 0
+    fields = ("order", "client", "work_done_for", "completion_notes", "resolution_status")
+    ordering = ("order", "id")
+
+
 class StaffMovementAssistantInline(admin.TabularInline):
     """
     Lets a manager see and, if needed, correct each assistant's own
@@ -127,4 +134,12 @@ class StaffMovementAdmin(admin.ModelAdmin):
     date_hierarchy = "date"
     readonly_fields = ("created_at",)
     autocomplete_fields = ("employee", "logged_by")
-    inlines = [StaffMovementAssistantInline]
+    inlines = [StaffMovementStopInline, StaffMovementAssistantInline]
+
+
+@admin.register(StaffMovementStop)
+class StaffMovementStopAdmin(admin.ModelAdmin):
+    list_display = ("movement", "order", "client", "work_done_for", "resolution_status")
+    list_filter = ("client", "resolution_status", "movement__date")
+    search_fields = ("client", "work_done_for", "completion_notes", "movement__employee__username")
+    ordering = ("-movement__date", "order")

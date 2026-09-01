@@ -262,11 +262,22 @@
             {% endif %}
           </td>
           <td>
-            <strong>{{ m.client }}</strong>
-            {% if m.work_done_for %}
-              <div style="color: #0091b3; font-size: 10px; margin-top: 2px;">
-                For: {{ m.work_done_for }}
-              </div>
+            {% if m.matching_stops %}
+              {% for s in m.matching_stops %}
+                <div style="margin-bottom: 4px;">
+                  <strong>{{ s.order }}. {{ s.client }}</strong>
+                  {% if s.work_done_for %}
+                    <div style="color: #0091b3; font-size: 10px;">For: {{ s.work_done_for }}</div>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            {% else %}
+              <strong>{{ m.client }}</strong>
+              {% if m.work_done_for %}
+                <div style="color: #0091b3; font-size: 10px; margin-top: 2px;">
+                  For: {{ m.work_done_for }}
+                </div>
+              {% endif %}
             {% endif %}
           </td>
           <td>
@@ -281,7 +292,15 @@
             {% if m.problem_description %}
               <div style="margin-bottom: 4px;"><strong>Problem:</strong> {{ m.problem_description }}</div>
             {% endif %}
-            {{ m.completion_notes|default:m.purpose|default:"—" }}
+            {% if m.matching_stops %}
+              {% for s in m.matching_stops %}
+                {% if s.completion_notes %}
+                  <div style="margin-bottom:4px;"><strong>{{ s.client }}:</strong> {{ s.completion_notes }}</div>
+                {% endif %}
+              {% endfor %}
+            {% else %}
+              {{ m.completion_notes|default:m.purpose|default:"—" }}
+            {% endif %}
           </td>
           <td>
             {% if m.is_cancelled %}

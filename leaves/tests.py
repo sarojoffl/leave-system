@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
@@ -538,8 +538,9 @@ class StaffMovementTestCase(TestCase):
         # Filter by client "Microsoft"
         response_filter = self.client.get(reverse("staff_movement"), {"client": "Microsoft"})
         self.assertEqual(response_filter.status_code, 200)
-        self.assertContains(response_filter, "Microsoft Office")
-        self.assertNotContains(response_filter, "Google Office")
+        filtered_clients = [m.client for m in response_filter.context["movements"]]
+        self.assertIn("Microsoft Office", filtered_clients)
+        self.assertNotIn("Google Office", filtered_clients)
 
     def test_block_movement_if_already_out(self):
         self.client.login(username="testemployee", password="password123")
@@ -777,3 +778,44 @@ class StaffMovementTestCase(TestCase):
         self.assertContains(response, "Staff Movement Reports")
         self.assertContains(response, "Monthly Staff Movement Trend")
         self.assertContains(response, "Global Tech Office")
+
+    def test_multi_stop_staff_movement(self):
+        from leaves.models import StaffMovementStop
+        self.client.login(username="testemployee", password="password123")
+        post_data = {
+            "date": date.today().strftime("%Y-%m-%d"),
+            "stop_client": ["Plant Pathology", "Gharelu Udhyog"],
+            "stop_work_done_for": ["Subendra", "Ram"],
+            "purpose_type": "amc",
+            "purpose": "Routine maintenance",
+        }
+        response = self.client.post(reverse("staff_movement"), post_data)
+        self.assertEqual(response.status_code, 302)
+
+        movement = StaffMovement.objects.get(employee=self.employee)
+        self.assertEqual(movement.stops.count(), 2)
+        stops = list(movement.stops.all())
+        self.assertEqual(stops[0].client, "Plant Pathology")
+        self.assertEqual(stops[0].work_done_for, "Subendra")
+        self.assertEqual(stops[1].client, "Gharelu Udhyog")
+        self.assertEqual(stops[1].work_done_for, "Ram")
+
+        # Set out_time in the past to test valid return
+        movement.out_time = (datetime.now() - timedelta(minutes=30)).time()
+        movement.save()
+
+        # Test Return edit with itemized notes
+        edit_url = reverse("staff_movement_edit", args=[movement.id])
+        valid_in_time = (datetime.now() - timedelta(minutes=5)).time().strftime("%H:%M")
+        edit_data = {
+            "in_time": valid_in_time,
+            f"stop_completion_notes_{stops[0].id}": "Fixed printer",
+            f"stop_completion_notes_{stops[1].id}": "Replaced switch",
+        }
+        response_edit = self.client.post(edit_url, edit_data)
+        self.assertEqual(response_edit.status_code, 302)
+
+        stops[0].refresh_from_db()
+        stops[1].refresh_from_db()
+        self.assertEqual(stops[0].completion_notes, "Fixed printer")
+        self.assertEqual(stops[1].completion_notes, "Replaced switch")

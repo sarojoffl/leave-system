@@ -93,6 +93,12 @@
 {% endblock %}
 
 {% block content %}
+<datalist id="existing-clients">
+  {% for c in existing_clients %}
+    <option value="{{ c }}"></option>
+  {% endfor %}
+</datalist>
+
 {% if is_manager %}
 
   <!-- ===== Manager View: Filters ===== -->
@@ -124,7 +130,7 @@
 
         <div style="display: flex; flex-direction: column; gap: 4px;">
           <label style="font-size: 0.75rem; color: var(--color-text-muted); font-weight: 600;">Client / Location</label>
-          <input type="text" name="client" value="{{ filter_client }}" placeholder="Search client..." class="staff-search-input" style="max-width:160px;">
+          <input type="text" name="client" list="existing-clients" value="{{ filter_client }}" placeholder="Search client..." class="staff-search-input" style="max-width:160px;">
           <small class="filter-spacer" style="font-size:0.7rem;min-height:1.1em;">&nbsp;</small>
         </div>
 
@@ -202,9 +208,20 @@
                 <span style="display:block;font-size:0.75rem;color:var(--color-primary);">{{ m.date_bs }}</span>
               </td>
               <td style="font-weight: 600;" class="clickable-cell" title="{{ m.client }}" data-full-text="{% if m.work_done_for %}Client: {{ m.client }}&#10;Work Done For: {{ m.work_done_for }}{% else %}{{ m.client }}{% endif %}" data-modal-title="Client & Contact Details">
-                {{ m.client }}
-                {% if m.work_done_for %}
-                  <span style="display:block;font-size:0.75rem;color:var(--color-primary);font-weight:500;">For: {{ m.work_done_for }}</span>
+                {% if m.matching_stops %}
+                  <div style="font-size:0.85rem;">
+                    {% for s in m.matching_stops %}
+                      <div style="margin-bottom:3px;">
+                        <span style="font-weight:600;color:var(--color-text);">{% if m.matching_stops|length > 1 %}{{ forloop.counter }}. {% endif %}{{ s.client }}</span>
+                        {% if s.work_done_for %}<span style="display:block;font-size:0.75rem;color:var(--color-primary);font-weight:500;">For: {{ s.work_done_for }}</span>{% endif %}
+                      </div>
+                    {% endfor %}
+                  </div>
+                {% else %}
+                  {{ m.client }}
+                  {% if m.work_done_for %}
+                    <span style="display:block;font-size:0.75rem;color:var(--color-primary);font-weight:500;">For: {{ m.work_done_for }}</span>
+                  {% endif %}
                 {% endif %}
               </td>
               <td style="font-size:0.85rem;color:var(--color-text-muted);">{{ m.assistants_display }}</td>
@@ -246,7 +263,19 @@
                   <span style="color:var(--color-text-muted);">—</span>
                 {% endif %}
               </td>
-              <td class="clickable-cell" title="{{ m.completion_notes }}" data-full-text="{{ m.completion_notes }}" data-modal-title="Completion Notes">{{ m.completion_notes|default:"—"|truncatechars:50 }}</td>
+              <td class="clickable-cell" title="{{ m.filtered_completion_notes }}" data-full-text="{{ m.filtered_completion_notes }}" data-modal-title="Completion Notes">
+                {% if filter_client and m.matching_stops %}
+                  {% for s in m.matching_stops %}
+                    {% if s.completion_notes %}
+                      <div>{% if m.matching_stops|length > 1 %}<strong>[{{ s.client }}]:</strong> {% endif %}{{ s.completion_notes }}</div>
+                    {% endif %}
+                  {% empty %}
+                    —
+                  {% endfor %}
+                {% else %}
+                  {{ m.completion_notes|default:"—"|truncatechars:50 }}
+                {% endif %}
+              </td>
             </tr>
           {% empty %}
             <tr>
@@ -342,9 +371,17 @@
             </div>
           {% endif %}
 
-          <div class="form-group">
-            <label for="client">Client / Location *</label>
-            <input type="text" id="client" name="client" placeholder="e.g. ABC Tech Office, Client Site">
+          <div class="form-group full" id="destination-section">
+            <label>Client / Location *</label>
+            <div id="destinations-list" style="display:flex;flex-direction:column;gap:8px;">
+              <div class="destination-row" style="display:flex;gap:8px;align-items:center;">
+                <input type="text" name="stop_client" list="existing-clients" placeholder="e.g. ABC Tech Office, Client Site" style="flex:1;" required>
+              </div>
+            </div>
+            <button type="button" class="btn btn-outline btn-sm" id="add-destination-btn" onclick="addDestinationRow()" style="margin-top:8px;font-size:0.8rem;">
+              + Add Another Destination / Client
+            </button>
+            <small style="color:var(--color-text-muted);font-size:0.75rem;display:block;margin-top:4px;">Visiting multiple clients in one trip? Click above to add extra stops.</small>
           </div>
 
           <div class="form-group">
@@ -395,16 +432,42 @@
         {% endif %}
 
         {% if is_edit %}
-          <div class="form-group full">
-            <label for="work_done_for">Work Done For / Contact Person <span style="font-weight:normal;opacity:0.6;">(Optional — e.g. Mr. Sharma, Finance Dept)</span></label>
-            <input type="text" id="work_done_for" name="work_done_for" value="{{ movement.work_done_for }}" placeholder="Person or department at client site who requested/received the work...">
-          </div>
+          {% if movement.has_multiple_stops %}
+            <div class="form-group full" style="margin-bottom:16px;padding:14px 16px;background:var(--input-bg);border:1.5px solid var(--color-border);border-radius:var(--radius-sm);">
+              <div style="font-weight:600;font-size:0.9rem;margin-bottom:12px;color:var(--color-primary);display:flex;align-items:center;gap:6px;">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                Itemized Completion Notes per Destination:
+              </div>
+              {% for s in movement.stops.all %}
+                <div style="margin-bottom:12px;padding:12px;background:var(--color-bg);border-radius:var(--radius-sm);border:1px solid var(--color-border);">
+                  <div style="font-weight:600;font-size:0.88rem;color:var(--color-text);margin-bottom:10px;">
+                    📍 Destination #{{ s.order }}: {{ s.client }}
+                  </div>
+                  <div class="form-grid" style="margin-bottom:8px;">
+                    <div class="form-group full" style="margin-bottom:8px;">
+                      <label style="font-size:0.78rem;">Work Done For / Contact Person(s) <span style="font-weight:normal;opacity:0.6;">(Optional — list multiple if applicable)</span></label>
+                      <input type="text" name="stop_work_done_for_{{ s.id }}" value="{{ s.work_done_for }}" placeholder="e.g. Mr. Sharma (Finance), Ms. Sita (IT Dept)...">
+                    </div>
+                    <div class="form-group full" style="margin-bottom:0;">
+                      <label style="font-size:0.78rem;">Completion Notes for {{ s.client }} *</label>
+                      <textarea name="stop_completion_notes_{{ s.id }}" placeholder="Describe work completed at {{ s.client }}..." style="min-height:65px;font-size:0.85rem;" required>{{ s.completion_notes }}</textarea>
+                    </div>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="form-group full">
+              <label for="work_done_for">Work Done For / Contact Person(s) <span style="font-weight:normal;opacity:0.6;">(Optional — list multiple if applicable)</span></label>
+              <input type="text" id="work_done_for" name="work_done_for" value="{{ movement.work_done_for }}" placeholder="e.g. Mr. Sharma (Finance), Ms. Sita (IT Dept)...">
+            </div>
 
-          <div class="form-group full">
-            <label for="completion_notes">Completion / Return Notes *</label>
-            <textarea id="completion_notes" name="completion_notes" placeholder="Describe work completed, findings, or next steps..." required>{{ movement.completion_notes }}</textarea>
-            <small style="color:var(--color-text-muted);font-size:0.75rem;display:block;">Shared for the whole visit — update it if anything's changed since it was last filled in.</small>
-          </div>
+            <div class="form-group full">
+              <label for="completion_notes">Completion / Return Notes *</label>
+              <textarea id="completion_notes" name="completion_notes" placeholder="Describe work completed (e.g. Finance: Fixed billing issue. IT: Configured router)..." required>{{ movement.completion_notes }}</textarea>
+              <small style="color:var(--color-text-muted);font-size:0.75rem;display:block;">Shared for the whole visit — update it if anything's changed since it was last filled in.</small>
+            </div>
+          {% endif %}
         {% endif %}
 
         {% if is_edit and open_assistant_links %}
@@ -515,7 +578,7 @@
 
           <div style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 0.75rem; color: var(--color-text-muted); font-weight: 600;">Client / Location</label>
-            <input type="text" name="admin_client" value="{{ admin_filter_client }}" placeholder="Search client..." class="staff-search-input">
+            <input type="text" name="admin_client" list="existing-clients" value="{{ admin_filter_client }}" placeholder="Search client..." class="staff-search-input">
             <small class="filter-spacer" style="font-size:0.7rem;min-height:1.1em;">&nbsp;</small>
           </div>
 
@@ -580,9 +643,20 @@
                   <span style="display:block;font-size:0.75rem;color:var(--color-primary);">{{ m.date_bs }}</span>
                 </td>
                 <td style="font-weight: 600;" class="clickable-cell" title="{{ m.client }}" data-full-text="{% if m.work_done_for %}Client: {{ m.client }}&#10;Work Done For: {{ m.work_done_for }}{% else %}{{ m.client }}{% endif %}" data-modal-title="Client & Contact Details">
-                  {{ m.client }}
-                  {% if m.work_done_for %}
-                    <span style="display:block;font-size:0.75rem;color:var(--color-primary);font-weight:500;">For: {{ m.work_done_for }}</span>
+                  {% if m.matching_stops %}
+                    <div style="font-size:0.85rem;">
+                      {% for s in m.matching_stops %}
+                        <div style="margin-bottom:3px;">
+                          <span style="font-weight:600;color:var(--color-text);">{% if m.matching_stops|length > 1 %}{{ forloop.counter }}. {% endif %}{{ s.client }}</span>
+                          {% if s.work_done_for %}<span style="display:block;font-size:0.75rem;color:var(--color-primary);font-weight:500;">For: {{ s.work_done_for }}</span>{% endif %}
+                        </div>
+                      {% endfor %}
+                    </div>
+                  {% else %}
+                    {{ m.client }}
+                    {% if m.work_done_for %}
+                      <span style="display:block;font-size:0.75rem;color:var(--color-primary);font-weight:500;">For: {{ m.work_done_for }}</span>
+                    {% endif %}
                   {% endif %}
                 </td>
                 <td style="font-size:0.85rem;color:var(--color-text-muted);">{{ m.assistants_display }}</td>
@@ -624,7 +698,19 @@
                     <span style="color:var(--color-text-muted);">—</span>
                   {% endif %}
                 </td>
-                <td class="clickable-cell" title="{{ m.completion_notes }}" data-full-text="{{ m.completion_notes }}" data-modal-title="Completion Notes">{{ m.completion_notes|default:"—"|truncatechars:50 }}</td>
+                <td class="clickable-cell" title="{{ m.filtered_completion_notes }}" data-full-text="{{ m.filtered_completion_notes }}" data-modal-title="Completion Notes">
+                  {% if admin_filter_client and m.matching_stops %}
+                    {% for s in m.matching_stops %}
+                      {% if s.completion_notes %}
+                        <div>{% if m.matching_stops|length > 1 %}<strong>[{{ s.client }}]:</strong> {% endif %}{{ s.completion_notes }}</div>
+                      {% endif %}
+                    {% empty %}
+                      —
+                    {% endfor %}
+                  {% else %}
+                    {{ m.completion_notes|default:"—"|truncatechars:50 }}
+                  {% endif %}
+                </td>
                 <td>
                   {% if m.is_cancelled %}
                     <span style="color:var(--color-text-muted);">—</span>
@@ -758,9 +844,20 @@
                   {% endif %}
                 </td>
                 <td style="font-weight: 600;" class="clickable-cell" title="{{ m.client }}" data-full-text="{% if m.work_done_for %}Client: {{ m.client }}&#10;Work Done For: {{ m.work_done_for }}{% else %}{{ m.client }}{% endif %}" data-modal-title="Client & Contact Details">
-                  {{ m.client }}
-                  {% if m.work_done_for %}
-                    <span style="display:block;font-size:0.75rem;color:var(--color-primary);font-weight:500;">For: {{ m.work_done_for }}</span>
+                  {% if m.has_multiple_stops %}
+                    <div style="font-size:0.85rem;">
+                      {% for s in m.stops.all %}
+                        <div style="margin-bottom:3px;">
+                          <span style="font-weight:600;color:var(--color-text);">{{ s.order }}. {{ s.client }}</span>
+                          {% if s.work_done_for %}<span style="display:block;font-size:0.75rem;color:var(--color-primary);font-weight:500;">For: {{ s.work_done_for }}</span>{% endif %}
+                        </div>
+                      {% endfor %}
+                    </div>
+                  {% else %}
+                    {{ m.client }}
+                    {% if m.work_done_for %}
+                      <span style="display:block;font-size:0.75rem;color:var(--color-primary);font-weight:500;">For: {{ m.work_done_for }}</span>
+                    {% endif %}
                   {% endif %}
                 </td>
                 <td style="font-size:0.85rem;color:var(--color-text-muted);">{{ m.assistants_display }}</td>
@@ -1067,5 +1164,27 @@
       if (cb.checked) t.value = '';
     });
   });
+
+  function addDestinationRow() {
+    const container = document.getElementById("destinations-list");
+    if (!container) return;
+    const rowCount = container.querySelectorAll(".destination-row").length + 1;
+    const div = document.createElement("div");
+    div.className = "destination-row";
+    div.style.cssText = "display:flex;gap:8px;align-items:center;";
+    div.innerHTML = `
+      <input type="text" name="stop_client" list="existing-clients" placeholder="Destination #${rowCount} Client / Location" style="flex:1;" required>
+      <button type="button" class="btn btn-sm" onclick="removeDestinationRow(this)" style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;padding:6px 10px;" title="Remove destination">✕</button>
+    `;
+    container.appendChild(div);
+  }
+
+  function removeDestinationRow(btn) {
+    const row = btn.closest(".destination-row");
+    const container = document.getElementById("destinations-list");
+    if (container && container.querySelectorAll(".destination-row").length > 1) {
+      row.remove();
+    }
+  }
 </script>
 {% endblock %}
