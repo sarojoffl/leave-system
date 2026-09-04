@@ -302,6 +302,7 @@ class StaffMovement(models.Model):
                     "work_done_for": s.work_done_for,
                     "purpose_type": s.purpose_type or self.purpose_type,
                     "purpose_type_display": s.get_purpose_type_display() if s.purpose_type else self.get_purpose_type_display(),
+                    "purpose": s.purpose,
                     "completion_notes": s.completion_notes,
                     "problem_description": s.problem_description,
                     "resolution_status": s.resolution_status,
@@ -316,6 +317,7 @@ class StaffMovement(models.Model):
                 "work_done_for": self.work_done_for,
                 "purpose_type": self.purpose_type,
                 "purpose_type_display": self.get_purpose_type_display(),
+                "purpose": self.purpose,
                 "completion_notes": self.completion_notes,
                 "problem_description": self.problem_description,
                 "resolution_status": self.resolution_status,
@@ -349,6 +351,7 @@ class StaffMovementStop(models.Model):
     movement = models.ForeignKey(StaffMovement, on_delete=models.CASCADE, related_name="stops")
     order = models.PositiveIntegerField(default=1)
     client = models.CharField(max_length=200)
+    purpose = models.TextField(blank=True, help_text="Additional notes / specific purpose for this stop")
     work_done_for = models.CharField(max_length=200, blank=True, help_text="Contact person or department at client site")
     purpose_type = models.CharField(max_length=30, choices=StaffMovement.PURPOSE_CHOICES, blank=True)
     completion_notes = models.TextField(blank=True, help_text="Completion notes for this specific client")

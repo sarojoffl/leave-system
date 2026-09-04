@@ -542,6 +542,13 @@ class StaffMovementTestCase(TestCase):
         self.assertIn("Microsoft Office", filtered_clients)
         self.assertNotIn("Google Office", filtered_clients)
 
+        # Filter by comma-separated clients "Google, Microsoft"
+        response_multi = self.client.get(reverse("staff_movement"), {"client": "Google, Microsoft"})
+        self.assertEqual(response_multi.status_code, 200)
+        multi_filtered_clients = [m.client for m in response_multi.context["movements"]]
+        self.assertIn("Google Office", multi_filtered_clients)
+        self.assertIn("Microsoft Office", multi_filtered_clients)
+
     def test_block_movement_if_already_out(self):
         self.client.login(username="testemployee", password="password123")
         today_str = date.today().strftime("%Y-%m-%d")
@@ -785,9 +792,9 @@ class StaffMovementTestCase(TestCase):
         post_data = {
             "date": date.today().strftime("%Y-%m-%d"),
             "stop_client": ["Plant Pathology", "Gharelu Udhyog"],
+            "stop_purpose": ["Repair Laptop", "Deliver Cheque"],
             "stop_work_done_for": ["Subendra", "Ram"],
             "purpose_type": "amc",
-            "purpose": "Routine maintenance",
         }
         response = self.client.post(reverse("staff_movement"), post_data)
         self.assertEqual(response.status_code, 302)
@@ -796,8 +803,10 @@ class StaffMovementTestCase(TestCase):
         self.assertEqual(movement.stops.count(), 2)
         stops = list(movement.stops.all())
         self.assertEqual(stops[0].client, "Plant Pathology")
+        self.assertEqual(stops[0].purpose, "Repair Laptop")
         self.assertEqual(stops[0].work_done_for, "Subendra")
         self.assertEqual(stops[1].client, "Gharelu Udhyog")
+        self.assertEqual(stops[1].purpose, "Deliver Cheque")
         self.assertEqual(stops[1].work_done_for, "Ram")
 
         # Set out_time in the past to test valid return
@@ -809,6 +818,8 @@ class StaffMovementTestCase(TestCase):
         valid_in_time = (datetime.now() - timedelta(minutes=5)).time().strftime("%H:%M")
         edit_data = {
             "in_time": valid_in_time,
+            f"stop_work_done_for_{stops[0].id}": "Subendra",
+            f"stop_work_done_for_{stops[1].id}": "Ram",
             f"stop_completion_notes_{stops[0].id}": "Fixed printer",
             f"stop_completion_notes_{stops[1].id}": "Replaced switch",
         }
@@ -819,3 +830,38 @@ class StaffMovementTestCase(TestCase):
         stops[1].refresh_from_db()
         self.assertEqual(stops[0].completion_notes, "Fixed printer")
         self.assertEqual(stops[1].completion_notes, "Replaced switch")
+
+        # Verify filtering by "Plant Pathology" isolates its purpose note in Manager View
+        self.client.login(username="testmanager", password="password123")
+        session = self.client.session
+        session["view_mode"] = "manager"
+        session.save()
+
+        resp_filter = self.client.get(reverse("staff_movement"), {"client": "Plant Pathology"})
+        self.assertEqual(resp_filter.status_code, 200)
+        filtered_m = resp_filter.context["movements"][0]
+        self.assertEqual(filtered_m.filtered_purpose, "Repair Laptop")
+
+    def test_work_done_for_required_on_return(self):
+        self.client.login(username="testemployee", password="password123")
+        now_dt = datetime.now()
+        out_time_obj = (now_dt - timedelta(minutes=15)).time()
+        in_time_str = (now_dt - timedelta(minutes=5)).strftime("%H:%M")
+
+        movement = StaffMovement.objects.create(
+            employee=self.employee,
+            date=date.today(),
+            client="Test Site",
+            out_time=out_time_obj,
+            purpose_type="goods_pickup",
+        )
+
+        response = self.client.post(reverse("staff_movement_edit", args=[movement.id]), {
+            "date": date.today().strftime("%Y-%m-%d"),
+            "client": "Test Site",
+            "in_time": in_time_str,
+            "purpose_type": "goods_pickup",
+            "completion_notes": "Completed task",
+            "work_done_for": "",  # Blank contact person
+        })
+        self.assertContains(response, "Please enter Work Done For / Contact Person")

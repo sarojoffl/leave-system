@@ -294,12 +294,15 @@
             {% endif %}
             {% if m.matching_stops %}
               {% for s in m.matching_stops %}
+                {% if s.purpose %}
+                  <div style="margin-bottom:2px;"><strong>{{ s.client }} (Note):</strong> {{ s.purpose }}</div>
+                {% endif %}
                 {% if s.completion_notes %}
-                  <div style="margin-bottom:4px;"><strong>{{ s.client }}:</strong> {{ s.completion_notes }}</div>
+                  <div style="margin-bottom:4px;"><strong>{{ s.client }} (Return):</strong> {{ s.completion_notes }}</div>
                 {% endif %}
               {% endfor %}
             {% else %}
-              {{ m.completion_notes|default:m.purpose|default:"—" }}
+              {{ m.completion_notes|default:m.filtered_purpose|default:m.purpose|default:"—" }}
             {% endif %}
           </td>
           <td>

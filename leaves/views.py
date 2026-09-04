@@ -1798,21 +1798,28 @@ def staff_movement(request):
                 filter_employee_id = None
 
         if filter_client:
-            movements = movements.filter(
-                Q(client__icontains=filter_client) | Q(stops__client__icontains=filter_client)
-            ).distinct()
+            client_terms = [c.strip() for c in filter_client.split(",") if c.strip()]
+            if client_terms:
+                client_q = Q()
+                for term in client_terms:
+                    client_q |= Q(client__icontains=term) | Q(stops__client__icontains=term)
+                movements = movements.filter(client_q).distinct()
 
         movements = movements.prefetch_related("stops")
         movements_list = list(movements)
+        client_terms_lower = [c.strip().lower() for c in filter_client.split(",") if c.strip()] if filter_client else []
         for m in movements_list:
             stops = list(m.stops.all())
-            if filter_client and stops:
-                m.matching_stops = [s for s in stops if filter_client.lower() in s.client.lower()]
+            if client_terms_lower and stops:
+                m.matching_stops = [s for s in stops if any(term in s.client.lower() for term in client_terms_lower)]
                 matching_notes = [f"[{s.client}]: {s.completion_notes}" if len(m.matching_stops) > 1 else s.completion_notes for s in m.matching_stops if s.completion_notes]
                 m.filtered_completion_notes = " ".join(matching_notes) if matching_notes else ""
+                matching_purposes = [f"[{s.client}]: {s.purpose}" if len(m.matching_stops) > 1 else s.purpose for s in m.matching_stops if s.purpose]
+                m.filtered_purpose = " ".join(matching_purposes) if matching_purposes else (m.purpose or "")
             else:
                 m.matching_stops = stops
                 m.filtered_completion_notes = m.completion_notes or ""
+                m.filtered_purpose = m.purpose or ""
 
         employees = exclude_staff_movement_ineligible(
             User.objects.exclude(role="ceo")
@@ -1860,6 +1867,7 @@ def staff_movement(request):
             work_done_for_str = request.POST.get("work_done_for", "").strip()
             stop_clients = [c.strip() for c in request.POST.getlist("stop_client") if c.strip()]
             stop_contacts = [w.strip() for w in request.POST.getlist("stop_work_done_for")]
+            stop_purposes = [p.strip() for p in request.POST.getlist("stop_purpose")]
             in_time_str = request.POST.get("in_time")
             purpose_type = request.POST.get("purpose_type", "").strip()
             purpose = request.POST.get("purpose", "").strip()
@@ -1867,11 +1875,16 @@ def staff_movement(request):
             assistant_ids = request.POST.getlist("assistants")
             on_behalf_of_id = request.POST.get("on_behalf_of", "").strip()
 
-            # If multi-stop payload submitted, construct client_str and work_done_for_str
+            # If multi-stop payload submitted, construct client_str, work_done_for_str, and purpose
             if stop_clients:
                 client_str = " , ".join(stop_clients)
                 if any(stop_contacts):
                     work_done_for_str = " , ".join(c for c in stop_contacts if c)
+                if any(stop_purposes) and not purpose:
+                    if len(stop_clients) > 1:
+                        purpose = " , ".join(f"[{c}]: {p}" for c, p in zip(stop_clients, stop_purposes) if p)
+                    elif stop_purposes:
+                        purpose = stop_purposes[0]
 
             out_time = datetime.now().time()
 
@@ -1952,10 +1965,12 @@ def staff_movement(request):
                 if stop_clients:
                     for idx, s_client in enumerate(stop_clients, start=1):
                         s_contact = stop_contacts[idx - 1] if idx - 1 < len(stop_contacts) else ""
+                        s_purpose = stop_purposes[idx - 1] if idx - 1 < len(stop_purposes) else ""
                         StaffMovementStop.objects.create(
                             movement=movement,
                             order=idx,
                             client=s_client,
+                            purpose=s_purpose,
                             work_done_for=s_contact,
                             purpose_type=purpose_type,
                         )
@@ -1964,6 +1979,7 @@ def staff_movement(request):
                         movement=movement,
                         order=1,
                         client=client_str,
+                        purpose=purpose,
                         work_done_for=work_done_for_str,
                         purpose_type=purpose_type,
                     )
@@ -2069,21 +2085,28 @@ def staff_movement(request):
                     admin_filter_employee_id = None
 
             if admin_filter_client:
-                admin_movements = admin_movements.filter(
-                    Q(client__icontains=admin_filter_client) | Q(stops__client__icontains=admin_filter_client)
-                ).distinct()
+                admin_client_terms = [c.strip() for c in admin_filter_client.split(",") if c.strip()]
+                if admin_client_terms:
+                    admin_client_q = Q()
+                    for term in admin_client_terms:
+                        admin_client_q |= Q(client__icontains=term) | Q(stops__client__icontains=term)
+                    admin_movements = admin_movements.filter(admin_client_q).distinct()
 
             admin_movements = admin_movements.prefetch_related("stops")
             admin_movements_list = list(admin_movements)
+            admin_terms_lower = [c.strip().lower() for c in admin_filter_client.split(",") if c.strip()] if admin_filter_client else []
             for m in admin_movements_list:
                 stops = list(m.stops.all())
-                if admin_filter_client and stops:
-                    m.matching_stops = [s for s in stops if admin_filter_client.lower() in s.client.lower()]
+                if admin_terms_lower and stops:
+                    m.matching_stops = [s for s in stops if any(term in s.client.lower() for term in admin_terms_lower)]
                     matching_notes = [f"[{s.client}]: {s.completion_notes}" if len(m.matching_stops) > 1 else s.completion_notes for s in m.matching_stops if s.completion_notes]
                     m.filtered_completion_notes = " ".join(matching_notes) if matching_notes else ""
+                    matching_purposes = [f"[{s.client}]: {s.purpose}" if len(m.matching_stops) > 1 else s.purpose for s in m.matching_stops if s.purpose]
+                    m.filtered_purpose = " ".join(matching_purposes) if matching_purposes else (m.purpose or "")
                 else:
                     m.matching_stops = stops
                     m.filtered_completion_notes = m.completion_notes or ""
+                    m.filtered_purpose = m.purpose or ""
 
             admin_employees = exclude_staff_movement_ineligible(
                 User.objects.exclude(role="ceo")
@@ -2168,11 +2191,128 @@ def staff_movement_edit(request, id):
         open_assistant_links = []
 
     if request.method == "POST":
-        in_time_str = request.POST.get("in_time")
+        action_type = request.POST.get("action_type", "").strip()
+        manage_stops = request.POST.get("manage_stops") == "1"
+        in_time_str = request.POST.get("in_time", "").strip()
         resolution_status = request.POST.get("resolution_status", "").strip()
         work_done_for = request.POST.get("work_done_for", "").strip()
         completion_notes = request.POST.get("completion_notes", "").strip()
         separate_returns = request.POST.get("separate_returns") == "1"
+
+        # --- Proxy Logger: Save Destinations Only (Staff Still OUT) ---
+        if action_type == "update_stops_only" or (manage_stops and is_staff_movement_admin and not movement.in_time and not in_time_str):
+            from leaves.models import StaffMovementStop
+            edit_clients = request.POST.getlist("edit_stop_client")
+            edit_purposes = request.POST.getlist("edit_stop_purpose")
+            edit_ids = request.POST.getlist("edit_stop_id")
+            errors = []
+
+            # Validate at least one non-empty client
+            cleaned = []
+            for idx, (cid, cname) in enumerate(zip(edit_ids, edit_clients)):
+                if cname.strip():
+                    cpur = edit_purposes[idx].strip() if idx < len(edit_purposes) else ""
+                    cleaned.append((cid.strip(), cname.strip(), cpur))
+
+            if not cleaned:
+                errors.append("Please enter at least one destination.")
+
+            if not errors:
+                existing_stop_ids = set(str(s.id) for s in movement.stops.all())
+                kept_ids = set()
+
+                for order, (stop_id, client_name, stop_purpose) in enumerate(cleaned, start=1):
+                    if stop_id and stop_id in existing_stop_ids:
+                        # Rename existing stop
+                        stop = StaffMovementStop.objects.get(id=int(stop_id), movement=movement)
+                        stop.client = client_name
+                        stop.purpose = stop_purpose
+                        stop.order = order
+                        stop.save()
+                        kept_ids.add(stop_id)
+                    else:
+                        # Add new stop
+                        StaffMovementStop.objects.create(
+                            movement=movement,
+                            client=client_name,
+                            purpose=stop_purpose,
+                            order=order,
+                        )
+
+                # Remove stops that were deleted by the admin
+                for old_id in existing_stop_ids - kept_ids:
+                    StaffMovementStop.objects.filter(id=int(old_id), movement=movement).delete()
+
+                # Update parent client field (comma-joined summary) and purpose
+                all_stops = list(movement.stops.order_by("order", "id"))
+                if all_stops:
+                    movement.client = ", ".join(s.client for s in all_stops)
+                    if len(all_stops) > 1:
+                        movement.purpose = " , ".join(f"[{s.client}]: {s.purpose}" for s in all_stops if s.purpose)
+                    elif all_stops:
+                        movement.purpose = all_stops[0].purpose
+                    movement.save(update_fields=["client", "purpose"])
+
+                messages.success(request, "Destinations updated successfully. Staff member remains active (OUT).")
+                return redirect("staff_movement")
+
+            for err in errors:
+                messages.error(request, err)
+            return render(request, "leaves/staff_movement.html", {
+                "movement": movement,
+                "is_edit": True,
+                "is_manager": False,
+                "is_primary": is_primary,
+                "is_staff_movement_admin": is_staff_movement_admin,
+                "my_assistant_link": my_assistant_link,
+                "other_employees": other_employees,
+                "open_assistant_links": open_assistant_links,
+                "selected_assistant_ids": list(movement.assistants.values_list("id", flat=True)),
+                "purpose_choices": StaffMovement.PURPOSE_CHOICES,
+                "resolution_choices": StaffMovement.RESOLUTION_CHOICES,
+                "existing_clients": _get_client_suggestions(),
+            })
+
+        # --- Record Return Flow (Marks return and saves all details) ---
+        # Sync any edited stops first if submitted together with return:
+        if manage_stops and is_staff_movement_admin and not movement.in_time:
+            from leaves.models import StaffMovementStop
+            edit_clients = request.POST.getlist("edit_stop_client")
+            edit_purposes = request.POST.getlist("edit_stop_purpose")
+            edit_ids = request.POST.getlist("edit_stop_id")
+            cleaned = []
+            for idx, (cid, cname) in enumerate(zip(edit_ids, edit_clients)):
+                if cname.strip():
+                    cpur = edit_purposes[idx].strip() if idx < len(edit_purposes) else ""
+                    cleaned.append((cid.strip(), cname.strip(), cpur))
+            if cleaned:
+                existing_stop_ids = set(str(s.id) for s in movement.stops.all())
+                kept_ids = set()
+                for order, (stop_id, client_name, stop_purpose) in enumerate(cleaned, start=1):
+                    if stop_id and stop_id in existing_stop_ids:
+                        stop = StaffMovementStop.objects.get(id=int(stop_id), movement=movement)
+                        stop.client = client_name
+                        stop.purpose = stop_purpose
+                        stop.order = order
+                        stop.save()
+                        kept_ids.add(stop_id)
+                    else:
+                        StaffMovementStop.objects.create(
+                            movement=movement,
+                            client=client_name,
+                            purpose=stop_purpose,
+                            order=order,
+                        )
+                for old_id in existing_stop_ids - kept_ids:
+                    StaffMovementStop.objects.filter(id=int(old_id), movement=movement).delete()
+                all_stops = list(movement.stops.order_by("order", "id"))
+                if all_stops:
+                    movement.client = ", ".join(s.client for s in all_stops)
+                    if len(all_stops) > 1:
+                        movement.purpose = " , ".join(f"[{s.client}]: {s.purpose}" for s in all_stops if s.purpose)
+                    elif all_stops:
+                        movement.purpose = all_stops[0].purpose
+                    movement.save(update_fields=["client", "purpose"])
 
         errors = []
         in_time = None
@@ -2210,6 +2350,15 @@ def staff_movement_edit(request, id):
 
         if not completion_notes and not stop_notes_parts:
             errors.append("Please enter completion / return notes.")
+
+        if stops_list:
+            for s in stops_list:
+                swdf = request.POST.get(f"stop_work_done_for_{s.id}", "").strip() or work_done_for
+                if not swdf:
+                    errors.append(f"Please enter Work Done For / Contact Person for {s.client}.")
+        else:
+            if not work_done_for:
+                errors.append("Please enter Work Done For / Contact Person.")
 
         if movement.purpose_type == "problem_solving":
             if resolution_status not in dict(StaffMovement.RESOLUTION_CHOICES):
@@ -2269,7 +2418,7 @@ def staff_movement_edit(request, id):
                     for s in stops_list:
                         snote = request.POST.get(f"stop_completion_notes_{s.id}", "").strip()
                         sres = request.POST.get(f"stop_resolution_status_{s.id}", "").strip()
-                        swdf = request.POST.get(f"stop_work_done_for_{s.id}", "").strip()
+                        swdf = request.POST.get(f"stop_work_done_for_{s.id}", "").strip() or work_done_for
                         if snote:
                             s.completion_notes = snote
                         if sres:
@@ -2443,22 +2592,28 @@ def staff_movement_export_pdf(request):
             filter_employee_id = None
 
     if filter_client:
-        # Match on parent movement client OR on individual stops
-        movements = movements.filter(
-            Q(client__icontains=filter_client) | Q(stops__client__icontains=filter_client)
-        ).distinct()
+        pdf_client_terms = [c.strip() for c in filter_client.split(",") if c.strip()]
+        if pdf_client_terms:
+            pdf_client_q = Q()
+            for term in pdf_client_terms:
+                pdf_client_q |= Q(client__icontains=term) | Q(stops__client__icontains=term)
+            movements = movements.filter(pdf_client_q).distinct()
 
     # Prefetch stops for multi-stop display in template
     movements = movements.prefetch_related("stops")
 
     # Attach matching_stops to each movement for filtered PDF display
     movements_list = list(movements)
+    pdf_terms_lower = [c.strip().lower() for c in filter_client.split(",") if c.strip()] if filter_client else []
     for m in movements_list:
         stops = list(m.stops.all())
-        if filter_client and stops:
-            m.matching_stops = [s for s in stops if filter_client.lower() in s.client.lower()]
+        if pdf_terms_lower and stops:
+            m.matching_stops = [s for s in stops if any(term in s.client.lower() for term in pdf_terms_lower)]
+            matching_purposes = [f"[{s.client}]: {s.purpose}" if len(m.matching_stops) > 1 else s.purpose for s in m.matching_stops if s.purpose]
+            m.filtered_purpose = " ".join(matching_purposes) if matching_purposes else (m.purpose or "")
         else:
             m.matching_stops = stops  # all stops (or empty for single-client legacy)
+            m.filtered_purpose = m.purpose or ""
 
     selected_employee = None
     if filter_employee_id:

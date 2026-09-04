@@ -109,7 +109,7 @@ class HolidayWorkRequestAdmin(BaseDayRequestAdmin):
 class StaffMovementStopInline(admin.TabularInline):
     model = StaffMovementStop
     extra = 0
-    fields = ("order", "client", "work_done_for", "completion_notes", "resolution_status")
+    fields = ("order", "client", "purpose", "work_done_for", "completion_notes", "resolution_status")
     ordering = ("order", "id")
 
 
@@ -139,7 +139,7 @@ class StaffMovementAdmin(admin.ModelAdmin):
 
 @admin.register(StaffMovementStop)
 class StaffMovementStopAdmin(admin.ModelAdmin):
-    list_display = ("movement", "order", "client", "work_done_for", "resolution_status")
+    list_display = ("movement", "order", "client", "purpose", "work_done_for", "resolution_status")
     list_filter = ("client", "resolution_status", "movement__date")
-    search_fields = ("client", "work_done_for", "completion_notes", "movement__employee__username")
+    search_fields = ("client", "purpose", "work_done_for", "completion_notes", "movement__employee__username")
     ordering = ("-movement__date", "order")

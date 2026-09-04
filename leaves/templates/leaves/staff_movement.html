@@ -53,6 +53,142 @@
     color: var(--color-text-muted);
     cursor: pointer;
   }
+  /* --- Log Movement Form: Section Panels --- */
+  .form-section {
+    background: var(--input-bg);
+    border: 1.5px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 18px 20px;
+    margin-bottom: 4px;
+  }
+  .form-section-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-primary);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .form-section-label svg {
+    flex-shrink: 0;
+    opacity: 0.8;
+  }
+
+  /* Destination row cards */
+  .dest-row {
+    display: flex;
+    gap: 10px;
+    align-items: stretch;
+    flex-wrap: wrap;
+    padding: 12px 14px;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    transition: border-color 0.2s ease;
+  }
+  .dest-row:hover,
+  .dest-row:focus-within {
+    border-color: var(--color-primary);
+  }
+  .dest-row .dest-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .dest-row .dest-field label {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-text-light);
+    font-weight: 600;
+  }
+  .dest-row .dest-field input {
+    padding: 9px 12px;
+    font-size: 0.84rem;
+    border: 1px solid var(--color-border-light);
+    background: var(--input-bg);
+  }
+  .dest-row .dest-field input:focus {
+    border-color: var(--color-primary);
+    background: var(--input-bg-focus);
+  }
+
+  /* Destination number badge */
+  .dest-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--color-accent), var(--color-primary));
+    color: #fff;
+    font-size: 0.68rem;
+    font-weight: 800;
+    flex-shrink: 0;
+    align-self: center;
+  }
+
+  /* Remove destination button */
+  .dest-remove-btn {
+    background: var(--color-rejected-bg);
+    color: var(--color-rejected-text);
+    border: 1px solid var(--color-rejected-border);
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 700;
+    transition: var(--transition);
+    align-self: center;
+  }
+  .dest-remove-btn:hover {
+    background: var(--color-danger);
+    color: #fff;
+    border-color: var(--color-danger);
+  }
+
+  /* Assist grid */
+  .assist-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    max-height: 220px;
+    overflow-y: auto;
+    padding: 10px;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    background: var(--color-bg);
+  }
+  .assist-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border: 1.5px solid var(--color-border);
+    border-radius: 8px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: var(--transition);
+    background: transparent;
+    user-select: none;
+  }
+  .assist-chip:hover {
+    border-color: var(--color-primary);
+    background: rgba(0, 145, 179, 0.04);
+  }
+  .assist-chip input:checked + span {
+    color: var(--color-primary);
+    font-weight: 700;
+  }
+  .assist-chip:has(input:checked) {
+    border-color: var(--color-primary);
+    background: rgba(0, 145, 179, 0.06);
+    box-shadow: 0 0 0 1px var(--color-focus-glow);
+  }
 </style>
 
 {% if is_manager or is_staff_movement_admin %}
@@ -250,7 +386,7 @@
                 {% endif %}
               </td>
               <td>{{ m.get_purpose_type_display|default:"—" }}</td>
-              <td class="clickable-cell" title="{{ m.purpose }}" data-full-text="{{ m.purpose }}" data-modal-title="Additional Notes">{{ m.purpose|default:"—"|truncatechars:50 }}</td>
+              <td class="clickable-cell" title="{{ m.filtered_purpose|default:m.purpose }}" data-full-text="{{ m.filtered_purpose|default:m.purpose }}" data-modal-title="Additional Notes">{{ m.filtered_purpose|default:m.purpose|default:"—"|truncatechars:50 }}</td>
               <td>
                 {% if m.purpose_type == "problem_solving" %}
                   <div class="clickable-cell" title="{{ m.problem_description }}" data-full-text="{{ m.problem_description }}" data-modal-title="Problem Description">{{ m.problem_description|default:"—"|truncatechars:50 }}</div>
@@ -351,67 +487,156 @@
 
       <div class="form-grid">
         {% if not is_edit %}
-          <div class="form-group">
-            <label for="date">Date *</label>
-            <input type="date" id="date" value="{{ today|date:'Y-m-d' }}" disabled class="out-time-field">
-            <input type="hidden" name="date" value="{{ today|date:'Y-m-d' }}">
-            <small id="date-bs" style="color:var(--color-primary);font-size:0.75rem;min-height:1.2em;display:block;"></small>
+          {# --- Section 1: Trip Info (Date + On Behalf) --- #}
+          <div class="form-group full">
+            <div class="form-section">
+              <div class="form-section-label">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                Trip Details
+              </div>
+              <div class="form-grid" style="gap:16px;">
+                <div class="form-group">
+                  <label for="date">Date *</label>
+                  <input type="date" id="date" value="{{ today|date:'Y-m-d' }}" disabled class="out-time-field">
+                  <input type="hidden" name="date" value="{{ today|date:'Y-m-d' }}">
+                  <small id="date-bs" style="color:var(--color-primary);font-size:0.75rem;min-height:1.2em;display:block;"></small>
+                </div>
+                <div class="form-group">
+                  <label for="out_time">Departure Time (Out) *</label>
+                  <input type="time" id="out_time" name="out_time" readonly class="out-time-field">
+                  <small style="color:var(--color-text-muted);font-size:0.75rem;display:block;">Auto-set to the current time when you submit.</small>
+                </div>
+              </div>
+              {% if can_log_on_behalf %}
+              <div class="form-group" style="margin-top:14px;">
+                <label for="on_behalf_of">Log On Behalf Of</label>
+                <select id="on_behalf_of" name="on_behalf_of">
+                  <option value="">— Myself —</option>
+                  {% for emp in proxy_employees %}
+                    <option value="{{ emp.id }}">{{ emp.get_full_name|default:emp.username }}</option>
+                  {% endfor %}
+                </select>
+                <small style="color:var(--color-text-muted);font-size:0.75rem;display:block;">Leave as "Myself" to log your own visit.</small>
+              </div>
+              {% endif %}
+            </div>
           </div>
 
-          {% if can_log_on_behalf %}
-            <div class="form-group">
-              <label for="on_behalf_of">Log On Behalf Of</label>
-              <select id="on_behalf_of" name="on_behalf_of">
-                <option value="">— Myself —</option>
-                {% for emp in proxy_employees %}
-                  <option value="{{ emp.id }}">{{ emp.get_full_name|default:emp.username }}</option>
-                {% endfor %}
-              </select>
-              <small style="color:var(--color-text-muted);font-size:0.75rem;display:block;">Leave as "Myself" to log your own visit.</small>
-            </div>
-          {% endif %}
-
+          {# --- Section 2: Destinations --- #}
           <div class="form-group full" id="destination-section">
-            <label>Client / Location *</label>
-            <div id="destinations-list" style="display:flex;flex-direction:column;gap:8px;">
-              <div class="destination-row" style="display:flex;gap:8px;align-items:center;">
-                <input type="text" name="stop_client" list="existing-clients" placeholder="e.g. ABC Tech Office, Client Site" style="flex:1;" required>
+            <div class="form-section">
+              <div class="form-section-label">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                Destination(s)
+              </div>
+              <div id="destinations-list" style="display:flex;flex-direction:column;gap:10px;">
+                <div class="destination-row dest-row">
+                  <span class="dest-badge">1</span>
+                  <div class="dest-field" style="flex:1.2;min-width:180px;">
+                    <label>Client / Location *</label>
+                    <input type="text" name="stop_client" list="existing-clients" placeholder="e.g. Nepal Telecom, PM Office" required>
+                  </div>
+                  <div class="dest-field" style="flex:1.5;min-width:200px;">
+                    <label>Notes / Remarks</label>
+                    <input type="text" name="stop_purpose" placeholder="e.g. Laptop repair, Cheque pickup">
+                  </div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-top:12px;padding-top:12px;border-top:1px dashed var(--color-border);">
+                <button type="button" class="btn btn-outline btn-sm" id="add-destination-btn" onclick="addDestinationRow()" style="font-size:0.78rem;">
+                  <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+                  Add Another Destination
+                </button>
+                <small style="color:var(--color-text-muted);font-size:0.72rem;">Multiple clients? Add separate stops.</small>
               </div>
             </div>
-            <button type="button" class="btn btn-outline btn-sm" id="add-destination-btn" onclick="addDestinationRow()" style="margin-top:8px;font-size:0.8rem;">
-              + Add Another Destination / Client
-            </button>
-            <small style="color:var(--color-text-muted);font-size:0.75rem;display:block;margin-top:4px;">Visiting multiple clients in one trip? Click above to add extra stops.</small>
+          </div>
+        {% endif %}
+
+        {% if is_edit and is_staff_movement_admin and not movement.in_time %}
+          {# --- Proxy Logger: Manage Destinations on Active Record --- #}
+          <div class="form-group full" id="edit-destination-section">
+            <div class="form-section">
+              <div class="form-section-label">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+                Manage Destinations &amp; Notes (Staff Still OUT)
+              </div>
+              <div id="edit-destinations-list" style="display:flex;flex-direction:column;gap:10px;">
+                {% for s in movement.stops.all %}
+                  <div class="edit-destination-row dest-row">
+                    <span class="dest-badge">{{ forloop.counter }}</span>
+                    <div class="dest-field" style="flex:1.2;min-width:180px;">
+                      <label>Client / Location *</label>
+                      <input type="text" name="edit_stop_client" list="existing-clients" value="{{ s.client }}" placeholder="Client / Location *" required>
+                    </div>
+                    <div class="dest-field" style="flex:1.5;min-width:200px;">
+                      <label>Notes / Remarks</label>
+                      <input type="text" name="edit_stop_purpose" value="{{ s.purpose }}" placeholder="Additional Notes / Remarks (Optional)">
+                    </div>
+                    <input type="hidden" name="edit_stop_id" value="{{ s.id }}">
+                    <button type="button" class="dest-remove-btn" onclick="removeEditDestinationRow(this)" title="Remove destination">✕</button>
+                  </div>
+                {% empty %}
+                  <div class="edit-destination-row dest-row">
+                    <span class="dest-badge">1</span>
+                    <div class="dest-field" style="flex:1.2;min-width:180px;">
+                      <label>Client / Location *</label>
+                      <input type="text" name="edit_stop_client" list="existing-clients" value="{{ movement.client }}" placeholder="Client / Location *" required>
+                    </div>
+                    <div class="dest-field" style="flex:1.5;min-width:200px;">
+                      <label>Notes / Remarks</label>
+                      <input type="text" name="edit_stop_purpose" value="{{ movement.purpose }}" placeholder="Additional Notes / Remarks (Optional)">
+                    </div>
+                    <input type="hidden" name="edit_stop_id" value="">
+                  </div>
+                {% endfor %}
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-top:12px;padding-top:12px;border-top:1px dashed var(--color-border);">
+                <button type="button" class="btn btn-outline btn-sm" onclick="addEditDestinationRow()" style="font-size:0.78rem;">
+                  <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+                  Add Another Destination
+                </button>
+                <button type="submit" name="action_type" value="update_stops_only" class="btn btn-outline btn-sm" style="font-weight:600;">
+                  Save Destinations Only (Staff Still Out)
+                </button>
+              </div>
+              <small style="color:var(--color-text-muted);font-size:0.72rem;display:block;margin-top:6px;">Clicking "Save Destinations Only" will update destinations without closing the visit or setting return time.</small>
+            </div>
           </div>
 
-          <div class="form-group">
-            <label for="out_time">Departure Time (Out) *</label>
-            <input type="time" id="out_time" name="out_time" readonly class="out-time-field">
-            <small style="color:var(--color-text-muted);font-size:0.75rem;display:block;">Auto-set to the current time when you submit.</small>
-          </div>
+          <input type="hidden" name="manage_stops" value="1">
         {% endif %}
 
         {% if is_edit %}
           <div class="form-group">
-            <label for="in_time">{% if is_staff_movement_admin %}Return Time (In) *{% else %}Your Return Time (In) *{% endif %}</label>
-            <input type="time" id="in_time" name="in_time" value="{{ movement.in_time|time:'H:i' }}" required>
+            <label for="in_time">{% if is_staff_movement_admin and not movement.in_time %}Return Time (In) <span style="font-weight:normal;opacity:0.6;">(fill only when staff has returned)</span>{% elif is_staff_movement_admin %}Return Time (In) *{% else %}Your Return Time (In) *{% endif %}</label>
+            <input type="time" id="in_time" name="in_time" value="{{ movement.in_time|time:'H:i' }}" {% if not is_staff_movement_admin or movement.in_time %}required{% endif %}>
           </div>
         {% endif %}
 
         {% if not is_edit %}
+          {# --- Section 3: Purpose --- #}
           <div class="form-group full">
-            <label for="purpose_type">Purpose *</label>
-            <select id="purpose_type" name="purpose_type" required>
-            <option value="">— Select purpose —</option>
-            {% for value, label in purpose_choices %}
-              <option value="{{ value }}">{{ label }}</option>
-            {% endfor %}
-            </select>
-          </div>
+            <div class="form-section">
+              <div class="form-section-label">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.5L17 7.5V19a2 2 0 0 1-2 2z"/></svg>
+                Purpose &amp; Objective
+              </div>
+              <div class="form-group">
+                <label for="purpose_type">Purpose Type *</label>
+                <select id="purpose_type" name="purpose_type" required>
+                  <option value="">— Select purpose —</option>
+                  {% for value, label in purpose_choices %}
+                    <option value="{{ value }}">{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
 
-          <div class="form-group full" id="problem-description-group" hidden>
-            <label for="problem_description">Problem Description *</label>
-            <textarea id="problem_description" name="problem_description" placeholder="Describe the problem that needs to be solved..."></textarea>
+              <div class="form-group" id="problem-description-group" hidden style="margin-top:12px;">
+                <label for="problem_description">Problem Description *</label>
+                <textarea id="problem_description" name="problem_description" placeholder="Describe the problem that needs to be solved..." style="min-height:75px;"></textarea>
+              </div>
+            </div>
           </div>
         {% endif %}
 
@@ -436,7 +661,7 @@
             <div class="form-group full" style="margin-bottom:16px;padding:14px 16px;background:var(--input-bg);border:1.5px solid var(--color-border);border-radius:var(--radius-sm);">
               <div style="font-weight:600;font-size:0.9rem;margin-bottom:12px;color:var(--color-primary);display:flex;align-items:center;gap:6px;">
                 <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-                Itemized Completion Notes per Destination:
+                Return Details per Destination:
               </div>
               {% for s in movement.stops.all %}
                 <div style="margin-bottom:12px;padding:12px;background:var(--color-bg);border-radius:var(--radius-sm);border:1px solid var(--color-border);">
@@ -445,12 +670,12 @@
                   </div>
                   <div class="form-grid" style="margin-bottom:8px;">
                     <div class="form-group full" style="margin-bottom:8px;">
-                      <label style="font-size:0.78rem;">Work Done For / Contact Person(s) <span style="font-weight:normal;opacity:0.6;">(Optional — list multiple if applicable)</span></label>
-                      <input type="text" name="stop_work_done_for_{{ s.id }}" value="{{ s.work_done_for }}" placeholder="e.g. Mr. Sharma (Finance), Ms. Sita (IT Dept)...">
+                      <label style="font-size:0.78rem;">Work Done For / Contact Person(s) for {{ s.client }} *</label>
+                      <input type="text" name="stop_work_done_for_{{ s.id }}" value="{{ s.work_done_for }}" placeholder="e.g. Mr. Sharma (Finance), Ms. Sita (IT Dept)..." {% if not is_staff_movement_admin or movement.in_time %}required{% endif %}>
                     </div>
                     <div class="form-group full" style="margin-bottom:0;">
                       <label style="font-size:0.78rem;">Completion Notes for {{ s.client }} *</label>
-                      <textarea name="stop_completion_notes_{{ s.id }}" placeholder="Describe work completed at {{ s.client }}..." style="min-height:65px;font-size:0.85rem;" required>{{ s.completion_notes }}</textarea>
+                      <textarea name="stop_completion_notes_{{ s.id }}" placeholder="Describe work completed at {{ s.client }}..." style="min-height:65px;font-size:0.85rem;" {% if not is_staff_movement_admin or movement.in_time %}required{% endif %}>{{ s.completion_notes }}</textarea>
                     </div>
                   </div>
                 </div>
@@ -458,13 +683,13 @@
             </div>
           {% else %}
             <div class="form-group full">
-              <label for="work_done_for">Work Done For / Contact Person(s) <span style="font-weight:normal;opacity:0.6;">(Optional — list multiple if applicable)</span></label>
-              <input type="text" id="work_done_for" name="work_done_for" value="{{ movement.work_done_for }}" placeholder="e.g. Mr. Sharma (Finance), Ms. Sita (IT Dept)...">
+              <label for="work_done_for">Work Done For / Contact Person(s) *</label>
+              <input type="text" id="work_done_for" name="work_done_for" value="{{ movement.work_done_for }}" placeholder="e.g. Mr. Sharma (Finance), Ms. Sita (IT Dept)..." {% if not is_staff_movement_admin or movement.in_time %}required{% endif %}>
             </div>
 
             <div class="form-group full">
               <label for="completion_notes">Completion / Return Notes *</label>
-              <textarea id="completion_notes" name="completion_notes" placeholder="Describe work completed (e.g. Finance: Fixed billing issue. IT: Configured router)..." required>{{ movement.completion_notes }}</textarea>
+              <textarea id="completion_notes" name="completion_notes" placeholder="Describe work completed (e.g. Finance: Fixed billing issue. IT: Configured router)..." {% if not is_staff_movement_admin or movement.in_time %}required{% endif %}>{{ movement.completion_notes }}</textarea>
               <small style="color:var(--color-text-muted);font-size:0.75rem;display:block;">Shared for the whole visit — update it if anything's changed since it was last filled in.</small>
             </div>
           {% endif %}
@@ -516,35 +741,36 @@
         {% endif %}
 
         {% if not is_edit %}
+          {# --- Section 4: Assist(s) --- #}
           <div class="form-group full">
-            <label for="purpose">Additional Notes <span style="font-weight:normal;opacity:0.6;">(Optional)</span></label>
-            <textarea id="purpose" name="purpose" placeholder="Add any extra details..."></textarea>
-          </div>
+            <div class="form-section">
+              <div class="form-section-label" style="justify-content:space-between;">
+                <span style="display:flex;align-items:center;gap:7px;">
+                  <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                  Colleague(s) Accompanying <span style="font-weight:normal;color:var(--color-text-light);font-size:0.68rem;text-transform:none;">(Optional)</span>
+                </span>
+                <span id="assistant-count" style="color:var(--color-primary);font-size:0.72rem;font-weight:600;"></span>
+              </div>
 
-          <div class="form-group full">
-            <label>Assist(s) <span style="font-weight:normal;opacity:0.6;">(optional — others who went together)</span></label>
+              <input type="text" id="assistant-search" placeholder="Search colleagues by name..."
+                style="width:100%;max-width:300px;margin-bottom:10px;padding:7px 12px;background:var(--color-bg);border:1px solid var(--color-border);border-radius:6px;font-size:0.82rem;color:var(--color-text);font-family:inherit;">
 
-            <input type="text" id="assistant-search" placeholder="Search employees..."
-            style="width:100%;max-width:320px;margin-top:6px;padding:8px 12px;background:var(--input-bg);border:1.5px solid var(--color-border);border-radius:var(--radius-sm);font-size:0.85rem;color:var(--color-text);font-family:inherit;">
-
-          <div id="assistant-list" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;max-height:200px;overflow-y:auto;padding:8px;border:1px solid var(--color-border);border-radius:var(--radius-sm);">
-            {% for emp in other_employees %}
-              <label class="assistant-option" data-name="{{ emp.get_full_name|default:emp.username|lower }}"
-                style="display:flex;align-items:center;gap:6px;padding:6px 12px;border:1.5px solid var(--color-border);border-radius:var(--radius-sm);font-size:0.85rem;cursor:pointer;">
-                <input type="checkbox" name="assistants" value="{{ emp.id }}">
-                {{ emp.get_full_name|default:emp.username }}
-              </label>
-            {% endfor %}
-          </div>
-
-          <small id="assistant-count" style="display:block;margin-top:4px;color:var(--color-text-muted);font-size:0.75rem;"></small>
+              <div id="assistant-list" class="assist-grid">
+                {% for emp in other_employees %}
+                  <label class="assistant-option assist-chip" data-name="{{ emp.get_full_name|default:emp.username|lower }}">
+                    <input type="checkbox" name="assistants" value="{{ emp.id }}">
+                    <span>{{ emp.get_full_name|default:emp.username }}</span>
+                  </label>
+                {% endfor %}
+              </div>
+            </div>
           </div>
         {% endif %}
       </div>
 
       <div class="form-actions">
-        <button type="submit" class="btn btn-primary">
-          {% if is_edit %}Save Changes{% else %}Log Movement{% endif %}
+        <button type="submit" name="action_type" value="record_return" class="btn btn-primary">
+          {% if is_edit and is_staff_movement_admin and not movement.in_time %}Record Return & Mark Completed{% elif is_edit %}Save Changes{% else %}Log Movement{% endif %}
         </button>
         {% if not is_edit %}
           <button type="reset" class="btn btn-outline" onclick="document.getElementById('date-bs').textContent='';">Clear Form</button>
@@ -685,7 +911,7 @@
                   {% endif %}
                 </td>
                 <td>{{ m.get_purpose_type_display|default:"—" }}</td>
-                <td class="clickable-cell" title="{{ m.purpose }}" data-full-text="{{ m.purpose }}" data-modal-title="Additional Notes">{{ m.purpose|default:"—"|truncatechars:50 }}</td>
+                <td class="clickable-cell" title="{{ m.filtered_purpose|default:m.purpose }}" data-full-text="{{ m.filtered_purpose|default:m.purpose }}" data-modal-title="Additional Notes">{{ m.filtered_purpose|default:m.purpose|default:"—"|truncatechars:50 }}</td>
                 <td>
                   {% if m.purpose_type == "problem_solving" %}
                     <div class="clickable-cell" title="{{ m.problem_description }}" data-full-text="{{ m.problem_description }}" data-modal-title="Problem Description">{{ m.problem_description|default:"—"|truncatechars:50 }}</div>
@@ -716,11 +942,11 @@
                     <span style="color:var(--color-text-muted);">—</span>
                   {% elif not m.in_time %}
                     <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                      <a href="{% url 'staff_movement_edit' m.id %}" class="btn btn-outline btn-sm">Manage Time</a>
+                      <a href="{% url 'staff_movement_edit' m.id %}" class="btn btn-outline btn-sm">Manage Visit</a>
                       <button type="button" class="btn btn-sm" style="background:#fff3cd;color:#856404;border:1px solid #ffc107;" onclick="openCancelModal({{ m.id }}, '{{ m.client|escapejs }}')">Cancel Visit</button>
                     </div>
                   {% else %}
-                    <a href="{% url 'staff_movement_edit' m.id %}" class="btn btn-outline btn-sm">Manage Time</a>
+                    <a href="{% url 'staff_movement_edit' m.id %}" class="btn btn-outline btn-sm">Manage Visit</a>
                   {% endif %}
                 </td>
               </tr>
@@ -885,7 +1111,7 @@
                   {% endif %}
                 </td>
                 <td>{{ m.get_purpose_type_display|default:"—" }}</td>
-                <td class="clickable-cell" title="{{ m.purpose }}" data-full-text="{{ m.purpose }}" data-modal-title="Additional Notes">{{ m.purpose|default:"—"|truncatechars:40 }}</td>
+                <td class="clickable-cell" title="{{ m.filtered_purpose|default:m.purpose }}" data-full-text="{{ m.filtered_purpose|default:m.purpose }}" data-modal-title="Additional Notes">{{ m.filtered_purpose|default:m.purpose|default:"—"|truncatechars:40 }}</td>
                 <td>
                   {% if m.purpose_type == "problem_solving" %}
                     <div class="clickable-cell" title="{{ m.problem_description }}" data-full-text="{{ m.problem_description }}" data-modal-title="Problem Description">{{ m.problem_description|default:"—"|truncatechars:40 }}</div>
@@ -1165,16 +1391,32 @@
     });
   });
 
+  function reindexDestinationBadges(listId, rowClass) {
+    const container = document.getElementById(listId);
+    if (!container) return;
+    container.querySelectorAll("." + rowClass).forEach((row, idx) => {
+      const badge = row.querySelector(".dest-badge");
+      if (badge) badge.textContent = idx + 1;
+    });
+  }
+
   function addDestinationRow() {
     const container = document.getElementById("destinations-list");
     if (!container) return;
     const rowCount = container.querySelectorAll(".destination-row").length + 1;
     const div = document.createElement("div");
-    div.className = "destination-row";
-    div.style.cssText = "display:flex;gap:8px;align-items:center;";
+    div.className = "destination-row dest-row";
     div.innerHTML = `
-      <input type="text" name="stop_client" list="existing-clients" placeholder="Destination #${rowCount} Client / Location" style="flex:1;" required>
-      <button type="button" class="btn btn-sm" onclick="removeDestinationRow(this)" style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;padding:6px 10px;" title="Remove destination">✕</button>
+      <span class="dest-badge">${rowCount}</span>
+      <div class="dest-field" style="flex:1.2;min-width:180px;">
+        <label>Client / Location *</label>
+        <input type="text" name="stop_client" list="existing-clients" placeholder="e.g. Nepal Telecom, PM Office" required>
+      </div>
+      <div class="dest-field" style="flex:1.5;min-width:200px;">
+        <label>Notes / Remarks</label>
+        <input type="text" name="stop_purpose" placeholder="e.g. Laptop repair, Cheque pickup">
+      </div>
+      <button type="button" class="dest-remove-btn" onclick="removeDestinationRow(this)" title="Remove destination">✕</button>
     `;
     container.appendChild(div);
   }
@@ -1184,6 +1426,38 @@
     const container = document.getElementById("destinations-list");
     if (container && container.querySelectorAll(".destination-row").length > 1) {
       row.remove();
+      reindexDestinationBadges("destinations-list", "destination-row");
+    }
+  }
+
+  function addEditDestinationRow() {
+    const container = document.getElementById("edit-destinations-list");
+    if (!container) return;
+    const rowCount = container.querySelectorAll(".edit-destination-row").length + 1;
+    const div = document.createElement("div");
+    div.className = "edit-destination-row dest-row";
+    div.innerHTML = `
+      <span class="dest-badge">${rowCount}</span>
+      <div class="dest-field" style="flex:1.2;min-width:180px;">
+        <label>Client / Location *</label>
+        <input type="text" name="edit_stop_client" list="existing-clients" placeholder="Client / Location *" required>
+      </div>
+      <div class="dest-field" style="flex:1.5;min-width:200px;">
+        <label>Notes / Remarks</label>
+        <input type="text" name="edit_stop_purpose" placeholder="Additional Notes / Remarks (Optional)">
+      </div>
+      <input type="hidden" name="edit_stop_id" value="">
+      <button type="button" class="dest-remove-btn" onclick="removeEditDestinationRow(this)" title="Remove destination">✕</button>
+    `;
+    container.appendChild(div);
+  }
+
+  function removeEditDestinationRow(btn) {
+    const row = btn.closest(".edit-destination-row");
+    const container = document.getElementById("edit-destinations-list");
+    if (container && container.querySelectorAll(".edit-destination-row").length > 1) {
+      row.remove();
+      reindexDestinationBadges("edit-destinations-list", "edit-destination-row");
     }
   }
 </script>
