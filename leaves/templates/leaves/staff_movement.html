@@ -1286,27 +1286,18 @@
   if (dateInput) {
     dateInput.addEventListener('change', () => showBs('date', 'date-bs'));
     showBs('date', 'date-bs');
-    dateInput.addEventListener('click', () => {
-      if (dateInput.showPicker) { try { dateInput.showPicker(); } catch (e) {} }
-    });
   }
 
   const filterDateInput = document.getElementById('filter-date');
   if (filterDateInput) {
     filterDateInput.addEventListener('change', () => showBs('filter-date', 'filter-date-bs'));
     showBs('filter-date', 'filter-date-bs');
-    filterDateInput.addEventListener('click', () => {
-      if (filterDateInput.showPicker) { try { filterDateInput.showPicker(); } catch (e) {} }
-    });
   }
 
   const adminFilterDateInput = document.getElementById('admin-filter-date');
   if (adminFilterDateInput) {
     adminFilterDateInput.addEventListener('change', () => showBs('admin-filter-date', 'admin-filter-date-bs'));
     showBs('admin-filter-date', 'admin-filter-date-bs');
-    adminFilterDateInput.addEventListener('click', () => {
-      if (adminFilterDateInput.showPicker) { try { adminFilterDateInput.showPicker(); } catch (e) {} }
-    });
   }
 
   const outTimeField = document.getElementById('out_time');

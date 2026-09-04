@@ -1,0 +1,503 @@
+{# Bikram Sambat (BS) / Nepali Calendar Datepicker Component #}
+<style>
+.bs-datepicker-popover {
+  position: absolute;
+  z-index: 10000;
+  background: var(--color-sidebar, #ffffff);
+  color: var(--color-text, #101522);
+  border: 1.5px solid var(--color-border, #e2e8f0);
+  border-radius: var(--radius-sm, 10px);
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  padding: 14px;
+  width: 300px;
+  font-family: inherit;
+  display: none;
+  backdrop-filter: blur(16px);
+}
+.bs-dp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.bs-dp-header select {
+  padding: 5px 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid var(--color-border, #cbd5e1);
+  background: var(--input-bg, #f8fafc);
+  color: var(--color-text, #101522);
+  font-family: inherit;
+  cursor: pointer;
+}
+.bs-dp-header select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+.bs-dp-nav-btn {
+  border: 1px solid var(--color-border, #cbd5e1);
+  background: var(--overlay-4, #f1f5f9);
+  color: var(--color-text, #334155);
+  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  line-height: 1;
+  transition: var(--transition, all 0.15s ease);
+}
+.bs-dp-nav-btn:hover {
+  background: var(--color-primary-dark, #e0f2fe);
+  color: var(--color-primary, #0369a1);
+  border-color: var(--color-primary);
+}
+.bs-dp-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-text-muted, #64748b);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.bs-dp-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+.bs-dp-day {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82rem;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--color-text, #1e293b);
+  background: transparent;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.bs-dp-day:hover {
+  background: var(--overlay-5, #f1f5f9);
+  color: var(--color-primary, #0284c7);
+  font-weight: 700;
+}
+.bs-dp-day.selected {
+  background: linear-gradient(135deg, var(--color-accent, #0066cc), var(--color-primary, #0284c7)) !important;
+  color: #ffffff !important;
+  font-weight: 800;
+  box-shadow: 0 2px 8px rgba(0, 145, 179, 0.3);
+}
+.bs-dp-day.today {
+  border: 1.5px solid var(--color-primary, #0ea5e9);
+  font-weight: 700;
+  color: var(--color-primary);
+}
+.bs-dp-day.empty {
+  cursor: default;
+  pointer-events: none;
+}
+.bs-dp-footer {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border, #f1f5f9);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.bs-dp-today-btn {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--color-primary, #0284c7);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-family: inherit;
+  transition: var(--transition, all 0.15s ease);
+}
+.bs-dp-today-btn:hover {
+  background: var(--overlay-4, #f0f9ff);
+}
+.bs-dp-clear-btn {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--color-danger, #ef4444);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-family: inherit;
+  transition: var(--transition, all 0.15s ease);
+}
+.bs-dp-clear-btn:hover {
+  background: var(--color-rejected-bg, #fef2f2);
+}
+</style>
+
+<!-- Popover Container -->
+<div id="bsDatepickerPopover" class="bs-datepicker-popover">
+  <div class="bs-dp-header">
+    <button type="button" class="bs-dp-nav-btn" id="bsDpPrevMonth">‹</button>
+    <div style="display: flex; gap: 6px;">
+      <select id="bsDpMonthSelect"></select>
+      <select id="bsDpYearSelect"></select>
+    </div>
+    <button type="button" class="bs-dp-nav-btn" id="bsDpNextMonth">›</button>
+  </div>
+  <div class="bs-dp-weekdays">
+    <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+  </div>
+  <div class="bs-dp-days" id="bsDpDaysGrid"></div>
+  <div class="bs-dp-footer">
+    <div style="display:flex; gap:6px;">
+      <button type="button" class="bs-dp-today-btn" id="bsDpTodayBtn">Today</button>
+      <button type="button" class="bs-dp-clear-btn" id="bsDpClearBtn">Clear</button>
+    </div>
+    <span style="font-size: 0.7rem; color: var(--color-text-muted, #94a3b8); font-weight: 600;">Nepali Calendar</span>
+  </div>
+</div>
+
+<script>
+(function() {
+  var bsData = {"1975": [31, 31, 32, 32, 31, 30, 30, 29, 30, 29, 30, 30], "1976": [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 31], "1977": [30, 32, 31, 32, 31, 31, 29, 30, 30, 29, 29, 31], "1978": [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30], "1979": [31, 31, 32, 32, 31, 30, 30, 29, 30, 29, 30, 30], "1980": [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 31], "1981": [31, 31, 31, 32, 31, 31, 29, 30, 30, 29, 29, 31], "1982": [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30], "1983": [31, 31, 32, 32, 31, 30, 30, 29, 30, 29, 30, 30], "1984": [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 31], "1985": [31, 31, 31, 32, 31, 31, 29, 30, 30, 29, 30, 30], "1986": [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30], "1987": [31, 32, 31, 32, 31, 30, 30, 29, 30, 29, 30, 30], "1988": [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 31], "1989": [31, 31, 31, 32, 31, 31, 30, 29, 30, 29, 30, 30], "1990": [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30], "1991": [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 30], "1992": [31, 32, 31, 32, 31, 30, 30, 30, 29, 30, 29, 31], "1993": [31, 31, 31, 32, 31, 31, 30, 29, 30, 29, 30, 30], "1994": [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30], "1995": [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 30], "1996": [31, 32, 31, 32, 31, 30, 30, 30, 29, 30, 29, 31], "1997": [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30], "1998": [31, 31, 32, 31, 32, 30, 30, 29, 30, 29, 30, 30], "1999": [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 31], "2000": [30, 32, 31, 32, 31, 30, 30, 30, 29, 30, 29, 31], "2001": [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30], "2002": [31, 31, 32, 32, 31, 30, 30, 29, 30, 29, 30, 30], "2003": [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 31], "2004": [30, 32, 31, 32, 31, 30, 30, 30, 29, 30, 29, 31], "2005": [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30], "2006": [31, 31, 32, 32, 31, 30, 30, 29, 30, 29, 30, 30], "2007": [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 31], "2008": [31, 31, 31, 32, 31, 31, 29, 30, 30, 29, 29, 31], "2009": [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30], "2010": [31, 31, 32, 32, 31, 30, 30, 29, 30, 29, 30, 30], "2011": [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 31], "2012": [31, 31, 31, 32, 31, 31, 29, 30, 30, 29, 30, 30], "2013": [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30], "2014": [31, 31, 32, 32, 31, 30, 30, 29, 30, 29, 30, 30], "2015": [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 31], "2016": [31, 31, 31, 32, 31, 31, 29, 30, 30, 29, 30, 30], "2017": [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30], "2018": [31, 32, 31, 32, 31, 30, 30, 29, 30, 29, 30, 30], "2019": [31, 32, 31, 32, 31, 30, 30, 30, 29, 30, 29, 31], "2020": [31, 31, 31, 32, 31, 31, 30, 29, 30, 29, 30, 30], "2021": [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30], "2022": [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 30], "2023": [31, 32, 31, 32, 31, 30, 30, 30, 29, 30, 29, 31], "2024": [31, 31, 31, 32, 31, 31, 30, 29, 30, 29, 30, 30], "2025": [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30], "2026": [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 31], "2027": [30, 32, 31, 32, 31, 30, 30, 30, 29, 30, 29, 31], "2028": [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30], "2029": [31, 31, 32, 31, 32, 30, 30, 29, 30, 29, 30, 30], "2030": [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 31], "2031": [30, 32, 31, 32, 31, 30, 30, 30, 29, 30, 29, 31], "2032": [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30], "2033": [31, 31, 32, 32, 31, 30, 30, 29, 30, 29, 30, 30], "2034": [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 31], "2035": [30, 32, 31, 32, 31, 31, 29, 30, 30, 29, 29, 31], "2036": [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30], "2037": [31, 31, 32, 32, 31, 30, 30, 29, 30, 29, 30, 30], "2038": [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 31], "2039": [31, 31, 31, 32, 31, 31, 29, 30, 30, 29, 30, 30], "2040": [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30], "2041": [31, 31, 32, 32, 31, 30, 30, 29, 30, 29, 30, 30], "2042": [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 31], "2043": [31, 31, 31, 32, 31, 31, 29, 30, 30, 29, 30, 30], "2044": [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30], "2045": [31, 32, 31, 32, 31, 30, 30, 29, 30, 29, 30, 30], "2046": [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 31], "2047": [31, 31, 31, 32, 31, 31, 30, 29, 30, 29, 30, 30], "2048": [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30], "2049": [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 30], "2050": [31, 32, 31, 32, 31, 30, 30, 30, 29, 30, 29, 31], "2051": [31, 31, 31, 32, 31, 31, 30, 29, 30, 29, 30, 30], "2052": [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30], "2053": [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 30], "2054": [31, 32, 31, 32, 31, 30, 30, 30, 29, 30, 29, 31], "2055": [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30], "2056": [31, 31, 32, 31, 32, 30, 30, 29, 30, 29, 30, 30], "2057": [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 31], "2058": [30, 32, 31, 32, 31, 30, 30, 30, 29, 30, 29, 31], "2059": [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30], "2060": [31, 31, 32, 32, 31, 30, 30, 29, 30, 29, 30, 30], "2061": [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 31], "2062": [30, 32, 31, 32, 31, 31, 29, 30, 29, 30, 29, 31], "2063": [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30], "2064": [31, 31, 32, 32, 31, 30, 30, 29, 30, 29, 30, 30], "2065": [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 31], "2066": [31, 31, 31, 32, 31, 31, 29, 30, 30, 29, 29, 31], "2067": [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30], "2068": [31, 31, 32, 32, 31, 30, 30, 29, 30, 29, 30, 30], "2069": [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 31], "2070": [31, 31, 31, 32, 31, 31, 29, 30, 30, 29, 30, 30], "2071": [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30], "2072": [31, 32, 31, 32, 31, 30, 30, 29, 30, 29, 30, 30], "2073": [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 31], "2074": [31, 31, 31, 32, 31, 31, 30, 29, 30, 29, 30, 30], "2075": [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30], "2076": [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 30], "2077": [31, 32, 31, 32, 31, 30, 30, 30, 29, 30, 29, 31], "2078": [31, 31, 31, 32, 31, 31, 30, 29, 30, 29, 30, 30], "2079": [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30], "2080": [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 30], "2081": [31, 32, 31, 32, 31, 30, 30, 30, 29, 30, 29, 31], "2082": [31, 31, 31, 32, 31, 31, 30, 29, 30, 29, 30, 30], "2083": [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30], "2084": [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 31], "2085": [30, 32, 31, 32, 31, 30, 30, 30, 29, 30, 29, 31], "2086": [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30], "2087": [31, 31, 32, 32, 31, 30, 30, 29, 30, 29, 30, 30], "2088": [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 31], "2089": [30, 32, 31, 32, 31, 30, 30, 30, 29, 30, 29, 31], "2090": [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30], "2091": [31, 31, 32, 32, 31, 30, 30, 29, 30, 29, 30, 30], "2092": [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 31], "2093": [31, 31, 31, 32, 31, 31, 29, 30, 30, 29, 29, 31], "2094": [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30], "2095": [31, 31, 32, 32, 31, 30, 30, 29, 30, 29, 30, 30], "2096": [31, 32, 31, 32, 31, 30, 30, 30, 29, 29, 30, 31], "2097": [31, 31, 31, 32, 31, 31, 29, 30, 30, 29, 30, 30], "2098": [31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30], "2099": [31, 31, 32, 32, 31, 30, 30, 29, 30, 29, 30, 30]};
+  var MONTHS = ["Baisakh","Jestha","Asar","Shrawan","Bhadra","Ashwin","Kartik","Mangsir","Poush","Magh","Falgun","Chaitra"];
+
+  function adToBSObj(year, month, day) {
+    var baseUtc = Date.UTC(1943, 3, 14);
+    var targetUtc = Date.UTC(year, month - 1, day);
+    var diff = Math.round((targetUtc - baseUtc) / (1000 * 60 * 60 * 24));
+    var y = 2000, m = 1, d = 1;
+    if (diff > 0) {
+      for (var i = 0; i < diff; i++) {
+        var months = bsData[y];
+        if (!months) return null;
+        d++;
+        if (d > months[m-1]) { d = 1; m++; if (m > 12) { m = 1; y++; } }
+      }
+    } else if (diff < 0) {
+      for (var i = 0; i < -diff; i++) {
+        d--;
+        if (d < 1) { m--; if (m < 1) { m = 12; y--; } var months = bsData[y]; if (!months) return null; d = months[m-1]; }
+      }
+    }
+    if (y < 1975 || y > 2099) return null;
+    return { year: y, month: m, day: d };
+  }
+
+  function bsToADObj(bsYear, bsMonth, bsDay) {
+    if (bsYear < 1975 || bsYear > 2099) return null;
+    var totalDays = 0;
+    for (var y = 1975; y < bsYear; y++) {
+      var mList = bsData[y.toString()];
+      if (!mList) return null;
+      for (var m = 0; m < 12; m++) totalDays += mList[m];
+    }
+    var currentYearMonths = bsData[bsYear.toString()];
+    if (!currentYearMonths) return null;
+    for (var m = 0; m < bsMonth - 1; m++) {
+      totalDays += currentYearMonths[m];
+    }
+    totalDays += (bsDay - 1);
+    var baseUtc = Date.UTC(1918, 3, 13);
+    var targetUtc = baseUtc + totalDays * 86400000;
+    var d = new Date(targetUtc);
+    return {
+      year: d.getUTCFullYear(),
+      month: d.getUTCMonth() + 1,
+      day: d.getUTCDate()
+    };
+  }
+
+  var MONTHS = ["Baisakh","Jestha","Asar","Shrawan","Bhadra","Ashwin","Kartik","Mangsir","Poush","Magh","Falgun","Chaitra"];
+
+  function formatBS(y, m, d) {
+    return MONTHS[m - 1] + " " + d + ", " + y;
+  }
+
+  // Populate Month & Year select dropdowns
+  var popover = document.getElementById('bsDatepickerPopover');
+  var mSelect = document.getElementById('bsDpMonthSelect');
+  var ySelect = document.getElementById('bsDpYearSelect');
+  var daysGrid = document.getElementById('bsDpDaysGrid');
+  var prevBtn = document.getElementById('bsDpPrevMonth');
+  var nextBtn = document.getElementById('bsDpNextMonth');
+  var todayBtn = document.getElementById('bsDpTodayBtn');
+  var clearBtn = document.getElementById('bsDpClearBtn');
+
+  if (mSelect) {
+    MONTHS.forEach(function(name, idx) {
+      var opt = document.createElement('option');
+      opt.value = idx + 1;
+      opt.textContent = name;
+      mSelect.appendChild(opt);
+    });
+    for (var y = 1975; y <= 2099; y++) {
+      var opt = document.createElement('option');
+      opt.value = y;
+      opt.textContent = y;
+      ySelect.appendChild(opt);
+    }
+  }
+
+  var activeHiddenInput = null;
+  var activeVisibleInput = null;
+  var currentBsYear = 2083;
+  var currentBsMonth = 5;
+
+  function renderGrid() {
+    daysGrid.innerHTML = '';
+    var yearStr = currentBsYear.toString();
+    var monthList = bsData[yearStr];
+    if (!monthList) return;
+    var maxDays = monthList[currentBsMonth - 1];
+
+    // Find day of week for 1st of this BS Month
+    var ad1st = bsToADObj(currentBsYear, currentBsMonth, 1);
+    var firstDayOfWeek = 0;
+    if (ad1st) {
+      var dt = new Date(Date.UTC(ad1st.year, ad1st.month - 1, ad1st.day));
+      firstDayOfWeek = dt.getUTCDay();
+    }
+
+    // Active selected input BS date
+    var selectedBs = null;
+    if (activeHiddenInput && activeHiddenInput.value) {
+      var parts = activeHiddenInput.value.split('T')[0].split('-');
+      if (parts.length === 3) {
+        selectedBs = adToBSObj(parseInt(parts[0], 10), parseInt(parts[1], 10), parseInt(parts[2], 10));
+      }
+    }
+
+    // Today BS date
+    var now = new Date();
+    var todayBs = adToBSObj(now.getFullYear(), now.getMonth() + 1, now.getDate());
+
+    // Render empty cells for day-of-week offset
+    for (var i = 0; i < firstDayOfWeek; i++) {
+      var emptyCell = document.createElement('div');
+      emptyCell.className = 'bs-dp-day empty';
+      daysGrid.appendChild(emptyCell);
+    }
+
+    // Render days 1 to maxDays
+    for (var d = 1; d <= maxDays; d++) {
+      var dayCell = document.createElement('div');
+      dayCell.className = 'bs-dp-day';
+      dayCell.textContent = d;
+
+      if (selectedBs && selectedBs.year === currentBsYear && selectedBs.month === currentBsMonth && selectedBs.day === d) {
+        dayCell.classList.add('selected');
+      }
+
+      if (todayBs && todayBs.year === currentBsYear && todayBs.month === currentBsMonth && todayBs.day === d) {
+        dayCell.classList.add('today');
+      }
+
+      (function(dayNum) {
+        dayCell.addEventListener('click', function(e) {
+          e.stopPropagation();
+          selectBsDate(currentBsYear, currentBsMonth, dayNum);
+        });
+      })(d);
+
+      daysGrid.appendChild(dayCell);
+    }
+  }
+
+  function selectBsDate(y, m, d) {
+    if (!activeHiddenInput || !activeVisibleInput) return;
+    var adObj = bsToADObj(y, m, d);
+    if (!adObj) return;
+
+    var mm = adObj.month < 10 ? '0' + adObj.month : adObj.month;
+    var dd = adObj.day < 10 ? '0' + adObj.day : adObj.day;
+    var dateStr = adObj.year + '-' + mm + '-' + dd;
+
+    if (activeVisibleInput.dataset.isDatetime === 'true') {
+      var timePart = activeHiddenInput.value ? activeHiddenInput.value.split('T')[1] : '10:00';
+      activeHiddenInput.value = dateStr + 'T' + (timePart || '10:00');
+    } else {
+      activeHiddenInput.value = dateStr;
+    }
+
+    activeVisibleInput.dispatchEvent(new Event('updateDisplay', { bubbles: true }));
+    activeHiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
+    activeHiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+    activeVisibleInput.dispatchEvent(new Event('change', { bubbles: true }));
+    hidePopover();
+  }
+
+  function clearSelectedDate() {
+    if (!activeHiddenInput || !activeVisibleInput) return;
+    activeHiddenInput.value = '';
+    activeVisibleInput.dispatchEvent(new Event('updateDisplay', { bubbles: true }));
+    activeHiddenInput.dispatchEvent(new Event('input', { bubbles: true }));
+    activeHiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+    activeVisibleInput.dispatchEvent(new Event('change', { bubbles: true }));
+    hidePopover();
+  }
+
+  function showPopover(hiddenInput, visibleInput) {
+    if (visibleInput.disabled || (visibleInput.readOnly === false && visibleInput.classList.contains('no-bs-picker'))) {
+      return;
+    }
+    activeHiddenInput = hiddenInput;
+    activeVisibleInput = visibleInput;
+    var rect = visibleInput.getBoundingClientRect();
+    var top = rect.bottom + window.scrollY + 6;
+    var left = Math.min(rect.left + window.scrollX, window.innerWidth - 320);
+    if (left < 10) left = 10;
+
+    popover.style.top = top + 'px';
+    popover.style.left = left + 'px';
+
+    // Parse current input date or use today
+    var bsObj = null;
+    if (hiddenInput.value) {
+      var parts = hiddenInput.value.split('T')[0].split('-');
+      if (parts.length === 3) {
+        bsObj = adToBSObj(parseInt(parts[0], 10), parseInt(parts[1], 10), parseInt(parts[2], 10));
+      }
+    }
+    if (!bsObj) {
+      var now = new Date();
+      bsObj = adToBSObj(now.getFullYear(), now.getMonth() + 1, now.getDate());
+    }
+
+    if (bsObj) {
+      currentBsYear = bsObj.year;
+      currentBsMonth = bsObj.month;
+    }
+    mSelect.value = currentBsMonth;
+    ySelect.value = currentBsYear;
+
+    renderGrid();
+    popover.style.display = 'block';
+  }
+
+  function hidePopover() {
+    if (popover) popover.style.display = 'none';
+  }
+
+  if (mSelect) {
+    mSelect.addEventListener('change', function() {
+      currentBsMonth = parseInt(this.value, 10);
+      renderGrid();
+    });
+    ySelect.addEventListener('change', function() {
+      currentBsYear = parseInt(this.value, 10);
+      renderGrid();
+    });
+    prevBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      currentBsMonth--;
+      if (currentBsMonth < 1) { currentBsMonth = 12; currentBsYear--; }
+      if (currentBsYear < 1975) currentBsYear = 1975;
+      mSelect.value = currentBsMonth;
+      ySelect.value = currentBsYear;
+      renderGrid();
+    });
+    nextBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      currentBsMonth++;
+      if (currentBsMonth > 12) { currentBsMonth = 1; currentBsYear++; }
+      if (currentBsYear > 2099) currentBsYear = 2099;
+      mSelect.value = currentBsMonth;
+      ySelect.value = currentBsYear;
+      renderGrid();
+    });
+    todayBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var now = new Date();
+      var tBs = adToBSObj(now.getFullYear(), now.getMonth() + 1, now.getDate());
+      if (tBs) {
+        selectBsDate(tBs.year, tBs.month, tBs.day);
+      }
+    });
+    clearBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      clearSelectedDate();
+    });
+  }
+
+  document.addEventListener('click', function(e) {
+    if (popover && !popover.contains(e.target) && !e.target.dataset.bsVisibleInput) {
+      hidePopover();
+    }
+  });
+
+  window.addEventListener('resize', hidePopover);
+
+  function attachBsPreviewAndPicker() {
+    document.querySelectorAll('input[type="datetime-local"], input[type="date"]').forEach(function(input) {
+      if (input.dataset.bsPreviewAttached) return;
+      if (input.classList.contains('no-bs-picker') || input.disabled) return;
+      input.dataset.bsPreviewAttached = 'true';
+
+      var isDatetime = input.type === 'datetime-local';
+      var originalName = input.name;
+
+      // 1. Create a hidden input for exact AD value form submission
+      var hiddenInput = document.createElement('input');
+      hiddenInput.type = 'hidden';
+      hiddenInput.name = originalName;
+      hiddenInput.value = input.value || '';
+      hiddenInput.id = (input.id ? input.id + '-hidden' : '');
+      input.parentNode.insertBefore(hiddenInput, input);
+
+      // 2. Convert visible input to text with readonly to disable native browser calendar popups
+      input.removeAttribute('name');
+      input.type = 'text';
+      input.readOnly = true;
+      input.style.cursor = 'pointer';
+      input.placeholder = input.placeholder || 'YYYY-MM-DD';
+      input.dataset.bsVisibleInput = 'true';
+      input.dataset.isDatetime = isDatetime ? 'true' : 'false';
+
+      function updateDisplay() {
+        var val = hiddenInput.value;
+        if (!val) {
+          input.value = '';
+          return;
+        }
+        var parts = val.split('T');
+        input.value = parts[0];
+      }
+
+      input.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        showPopover(hiddenInput, input);
+      });
+
+      input.addEventListener('updateDisplay', updateDisplay);
+      hiddenInput.addEventListener('change', updateDisplay);
+      hiddenInput.addEventListener('input', updateDisplay);
+
+      updateDisplay();
+    });
+  }
+
+  // Expose global init function for dynamically injected forms/modals
+  window.initBsDatepickers = attachBsPreviewAndPicker;
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', attachBsPreviewAndPicker);
+  } else {
+    attachBsPreviewAndPicker();
+  }
+})();
+</script>
