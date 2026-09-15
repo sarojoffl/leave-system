@@ -43,10 +43,11 @@ class LeaveRequest(models.Model):
         from django.apps import apps
         PublicHolidayModel = apps.get_model('leaves', 'PublicHoliday')
 
+        holiday_qs = PublicHolidayModel.objects.filter(
+            date__range=(self.start_date, self.end_date)
+        )
         holidays = set(
-            PublicHolidayModel.objects.filter(
-                date__range=(self.start_date, self.end_date)
-            ).values_list('date', flat=True)
+            h.date for h in holiday_qs if h.applies_to(self.employee)
         )
 
         current = self.start_date
@@ -91,14 +92,36 @@ class LeaveBalance(models.Model):
 
 
 class PublicHoliday(models.Model):
+    APPLICABLE_CHOICES = [
+        ('all', 'All Staff'),
+        ('female', 'Female Staff Only'),
+    ]
+
     date = models.DateField(unique=True)
     name = models.CharField(max_length=150)
+    applicable_to = models.CharField(
+        max_length=20,
+        choices=APPLICABLE_CHOICES,
+        default='all',
+        help_text="Whether this holiday applies to all staff or female staff only (e.g. Teej)"
+    )
 
     class Meta:
         ordering = ['date']
 
     def __str__(self):
-        return f"{self.date}: {self.name}"
+        app = f" ({self.get_applicable_to_display()})" if self.applicable_to != 'all' else ""
+        return f"{self.date}: {self.name}{app}"
+
+    def applies_to(self, user):
+        """Returns True if this holiday applies to the given user."""
+        if not user:
+            return True
+        if self.applicable_to == 'all':
+            return True
+        if self.applicable_to == 'female':
+            return getattr(user, 'gender', None) == 'female'
+        return True
 
 
 class BaseDayRequest(models.Model):
@@ -363,3 +386,61 @@ class StaffMovementStop(models.Model):
 
     def __str__(self):
         return f"Stop #{self.order}: {self.client} for movement #{self.movement_id}"
+
+
+class BiometricDevice(models.Model):
+    """Registered ZKTeco biometric device that pushes attendance data."""
+    serial_number = models.CharField(max_length=100, unique=True)
+    name = models.CharField(max_length=200, blank=True, help_text="Friendly name, e.g. 'Office Main Entrance'")
+    is_active = models.BooleanField(default=True)
+    last_seen = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-last_seen"]
+
+    def __str__(self):
+        return self.name or self.serial_number
+
+
+class AttendanceLog(models.Model):
+    """Raw attendance punch record from ZKTeco biometric device."""
+    STATUS_CHOICES = [
+        (0, 'Check-in'),
+        (1, 'Check-out'),
+        (2, 'Break-out'),
+        (3, 'Break-in'),
+        (4, 'Overtime-in'),
+        (5, 'Overtime-out'),
+    ]
+    VERIFY_CHOICES = [
+        (0, 'Password'),
+        (1, 'Fingerprint'),
+        (2, 'Card'),
+        (15, 'Face'),
+    ]
+
+    device = models.ForeignKey(
+        BiometricDevice, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="attendance_logs"
+    )
+    device_user_id = models.CharField(max_length=20, help_text="PIN / User ID from the biometric device")
+    employee = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="attendance_logs",
+        help_text="Resolved Django user (auto-matched via device_user_id)"
+    )
+    timestamp = models.DateTimeField(help_text="Punch date/time from the device")
+    status = models.IntegerField(choices=STATUS_CHOICES, default=0)
+    verify_mode = models.IntegerField(choices=VERIFY_CHOICES, null=True, blank=True)
+    work_code = models.CharField(max_length=20, blank=True)
+    raw_data = models.TextField(blank=True, help_text="Original line from device for debugging")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-timestamp"]
+        unique_together = [("device_user_id", "timestamp", "device")]
+
+    def __str__(self):
+        name = self.employee or self.device_user_id
+        return f"{name} — {self.get_status_display()} @ {self.timestamp:%Y-%m-%d %H:%M}"

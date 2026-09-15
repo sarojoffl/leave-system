@@ -865,3 +865,234 @@ class StaffMovementTestCase(TestCase):
             "work_done_for": "",  # Blank contact person
         })
         self.assertContains(response, "Please enter Work Done For / Contact Person")
+
+
+class IClockIntegrationTestCase(TestCase):
+    """Tests for ZKTeco iClock biometric webhook endpoints."""
+
+    def setUp(self):
+        self.client = Client()
+        self.employee = User.objects.create_user(
+            username="bio_user",
+            password="password123",
+            role="employee",
+            device_user_id="42",
+        )
+
+    def test_cdata_get_handshake(self):
+        """GET /iclock/cdata should return OK for device handshake."""
+        response = self.client.get("/iclock/cdata", {"SN": "TESTDEVICE001"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content.decode(), "OK")
+
+    def test_cdata_post_attlog_creates_record(self):
+        """POST with ATTLOG data should create an AttendanceLog record."""
+        from leaves.models import AttendanceLog
+        body = "42\t2026-09-14 10:00:00\t0\t1\t0"
+        response = self.client.post(
+            "/iclock/cdata?SN=TESTDEVICE001&table=ATTLOG",
+            data=body,
+            content_type="text/plain",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("OK", response.content.decode())
+
+        # Verify record created
+        self.assertEqual(AttendanceLog.objects.count(), 1)
+        log = AttendanceLog.objects.first()
+        self.assertEqual(log.device_user_id, "42")
+        self.assertEqual(log.status, 0)  # Check-in
+        self.assertEqual(log.verify_mode, 1)  # Fingerprint
+        self.assertEqual(log.employee, self.employee)  # Auto-matched
+
+    def test_cdata_post_attlog_duplicate_prevention(self):
+        """Same punch sent twice should only create one record."""
+        from leaves.models import AttendanceLog
+        body = "42\t2026-09-14 10:00:00\t0\t1\t0"
+        self.client.post("/iclock/cdata?SN=TESTDEVICE001&table=ATTLOG", data=body, content_type="text/plain")
+        self.client.post("/iclock/cdata?SN=TESTDEVICE001&table=ATTLOG", data=body, content_type="text/plain")
+        self.assertEqual(AttendanceLog.objects.count(), 1)
+
+    def test_cdata_post_multiple_lines(self):
+        """Multiple ATTLOG lines in one POST should create multiple records."""
+        from leaves.models import AttendanceLog
+        body = "42\t2026-09-14 10:00:00\t0\t1\t0\n42\t2026-09-14 17:30:00\t1\t1\t0"
+        self.client.post("/iclock/cdata?SN=TESTDEVICE001&table=ATTLOG", data=body, content_type="text/plain")
+        self.assertEqual(AttendanceLog.objects.count(), 2)
+        # First is check-in, second is check-out
+        logs = AttendanceLog.objects.order_by("timestamp")
+        self.assertEqual(logs[0].status, 0)
+        self.assertEqual(logs[1].status, 1)
+
+    def test_cdata_auto_registers_device(self):
+        """Unknown device serial should auto-create a BiometricDevice."""
+        from leaves.models import BiometricDevice
+        self.client.get("/iclock/cdata", {"SN": "NEWDEVICE999"})
+        # GET handshake doesn't create device — only POST does
+        self.assertEqual(BiometricDevice.objects.filter(serial_number="NEWDEVICE999").count(), 0)
+
+        body = "42\t2026-09-14 10:00:00\t0\t1\t0"
+        self.client.post("/iclock/cdata?SN=NEWDEVICE999&table=ATTLOG", data=body, content_type="text/plain")
+        device = BiometricDevice.objects.get(serial_number="NEWDEVICE999")
+        self.assertIsNotNone(device.last_seen)
+        self.assertTrue(device.is_active)
+
+    def test_cdata_unmapped_user(self):
+        """PIN not matching any user should still create log with employee=None."""
+        from leaves.models import AttendanceLog
+        body = "999\t2026-09-14 10:00:00\t0\t1\t0"
+        self.client.post("/iclock/cdata?SN=TESTDEVICE001&table=ATTLOG", data=body, content_type="text/plain")
+        log = AttendanceLog.objects.first()
+        self.assertIsNotNone(log)
+        self.assertEqual(log.device_user_id, "999")
+        self.assertIsNone(log.employee)
+
+    def test_getrequest_returns_ok(self):
+        """GET /iclock/getrequest should return OK."""
+        response = self.client.get("/iclock/getrequest", {"SN": "TESTDEVICE001"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content.decode(), "OK")
+
+    def test_cdata_malformed_line_skipped(self):
+        """Malformed lines should be skipped without crashing."""
+        from leaves.models import AttendanceLog
+        body = "bad_data\n42\t2026-09-14 10:00:00\t0\t1\t0"
+        self.client.post("/iclock/cdata?SN=TESTDEVICE001&table=ATTLOG", data=body, content_type="text/plain")
+        # Only the valid line should create a record
+        self.assertEqual(AttendanceLog.objects.count(), 1)
+
+
+class AttendanceCalendarTestCase(TestCase):
+    """Tests for Attendance utilities, calendar views, and team roster."""
+
+    def setUp(self):
+        self.employee = User.objects.create_user(
+            username="emp_john",
+            first_name="John",
+            last_name="Doe",
+            password="password123",
+            role="employee",
+            device_user_id="101",
+        )
+        self.manager = User.objects.create_user(
+            username="mgr_jane",
+            first_name="Jane",
+            last_name="Smith",
+            password="password123",
+            role="manager",
+            device_user_id="102",
+        )
+        self.annual_leave = LeaveType.objects.create(name="Annual Leave")
+
+    def test_daily_attendance_ontime_summary(self):
+        """Punch at 10:05 AM should be categorized as Present."""
+        from leaves.models import AttendanceLog
+        from leaves.attendance_utils import get_daily_attendance_summary
+        from django.utils import timezone
+
+        target = date(2026, 9, 10)  # A Thursday (working day)
+        tz = timezone.get_current_timezone()
+        dt1 = timezone.make_aware(datetime(2026, 9, 10, 10, 5, 0), tz)
+        dt2 = timezone.make_aware(datetime(2026, 9, 10, 17, 35, 0), tz)
+
+        AttendanceLog.objects.create(employee=self.employee, device_user_id="101", timestamp=dt1, status=0)
+        AttendanceLog.objects.create(employee=self.employee, device_user_id="101", timestamp=dt2, status=1)
+
+        summary = get_daily_attendance_summary(self.employee, target)
+        self.assertEqual(summary["status"], "present")
+        self.assertEqual(summary["punch_count"], 2)
+        self.assertIn("7h 30m", summary["duration_formatted"])
+
+    def test_daily_attendance_late_summary(self):
+        """Punch at 10:25 AM should be categorized as Late."""
+        from leaves.models import AttendanceLog
+        from leaves.attendance_utils import get_daily_attendance_summary
+        from django.utils import timezone
+
+        target = date(2026, 9, 10)
+        tz = timezone.get_current_timezone()
+        dt1 = timezone.make_aware(datetime(2026, 9, 10, 10, 25, 0), tz)
+        dt2 = timezone.make_aware(datetime(2026, 9, 10, 17, 30, 0), tz)
+
+        AttendanceLog.objects.create(employee=self.employee, device_user_id="101", timestamp=dt1, status=0)
+        AttendanceLog.objects.create(employee=self.employee, device_user_id="101", timestamp=dt2, status=1)
+
+        summary = get_daily_attendance_summary(self.employee, target)
+        self.assertEqual(summary["status"], "late")
+
+    def test_my_attendance_view_loads_successfully(self):
+        """Employee can access their monthly attendance calendar."""
+        self.client.force_login(self.employee)
+        response = self.client.get(reverse("my_attendance"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "My Attendance")
+        self.assertIn("calendar_weeks", response.context)
+        self.assertIn("summary_stats", response.context)
+
+    def test_team_attendance_view_permission(self):
+        """Manager can access team attendance roster; employee is forbidden."""
+        self.client.force_login(self.employee)
+        response = self.client.get(reverse("team_attendance"))
+        self.assertEqual(response.status_code, 403)
+
+        self.client.force_login(self.manager)
+        response = self.client.get(reverse("team_attendance"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Team Attendance")
+        self.assertIn("roster_rows", response.context)
+
+    def test_attendance_day_detail_api(self):
+        """Detail API returns punch timeline and duration for a given date."""
+        from leaves.models import AttendanceLog
+        from django.utils import timezone
+
+        target = date(2026, 9, 10)
+        tz = timezone.get_current_timezone()
+        dt1 = timezone.make_aware(datetime(2026, 9, 10, 10, 2, 0), tz)
+        dt2 = timezone.make_aware(datetime(2026, 9, 10, 17, 35, 0), tz)
+        AttendanceLog.objects.create(employee=self.employee, device_user_id="101", timestamp=dt1, status=0)
+        AttendanceLog.objects.create(employee=self.employee, device_user_id="101", timestamp=dt2, status=1)
+
+        self.client.force_login(self.employee)
+        response = self.client.get(f"{reverse('attendance_day_detail_api')}?date=2026-09-10")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["success"])
+        self.assertEqual(data["status"], "present")
+        self.assertEqual(len(data["punches"]), 2)
+
+    def test_gender_specific_holiday_attendance(self):
+        """Female holiday (Teej) should mark female staff as Holiday and male staff as Absent if unpunched."""
+        from leaves.models import PublicHoliday
+        from leaves.attendance_utils import get_daily_attendance_summary
+
+        female_emp = User.objects.create_user(
+            username="emp_sita",
+            first_name="Sita",
+            gender="female",
+            role="employee",
+            password="password123",
+        )
+        male_emp = User.objects.create_user(
+            username="emp_ramesh",
+            first_name="Ramesh",
+            gender="male",
+            role="employee",
+            password="password123",
+        )
+
+        teej_date = date(2026, 9, 14)  # Teej date (past date)
+        PublicHoliday.objects.create(
+            date=teej_date,
+            name="Haritalika Teej",
+            applicable_to="female",
+        )
+
+        female_summary = get_daily_attendance_summary(female_emp, teej_date)
+        self.assertEqual(female_summary["status"], "holiday")
+        self.assertIn("Haritalika Teej", female_summary["status_label"])
+
+        male_summary = get_daily_attendance_summary(male_emp, teej_date)
+        self.assertEqual(male_summary["status"], "absent")
+
+

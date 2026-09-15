@@ -13,6 +13,14 @@
 {% endif %}
 
 <div class="stat-grid">
+  <div class="stat-card green">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <div class="stat-label">Present Today</div>
+      <a href="{% url 'team_attendance' %}" style="font-size:0.75rem;font-weight:700;color:var(--color-primary);text-decoration:none;">Roster &rarr;</a>
+    </div>
+    <div class="stat-value">{{ team_attendance_today.present_count }} <span style="font-size:0.9rem;font-weight:600;color:var(--color-text-muted);">/ {{ employee_count }}</span></div>
+    <div class="stat-sub">{{ team_attendance_today.on_time_count }} on time · {{ team_attendance_today.late_count }} late</div>
+  </div>
   <div class="stat-card blue">
     <div class="stat-label">Team Size</div>
     <div class="stat-value">{{ employee_count }}</div>

@@ -1,0 +1,832 @@
+{% extends "base/base.html" %}
+{% load bs_date %}
+
+{% block title %}My Attendance{% endblock %}
+{% block page_title %}
+  {% if target_employee == request.user %}
+    My Attendance
+  {% else %}
+    Attendance — {{ target_employee.get_full_name|default:target_employee.username }}
+  {% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .att-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .att-nav-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .att-month-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--color-text);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 200px;
+    text-align: center;
+  }
+  .att-month-sub {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--color-text-muted);
+    margin-top: 2px;
+  }
+  
+  /* View Switcher Tabs */
+  .att-view-toggle {
+    display: inline-flex;
+    background: var(--overlay-3);
+    padding: 3px;
+    border-radius: 10px;
+    gap: 2px;
+    border: 1px solid var(--color-border);
+  }
+  .att-view-btn {
+    border: none;
+    background: transparent;
+    padding: 6px 14px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: var(--transition);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .att-view-btn.active {
+    background: var(--color-card);
+    color: var(--color-text);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  }
+
+  .att-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+  .att-stat-card {
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    box-shadow: var(--shadow);
+    transition: var(--transition);
+  }
+  .att-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+  }
+  .att-stat-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--color-text-muted);
+    margin-bottom: 4px;
+  }
+  .att-stat-val {
+    font-size: 1.55rem;
+    font-weight: 800;
+    color: var(--color-text);
+    line-height: 1.1;
+  }
+  .att-stat-sub {
+    font-size: 0.75rem;
+    color: var(--color-text-light);
+    margin-top: 4px;
+  }
+  .att-stat-card.green .att-stat-val { color: var(--color-success); }
+  .att-stat-card.yellow .att-stat-val { color: var(--color-warning); }
+  .att-stat-card.blue .att-stat-val { color: var(--color-primary); }
+  .att-stat-card.red .att-stat-val { color: var(--color-danger); }
+
+  /* Calendar Grid View */
+  .att-calendar-card {
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    margin-bottom: 30px;
+  }
+  .att-cal-scroll-wrapper {
+    width: 100%;
+  }
+  .att-cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    border-top: 1px solid var(--color-border);
+    width: 100%;
+  }
+  .att-cal-header-day {
+    padding: 10px 8px;
+    text-align: center;
+    font-weight: 700;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--color-text-muted);
+    background: var(--overlay-2);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .att-cal-header-day.sat {
+    color: var(--color-danger);
+    background: rgba(214, 0, 61, 0.04);
+  }
+  .att-cal-cell {
+    min-height: 100px;
+    border-right: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--color-border);
+    padding: 8px 10px;
+    position: relative;
+    background: var(--color-card);
+    transition: var(--transition);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .att-cal-cell:nth-child(7n) {
+    border-right: none;
+  }
+  .att-cal-cell.empty {
+    background: var(--overlay-1);
+    cursor: default;
+  }
+  .att-cal-cell:not(.empty):hover {
+    background: var(--overlay-4);
+    box-shadow: inset 0 0 0 2px var(--color-primary);
+  }
+  .att-cal-cell.today {
+    background: rgba(0, 145, 179, 0.06);
+    border: 2px solid var(--color-primary);
+  }
+  .att-cal-cell.weekend {
+    background: rgba(16, 21, 34, 0.02);
+  }
+  .att-cal-date-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .att-bs-num {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: var(--color-text);
+  }
+  .att-cal-cell.today .att-bs-num { color: var(--color-primary); }
+  .att-cal-cell.weekend .att-bs-num { color: var(--color-danger); }
+  .att-ad-num {
+    font-size: 0.75rem;
+    color: var(--color-text-light);
+    font-weight: 600;
+  }
+  .att-cell-content {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    flex: 1;
+  }
+
+  /* Badges */
+  .att-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 7px;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    width: fit-content;
+    line-height: 1.3;
+  }
+  .badge-present { background: rgba(10, 148, 80, 0.12); color: var(--color-success); border: 1px solid rgba(10, 148, 80, 0.25); }
+  .badge-late { background: rgba(179, 95, 0, 0.12); color: var(--color-warning); border: 1px solid rgba(179, 95, 0, 0.3); }
+  .badge-on_leave { background: rgba(0, 102, 204, 0.12); color: var(--color-accent); border: 1px solid rgba(0, 102, 204, 0.25); }
+  .badge-holiday { background: rgba(139, 63, 209, 0.12); color: var(--color-purple); border: 1px solid rgba(139, 63, 209, 0.25); }
+  .badge-weekend { background: rgba(16, 21, 34, 0.06); color: var(--color-text-muted); }
+  .badge-staff_movement { background: rgba(0, 184, 212, 0.12); color: #0091b3; border: 1px solid rgba(0, 184, 212, 0.3); }
+  .badge-regularized { background: rgba(13, 148, 136, 0.12); color: #0d9488; border: 1px solid rgba(13, 148, 136, 0.3); }
+  .badge-absent { background: rgba(214, 0, 61, 0.1); color: var(--color-danger); border: 1px solid rgba(214, 0, 61, 0.25); }
+  .badge-not_checked_in { background: rgba(16, 21, 34, 0.06); color: var(--color-text-muted); }
+  .badge-upcoming { opacity: 0.5; }
+
+  .att-times-row {
+    font-size: 0.72rem;
+    color: var(--color-text-muted);
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  .att-times-row span.in { color: var(--color-success); }
+  .att-times-row span.out { color: var(--color-accent); }
+  .att-duration-tag {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--color-text);
+    margin-top: 2px;
+  }
+
+  /* List View for Mobile */
+  .att-list-view {
+    display: none;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 30px;
+  }
+  .att-list-card {
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+    transition: var(--transition);
+  }
+  .att-list-card:hover {
+    background: var(--overlay-4);
+    border-color: var(--color-primary);
+  }
+  .att-list-card.today {
+    border: 2px solid var(--color-primary);
+    background: rgba(0, 145, 179, 0.04);
+  }
+  .att-list-card.weekend {
+    background: rgba(16, 21, 34, 0.015);
+  }
+  .att-list-date-box {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .att-list-day-circle {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    background: var(--overlay-3);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 1.1rem;
+    color: var(--color-text);
+    line-height: 1;
+  }
+  .att-list-card.today .att-list-day-circle {
+    background: var(--color-primary);
+    color: #ffffff;
+  }
+  .att-list-card.weekend .att-list-day-circle {
+    color: var(--color-danger);
+  }
+  .att-list-date-sub {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+  }
+  .att-list-times-box {
+    text-align: right;
+    font-size: 0.8rem;
+  }
+
+  /* Modal timeline styles */
+  .punch-timeline {
+    position: relative;
+    padding-left: 24px;
+    margin: 16px 0;
+  }
+  .punch-timeline::before {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 6px;
+    bottom: 6px;
+    width: 2px;
+    background: var(--color-border);
+  }
+  .punch-item {
+    position: relative;
+    padding-bottom: 14px;
+  }
+  .punch-item::before {
+    content: '';
+    position: absolute;
+    left: -20px;
+    top: 5px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(0, 145, 179, 0.2);
+  }
+  .punch-time {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--color-text);
+  }
+  .punch-meta {
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+  }
+
+  @media (max-width: 768px) {
+    .att-header-row {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 10px;
+    }
+    .att-nav-group {
+      justify-content: space-between;
+      width: 100%;
+    }
+    .att-month-title {
+      min-width: unset;
+      font-size: 1.1rem;
+    }
+    .att-view-toggle {
+      width: 100%;
+      justify-content: center;
+    }
+    .att-view-btn {
+      flex: 1;
+      justify-content: center;
+      padding: 6px;
+      font-size: 0.75rem;
+    }
+    .att-stats-grid {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+    .att-stat-card {
+      padding: 10px 12px;
+    }
+    .att-stat-val {
+      font-size: 1.25rem;
+    }
+    .att-stat-label {
+      font-size: 0.68rem;
+    }
+    .att-stat-sub {
+      font-size: 0.65rem;
+    }
+
+    /* Full 7-column calendar fit without sliding, with comfortable cell length */
+    .att-cal-scroll-wrapper {
+      width: 100%;
+      overflow: hidden;
+    }
+    .att-cal-grid {
+      width: 100%;
+      min-width: unset;
+    }
+    .att-cal-header-day {
+      padding: 6px 1px;
+      font-size: 0.65rem;
+      letter-spacing: 0;
+    }
+    .att-cal-cell {
+      min-height: 72px;
+      padding: 4px 3px;
+    }
+    .att-cal-date-row {
+      margin-bottom: 2px;
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+    .att-bs-num {
+      font-size: 0.88rem;
+      font-weight: 800;
+    }
+    .att-ad-num {
+      font-size: 0.55rem;
+      display: inline-block;
+      opacity: 0.85;
+    }
+    .att-badge {
+      font-size: 0.52rem;
+      padding: 1px 3px;
+      border-radius: 3px;
+      line-height: 1.15;
+      margin-bottom: 2px;
+    }
+    .att-times-row {
+      font-size: 0.52rem;
+      line-height: 1.15;
+    }
+    .att-duration-tag {
+      font-size: 0.52rem;
+      margin-top: 1px;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Top Header & Navigation -->
+<div class="att-header-row">
+  <div class="att-nav-group">
+    <a href="{% if prev_url %}{{ prev_url }}{% if is_manager and target_employee.id != request.user.id %}&employee_id={{ target_employee.id }}{% endif %}{% else %}#{% endif %}"
+       class="btn btn-outline btn-sm {% if not prev_url %}disabled{% endif %}" title="Previous Month">
+      <i class="ri-arrow-left-s-line"></i> Prev
+    </a>
+    
+    <div class="att-month-title">
+      <span>{{ calendar_bs_month_label }}</span>
+      <span class="att-month-sub">{{ calendar_ad_month_label }}</span>
+    </div>
+
+    <a href="{% if next_url %}{{ next_url }}{% if is_manager and target_employee.id != request.user.id %}&employee_id={{ target_employee.id }}{% endif %}{% else %}#{% endif %}"
+       class="btn btn-outline btn-sm {% if not next_url %}disabled{% endif %}" title="Next Month">
+      Next <i class="ri-arrow-right-s-line"></i>
+    </a>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <!-- View Switcher Toggle -->
+    <div class="att-view-toggle">
+      <button type="button" class="att-view-btn active" id="btnViewCalendar" onclick="switchAttendanceView('calendar')">
+        <i class="ri-calendar-grid-line"></i> Calendar
+      </button>
+      <button type="button" class="att-view-btn" id="btnViewList" onclick="switchAttendanceView('list')">
+        <i class="ri-list-check-2"></i> List
+      </button>
+    </div>
+
+    {% if is_manager %}
+    <form method="get" class="d-flex align-items-center" style="gap:8px;">
+      <input type="hidden" name="bs_year" value="{{ current_bs_year }}">
+      <input type="hidden" name="bs_month" value="{{ current_bs_month }}">
+      <select name="employee_id" class="form-select form-select-sm" style="min-width:180px;" onchange="this.form.submit()">
+        {% for emp in team_employees %}
+          <option value="{{ emp.id }}" {% if emp.id == target_employee.id %}selected{% endif %}>
+            {{ emp.get_full_name|default:emp.username }} {% if emp.department %}({{ emp.department }}){% endif %}
+          </option>
+        {% endfor %}
+      </select>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Summary Metric Cards -->
+<div class="att-stats-grid">
+  <div class="att-stat-card green">
+    <div class="att-stat-label">Present Days</div>
+    <div class="att-stat-val">{{ summary_stats.total_present }}</div>
+    <div class="att-stat-sub">including {{ summary_stats.total_late }} late arrival{{ summary_stats.total_late|pluralize }}</div>
+  </div>
+  <div class="att-stat-card yellow">
+    <div class="att-stat-label">Late Count</div>
+    <div class="att-stat-val">{{ summary_stats.total_late }}</div>
+    <div class="att-stat-sub">checked in after 10:15 AM</div>
+  </div>
+  <div class="att-stat-card blue">
+    <div class="att-stat-label">Total Work Hours</div>
+    <div class="att-stat-val">{{ summary_stats.total_work_hours }}h</div>
+    <div class="att-stat-sub">Avg {{ summary_stats.avg_daily_hours }} hrs/day</div>
+  </div>
+  <div class="att-stat-card red">
+    <div class="att-stat-label">Leaves / Absences</div>
+    <div class="att-stat-val">{{ summary_stats.total_leaves }} / {{ summary_stats.total_absent }}</div>
+    <div class="att-stat-sub">{{ summary_stats.total_leaves }} leave · {{ summary_stats.total_absent }} absent</div>
+  </div>
+</div>
+
+<!-- 1. Monthly Calendar Grid View -->
+<div class="att-calendar-card" id="attCalendarContainer">
+  <div class="att-cal-scroll-wrapper">
+    <div class="att-cal-grid">
+      <div class="att-cal-header-day">Sun</div>
+      <div class="att-cal-header-day">Mon</div>
+      <div class="att-cal-header-day">Tue</div>
+      <div class="att-cal-header-day">Wed</div>
+      <div class="att-cal-header-day">Thu</div>
+      <div class="att-cal-header-day">Fri</div>
+      <div class="att-cal-header-day sat">Sat</div>
+
+      {% for week in calendar_weeks %}
+        {% for day in week %}
+          {% if day.bs_d %}
+            <div class="att-cal-cell {% if day.is_today %}today{% endif %} {% if day.is_saturday %}weekend{% endif %}"
+                 onclick="openDayDetailModal('{{ day.ad_date|date:'Y-m-d' }}', '{{ day.bs_d }} {{ calendar_bs_month_label }}', '{{ day.ad_date|date:'M d, Y' }}')">
+              <div class="att-cal-date-row">
+                <span class="att-bs-num">{{ day.bs_d }}</span>
+                <span class="att-ad-num">{{ day.ad_date|date:"M d" }}</span>
+              </div>
+
+              <div class="att-cell-content">
+                {% if day.summary %}
+                  <span class="att-badge badge-{{ day.summary.status }}">
+                    {{ day.summary.status_label }}
+                  </span>
+
+                  {% if day.summary.first_punch or day.summary.last_punch %}
+                    <div class="att-times-row">
+                      {% if day.summary.first_punch %}
+                        <span class="in">In: {{ day.summary.first_punch.timestamp|date:"h:i A" }}</span>
+                      {% elif day.summary.has_missing_in %}
+                        <span class="in" style="color:var(--color-warning);font-size:0.72rem;font-weight:700;" title="Missing Check-in punch">In: — ⚠️</span>
+                      {% endif %}
+                      {% if day.summary.last_punch %}
+                        <br><span class="out">Out: {{ day.summary.last_punch.timestamp|date:"h:i A" }}</span>
+                      {% elif day.summary.has_missing_out %}
+                        <br><span class="out" style="color:var(--color-warning);font-size:0.72rem;font-weight:700;" title="Missing Check-out punch">Out: — ⚠️</span>
+                      {% endif %}
+                    </div>
+                    {% if day.summary.duration_formatted != "—" %}
+                      <div class="att-duration-tag">⏱ {{ day.summary.duration_formatted }}</div>
+                    {% endif %}
+                  {% elif day.summary.leave_info %}
+                    <div class="att-times-row" style="color:var(--color-accent);">{{ day.summary.leave_info }}</div>
+                  {% elif day.summary.holiday_name %}
+                    <div class="att-times-row" style="color:var(--color-purple);">{{ day.summary.holiday_name }}</div>
+                  {% endif %}
+                {% endif %}
+              </div>
+            </div>
+          {% else %}
+            <div class="att-cal-cell empty"></div>
+          {% endif %}
+        {% endfor %}
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- 2. Mobile-Friendly List View -->
+<div class="att-list-view" id="attListContainer">
+  {% for week in calendar_weeks %}
+    {% for day in week %}
+      {% if day.bs_d %}
+        <div class="att-list-card {% if day.is_today %}today{% endif %} {% if day.is_saturday %}weekend{% endif %}"
+             onclick="openDayDetailModal('{{ day.ad_date|date:'Y-m-d' }}', '{{ day.bs_d }} {{ calendar_bs_month_label }}', '{{ day.ad_date|date:'M d, Y' }}')">
+          <div class="att-list-date-box">
+            <div class="att-list-day-circle">
+              <span>{{ day.bs_d }}</span>
+            </div>
+            <div>
+              <div style="font-weight:700;font-size:0.95rem;color:var(--color-text);">
+                {{ day.bs_d }} {{ calendar_bs_month_label }}
+              </div>
+              <div class="att-list-date-sub">{{ day.ad_date|date:"l, M d, Y" }}</div>
+            </div>
+          </div>
+
+          <div class="att-list-times-box">
+            <div style="margin-bottom:4px;">
+              <span class="att-badge badge-{{ day.summary.status }}">{{ day.summary.status_label }}</span>
+            </div>
+            {% if day.summary.first_punch or day.summary.last_punch %}
+              <div style="font-size:0.78rem;color:var(--color-text-muted);font-weight:600;">
+                {% if day.summary.first_punch %}
+                  <span style="color:var(--color-success);">In: {{ day.summary.first_punch.timestamp|date:"h:i A" }}</span>
+                {% elif day.summary.has_missing_in %}
+                  <span style="color:var(--color-warning);">In: — ⚠️</span>
+                {% endif %}
+                {% if day.summary.last_punch %}
+                  · <span style="color:var(--color-accent);">Out: {{ day.summary.last_punch.timestamp|date:"h:i A" }}</span>
+                {% elif day.summary.has_missing_out %}
+                  · <span style="color:var(--color-warning);">Out: — ⚠️</span>
+                {% endif %}
+              </div>
+              {% if day.summary.duration_formatted != "—" %}
+                <div style="font-size:0.75rem;font-weight:700;color:var(--color-text);margin-top:2px;">⏱ {{ day.summary.duration_formatted }}</div>
+              {% endif %}
+            {% elif day.summary.leave_info %}
+              <div style="font-size:0.78rem;color:var(--color-accent);font-weight:600;">{{ day.summary.leave_info }}</div>
+            {% elif day.summary.holiday_name %}
+              <div style="font-size:0.78rem;color:var(--color-purple);font-weight:600;">{{ day.summary.holiday_name }}</div>
+            {% endif %}
+          </div>
+        </div>
+      {% endif %}
+    {% endfor %}
+  {% endfor %}
+</div>
+
+<!-- Day Detail Modal -->
+<div class="modal fade" id="dayDetailModal" tabindex="-1" aria-hidden="true" style="display:none;">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="background:var(--color-card);border:1px solid var(--color-border);border-radius:var(--radius);box-shadow:var(--shadow);">
+      <div class="modal-header" style="border-bottom:1px solid var(--color-border);padding:16px 20px;">
+        <div>
+          <h5 class="modal-title" id="modalDayTitle" style="font-weight:700;margin:0;">Attendance Details</h5>
+          <small id="modalDaySub" style="color:var(--color-text-muted);"></small>
+        </div>
+        <button type="button" class="btn-close" onclick="closeDayDetailModal()"></button>
+      </div>
+      <div class="modal-body" id="modalDayBody" style="padding:20px;">
+        <div class="text-center py-4"><i class="ri-loader-4-line ri-spin" style="font-size:2rem;color:var(--color-primary);"></i></div>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid var(--color-border);padding:12px 20px;">
+        <a href="#" id="modalRegularizeBtn" class="btn btn-outline btn-sm" style="display:none;">
+          <i class="ri-edit-line"></i> Request Regularization
+        </a>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="closeDayDetailModal()">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function switchAttendanceView(view) {
+    const calContainer = document.getElementById('attCalendarContainer');
+    const listContainer = document.getElementById('attListContainer');
+    const btnCal = document.getElementById('btnViewCalendar');
+    const btnList = document.getElementById('btnViewList');
+
+    if (view === 'list') {
+      calContainer.style.display = 'none';
+      listContainer.style.display = 'flex';
+      btnCal.classList.remove('active');
+      btnList.classList.add('active');
+      localStorage.setItem('attendance_view_pref', 'list');
+    } else {
+      calContainer.style.display = 'block';
+      listContainer.style.display = 'none';
+      btnList.classList.remove('active');
+      btnCal.classList.add('active');
+      localStorage.setItem('attendance_view_pref', 'calendar');
+    }
+  }
+
+  // Auto-select view preference (default to calendar)
+  document.addEventListener('DOMContentLoaded', () => {
+    const saved = localStorage.getItem('attendance_view_pref');
+    if (saved === 'list') {
+      switchAttendanceView('list');
+    } else {
+      switchAttendanceView('calendar');
+    }
+  });
+
+  function openDayDetailModal(adDate, bsLabel, adLabel) {
+    const modal = document.getElementById('dayDetailModal');
+    const title = document.getElementById('modalDayTitle');
+    const sub = document.getElementById('modalDaySub');
+    const body = document.getElementById('modalDayBody');
+    const regBtn = document.getElementById('modalRegularizeBtn');
+
+    title.innerText = bsLabel;
+    sub.innerText = adLabel;
+    body.innerHTML = '<div class="text-center py-4"><i class="ri-loader-4-line ri-spin" style="font-size:2rem;color:var(--color-primary);"></i><p style="margin-top:8px;color:var(--color-text-muted);">Loading punch data...</p></div>';
+
+    modal.style.display = 'block';
+    modal.classList.add('show');
+    document.body.classList.add('modal-open');
+
+    // Fetch details via API
+    fetch(`{% url 'attendance_day_detail_api' %}?employee_id={{ target_employee.id }}&date=${adDate}`)
+      .then(res => {
+        if (!res.ok) {
+          throw new Error(`Server returned ${res.status}`);
+        }
+        return res.json();
+      })
+      .then(data => {
+        if (!data.success) {
+          body.innerHTML = `<div class="alert alert-danger">${data.error || 'Failed to load details'}</div>`;
+          return;
+        }
+
+        let html = `
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+            <span class="att-badge badge-${data.status}" style="font-size:0.85rem;padding:4px 10px;">${data.status_label}</span>
+            <span style="font-weight:700;font-size:0.95rem;color:var(--color-text);">Total: ${data.duration_formatted}</span>
+          </div>
+        `;
+
+        if (data.in_time_display !== '—' || data.out_time_display !== '—') {
+          let inDisplay = data.in_time_display !== '—' ? data.in_time_display : (data.is_today ? '—' : '— (Missing)');
+          let outDisplay = data.out_time_display !== '—' ? data.out_time_display : (data.is_today ? '— (In Progress)' : '— (Missing)');
+          let inColor = data.in_time_display !== '—' ? 'var(--color-success)' : (data.is_today ? 'var(--color-text-muted)' : 'var(--color-warning)');
+          let outColor = data.out_time_display !== '—' ? 'var(--color-accent)' : (data.is_today ? 'var(--color-primary)' : 'var(--color-warning)');
+
+          html += `
+            <div style="background:var(--overlay-2);border-radius:10px;padding:12px;margin-bottom:16px;font-size:0.85rem;">
+              <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+                <span style="color:var(--color-text-muted);">First Check-in:</span>
+                <strong style="color:${inColor};">${inDisplay}</strong>
+              </div>
+              <div style="display:flex;justify-content:space-between;">
+                <span style="color:var(--color-text-muted);">Last Check-out:</span>
+                <strong style="color:${outColor};">${outDisplay}</strong>
+              </div>
+            </div>
+          `;
+        }
+
+        if (!data.is_today && data.has_missing_in) {
+          html += `<div class="alert alert-warning" style="font-size:0.85rem;margin-bottom:12px;"><i class="ri-alert-line"></i> <strong>Missing Check-in:</strong> Only a check-out punch was recorded on this day. Total hours cannot be calculated.</div>`;
+        }
+        if (!data.is_today && data.has_missing_out) {
+          html += `<div class="alert alert-warning" style="font-size:0.85rem;margin-bottom:12px;"><i class="ri-alert-line"></i> <strong>Missing Check-out:</strong> Only a check-in punch was recorded on this day. Total hours cannot be calculated.</div>`;
+        }
+
+        if (data.leave_info) {
+          html += `<div class="alert alert-info" style="font-size:0.85rem;margin-bottom:12px;"><i class="ri-information-line"></i> <strong>Approved Leave:</strong> ${data.leave_info}</div>`;
+        }
+        if (data.holiday_name) {
+          html += `<div class="alert alert-warning" style="font-size:0.85rem;margin-bottom:12px;"><i class="ri-calendar-event-line"></i> <strong>Public Holiday:</strong> ${data.holiday_name}</div>`;
+        }
+        if (data.movement_info && (Array.isArray(data.movement_info) ? data.movement_info.length > 0 : true)) {
+          let movList = Array.isArray(data.movement_info) ? data.movement_info : [{client: data.movement_info}];
+          html += `
+            <div style="background:var(--overlay-2);border-radius:10px;padding:12px 14px;margin-bottom:16px;border:1px solid rgba(0, 184, 212, 0.25);">
+              <div style="font-weight:700;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.5px;color:#0091b3;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+                <i class="ri-map-pin-user-line" style="font-size:0.95rem;"></i> Field Movements (${movList.length})
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px;">
+          `;
+          movList.forEach((mov, idx) => {
+            let timesText = '';
+            if (mov.out_time) {
+              timesText = ` <span style="color:var(--color-text-muted);font-weight:500;">(${mov.out_time} – ${mov.in_time || 'Out'})</span>`;
+            }
+            let purposeText = mov.purpose ? ` · <span style="color:var(--color-text-light);font-size:0.8rem;">${mov.purpose}</span>` : '';
+            let asstTag = mov.is_assisting ? ' <span class="badge" style="background:rgba(0,184,212,0.15);color:#0091b3;font-size:0.68rem;padding:2px 6px;">Assisting</span>' : '';
+            html += `
+              <div style="font-size:0.85rem;line-height:1.4;display:flex;align-items:baseline;gap:6px;">
+                <span style="color:#0091b3;font-weight:700;font-size:0.8rem;">${idx + 1}.</span>
+                <div>
+                  <strong style="color:var(--color-text);">${mov.client}</strong>${timesText}${purposeText}${asstTag}
+                </div>
+              </div>
+            `;
+          });
+          html += `
+              </div>
+            </div>
+          `;
+        }
+
+        html += `<h6 style="font-weight:700;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--color-text-muted);margin-top:16px;">Raw Punch Timeline (${data.punches.length})</h6>`;
+
+        if (data.punches.length > 0) {
+          html += '<div class="punch-timeline">';
+          data.punches.forEach(p => {
+            html += `
+              <div class="punch-item">
+                <div class="punch-time">${p.time}</div>
+                <div class="punch-meta">${p.status_display} · ${p.verify_mode} · ${p.device}</div>
+              </div>
+            `;
+          });
+          html += '</div>';
+        } else {
+          html += '<div style="color:var(--color-text-muted);font-size:0.85rem;padding:12px 0;">No biometric punches recorded on this date.</div>';
+        }
+
+        body.innerHTML = html;
+
+        // Show regularization button if absent, unpunched, or missing in/out punch
+        if (data.status === 'absent' || data.status === 'not_checked_in' || data.has_missing_in || data.has_missing_out || data.punches.length === 1) {
+          regBtn.style.display = 'inline-flex';
+          regBtn.href = `{% url 'apply_attendance_request' %}?date=${adDate}`;
+        } else {
+          regBtn.style.display = 'none';
+        }
+      })
+      .catch(err => {
+        body.innerHTML = `<div class="alert alert-danger">Error fetching details.</div>`;
+      });
+  }
+
+  function closeDayDetailModal() {
+    const modal = document.getElementById('dayDetailModal');
+    modal.style.display = 'none';
+    modal.classList.remove('show');
+    document.body.classList.remove('modal-open');
+  }
+
+  // Close modal on escape key or clicking backdrop
+  window.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeDayDetailModal();
+  });
+  window.addEventListener('click', e => {
+    const modal = document.getElementById('dayDetailModal');
+    if (e.target === modal) closeDayDetailModal();
+  });
+</script>
+{% endblock %}

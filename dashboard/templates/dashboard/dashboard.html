@@ -6,6 +6,27 @@
 
 {% block content %}
 <div class="stat-grid">
+  <div class="stat-card {% if today_attendance.status == 'present' %}green{% elif today_attendance.status == 'late' %}yellow{% elif today_attendance.status == 'on_leave' %}blue{% elif today_attendance.status == 'holiday' or today_attendance.status == 'weekend' %}blue{% else %}red{% endif %}">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <div class="stat-label">Today's Attendance</div>
+      <a href="{% url 'my_attendance' %}" style="font-size:0.75rem;font-weight:700;color:var(--color-primary);text-decoration:none;">View &rarr;</a>
+    </div>
+    <div class="stat-value" style="font-size:1.45rem;margin-top:2px;">
+      {% if today_attendance.first_punch %}
+        {{ today_attendance.first_punch.timestamp|date:"h:i A" }}
+      {% else %}
+        {{ today_attendance.status_label }}
+      {% endif %}
+    </div>
+    <div class="stat-sub">
+      {% if today_attendance.first_punch %}
+        <span style="font-weight:600;">{{ today_attendance.status_label }}</span>
+        {% if today_attendance.last_punch %} · Out: {{ today_attendance.last_punch.timestamp|date:"h:i A" }}{% endif %}
+      {% else %}
+        {% if today_attendance.leave_info %}{{ today_attendance.leave_info }}{% elif today_attendance.holiday_name %}{{ today_attendance.holiday_name }}{% else %}No punch recorded yet{% endif %}
+      {% endif %}
+    </div>
+  </div>
   <div class="stat-card {% if balance_remaining < 0 %}red{% else %}blue{% endif %}">
     <div class="stat-label">Leave Balance</div>
     <div class="stat-value" {% if balance_remaining < 0 %}style="color:var(--color-danger)"{% endif %}>{{ balance_remaining|floatformat:"-1" }}</div>

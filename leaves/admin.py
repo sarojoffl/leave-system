@@ -4,6 +4,7 @@ from django.utils import timezone
 from .models import (
     LeaveType, LeaveRequest, LeaveBalance, PublicHoliday,
     AttendanceRequest, HolidayWorkRequest, StaffMovement, StaffMovementAssistant, StaffMovementStop,
+    BiometricDevice, AttendanceLog,
 )
 
 
@@ -66,8 +67,8 @@ class LeaveBalanceAdmin(admin.ModelAdmin):
 
 @admin.register(PublicHoliday)
 class PublicHolidayAdmin(admin.ModelAdmin):
-    list_display = ("date", "name")
-    list_filter = ("date",)
+    list_display = ("date", "name", "applicable_to")
+    list_filter = ("applicable_to", "date")
     date_hierarchy = "date"
     ordering = ("date",)
 
@@ -143,3 +144,29 @@ class StaffMovementStopAdmin(admin.ModelAdmin):
     list_filter = ("client", "resolution_status", "movement__date")
     search_fields = ("client", "purpose", "work_done_for", "completion_notes", "movement__employee__username")
     ordering = ("-movement__date", "order")
+
+
+@admin.register(BiometricDevice)
+class BiometricDeviceAdmin(admin.ModelAdmin):
+    list_display = ("serial_number", "name", "is_active", "last_seen", "created_at")
+    list_filter = ("is_active",)
+    search_fields = ("serial_number", "name")
+    readonly_fields = ("created_at", "last_seen")
+
+
+@admin.register(AttendanceLog)
+class AttendanceLogAdmin(admin.ModelAdmin):
+    list_display = ("device_user_id", "employee", "timestamp", "status_display", "verify_display", "device")
+    list_filter = ("status", "device", "timestamp")
+    search_fields = ("device_user_id", "employee__username", "employee__first_name", "employee__last_name")
+    date_hierarchy = "timestamp"
+    readonly_fields = ("created_at", "raw_data")
+    autocomplete_fields = ("employee",)
+
+    @admin.display(description="Status")
+    def status_display(self, obj):
+        return obj.get_status_display()
+
+    @admin.display(description="Verify")
+    def verify_display(self, obj):
+        return obj.get_verify_mode_display() if obj.verify_mode is not None else "—"

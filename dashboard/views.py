@@ -16,6 +16,10 @@ from leaves.models import (
 from leaves.permissions import manager_required
 from leaves.views import get_fiscal_year_start
 from leaves.bs_convert import ad_to_bs, bs_month_name, bs_to_ad, build_ad_label, _BS
+from leaves.attendance_utils import (
+    get_daily_attendance_summary,
+    get_today_team_attendance_summary,
+)
 
 
 def _build_bs_calendar(
@@ -175,6 +179,7 @@ def calendar_data(request):
             date__gte=bs_month_start_ad,
             date__lte=bs_month_end_ad,
         )
+        if h.applies_to(request.user)
     }
 
     if is_manager:
@@ -301,6 +306,7 @@ def dashboard(request):
             date__gte=bs_month_start_ad,
             date__lte=bs_month_end_ad,
         )
+        if h.applies_to(user)
     }
 
     user_leave_map = {}
@@ -336,10 +342,13 @@ def dashboard(request):
         "type": l.leave_type.name,
     } for l in team_leaves_today]
 
-    public_holidays = PublicHoliday.objects.filter(
-        date__gte=bs_month_start_ad,
-        date__lte=bs_month_end_ad,
-    )
+    public_holidays = [
+        h for h in PublicHoliday.objects.filter(
+            date__gte=bs_month_start_ad,
+            date__lte=bs_month_end_ad,
+        )
+        if h.applies_to(user)
+    ]
 
     overflow_percent = (
         max(round(((balance.used - balance.total) / balance.total) * 100), 0)
@@ -348,7 +357,10 @@ def dashboard(request):
 
     prev_params, next_params = _nav_params(bs_y, bs_m)
 
+    today_attendance = get_daily_attendance_summary(user, today)
+
     context = {
+        "today_attendance":          today_attendance,
         "balance_used":        balance.used if balance else 0,
         "balance_total":       balance.total if balance else 12,
         "balance_remaining":   balance.remaining if balance else 12,
@@ -488,6 +500,7 @@ def manager_dashboard(request):
             date__gte=bs_month_start_ad,
             date__lte=bs_month_end_ad,
         )
+        if h.applies_to(request.user)
     }
 
     month_leaves = list(
@@ -505,7 +518,10 @@ def manager_dashboard(request):
         holiday_map=month_holidays, month_leaves=month_leaves, is_manager=True,
     )
 
+    team_attendance_today = get_today_team_attendance_summary()
+
     context = {
+        "team_attendance_today":     team_attendance_today,
         "employee_count":            employee_count,
         "on_leave_today_count":      on_leave_today_count,
         "on_leave_today":            on_leave_today,

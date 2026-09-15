@@ -471,11 +471,17 @@
     </div>
   </div>
   {% else %}
-  <div class="card" style="margin-bottom: 20px;">
-    <div class="card-header">
+  <div class="card" id="log-movement-card" style="margin-bottom: 20px;">
+    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;{% if not is_edit and is_staff_movement_admin %}cursor:pointer;{% endif %}" {% if not is_edit and is_staff_movement_admin %}onclick="toggleLogForm()"{% endif %}>
       <span class="card-title">{% if is_edit %}Edit Movement Record{% else %}Log Client Visit / Movement{% endif %}</span>
+      {% if not is_edit and is_staff_movement_admin %}
+        <button type="button" class="btn btn-primary btn-sm" id="toggle-log-form-btn" onclick="event.stopPropagation(); toggleLogForm();">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          Log Movement
+        </button>
+      {% endif %}
     </div>
-    <form method="post" action="{% if is_edit %}{% url 'staff_movement_edit' movement.id %}{% else %}{% url 'staff_movement' %}{% endif %}" class="card-body">
+    <form method="post" action="{% if is_edit %}{% url 'staff_movement_edit' movement.id %}{% else %}{% url 'staff_movement' %}{% endif %}" class="card-body" id="log-movement-form-body" {% if not is_edit and is_staff_movement_admin %}style="display:none;"{% endif %}>
       {% csrf_token %}
 
       {% if is_edit and is_staff_movement_admin %}
@@ -774,6 +780,9 @@
         </button>
         {% if not is_edit %}
           <button type="reset" class="btn btn-outline" onclick="document.getElementById('date-bs').textContent='';">Clear Form</button>
+          {% if is_staff_movement_admin %}
+            <button type="button" class="btn btn-outline" onclick="toggleLogForm(false)">Cancel</button>
+          {% endif %}
         {% endif %}
       </div>
     </form>
@@ -1449,6 +1458,24 @@
     if (container && container.querySelectorAll(".edit-destination-row").length > 1) {
       row.remove();
       reindexDestinationBadges("edit-destinations-list", "edit-destination-row");
+    }
+  }
+
+  // Toggle Log Movement form for proxy loggers
+  function toggleLogForm(forceOpen) {
+    const formBody = document.getElementById('log-movement-form-body');
+    const btn = document.getElementById('toggle-log-form-btn');
+    if (!formBody) return;
+
+    const shouldOpen = (forceOpen !== undefined) ? forceOpen : (formBody.style.display === 'none');
+
+    if (shouldOpen) {
+      formBody.style.display = '';
+      if (btn) btn.innerHTML = '<i class="ri-close-line"></i> Close';
+      formBody.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      formBody.style.display = 'none';
+      if (btn) btn.innerHTML = '<i class="ri-add-line"></i> Log Movement';
     }
   }
 </script>

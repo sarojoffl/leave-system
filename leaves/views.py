@@ -1,12 +1,14 @@
 import logging
 from calendar import month_name
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from io import BytesIO
 
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
+
+User = get_user_model()
 from django.core.exceptions import PermissionDenied
 from django.core.mail import send_mail
 from django.db import transaction
@@ -28,7 +30,14 @@ from .models import AttendanceRequest, HolidayWorkRequest, LeaveBalance, LeaveRe
 from .permissions import manager_required
 
 logger = logging.getLogger(__name__)
-from leaves.bs_convert import ad_to_bs_display
+from leaves.bs_convert import (
+    _BS, ad_to_bs, bs_to_ad, bs_month_name, build_ad_label, ad_to_bs_display,
+)
+from leaves.attendance_utils import (
+    get_daily_attendance_summary,
+    get_monthly_attendance_summary,
+    get_today_team_attendance_summary,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -966,16 +975,18 @@ def _get_reports_data(today=None):
 
     monthly_qs = LeaveRequest.objects.filter(
         status="approved",
-    ).only("start_date", "end_date")
+    ).select_related("employee").only("start_date", "end_date", "employee__gender")
     monthly_days_map = {m: 0 for m in range(1, 13)}
 
     from leaves.models import PublicHoliday
-    holidays = set(PublicHoliday.objects.values_list("date", flat=True))
+    all_holidays = list(PublicHoliday.objects.all())
 
     for l in monthly_qs:
+        # Build employee-specific holiday date set
+        emp_holidays = set(h.date for h in all_holidays if h.applies_to(l.employee))
         curr = l.start_date
         while curr <= l.end_date:
-            if curr.weekday() != 5 and curr not in holidays:
+            if curr.weekday() != 5 and curr not in emp_holidays:
                 try:
                     bs_y, bs_m, _ = ad_to_bs(curr)
                     if bs_y == bs_y_today:
@@ -1062,13 +1073,15 @@ def _get_monthly_employee_leave_stats(bs_year, bs_month):
         .order_by("employee__first_name", "employee__username")
     )
 
-    holidays = set(PublicHoliday.objects.values_list("date", flat=True))
+    all_holidays = list(PublicHoliday.objects.all())
     per_emp_map = {}
 
     for l in approved_leaves:
+        # Build employee-specific holiday date set
+        emp_holidays = set(h.date for h in all_holidays if h.applies_to(l.employee))
         curr = l.start_date
         while curr <= l.end_date:
-            if curr.weekday() != 5 and curr not in holidays:
+            if curr.weekday() != 5 and curr not in emp_holidays:
                 try:
                     bs_y, bs_m, _ = ad_to_bs(curr)
                 except (ValueError, AttributeError):
@@ -2639,3 +2652,202 @@ def staff_movement_export_pdf(request):
         "today_bs": today_bs,
     }
     return render(request, "leaves/staff_movement_pdf.html", context)
+
+
+# ---------------------------------------------------------------------------
+# Attendance Views
+# ---------------------------------------------------------------------------
+
+@login_required
+def my_attendance(request):
+    today = date.today()
+    bs_y_today, bs_m_today, _ = ad_to_bs(today)
+
+    try:
+        bs_y = int(request.GET.get("bs_year", bs_y_today))
+        bs_m = int(request.GET.get("bs_month", bs_m_today))
+        if bs_y not in _BS or not (1 <= bs_m <= 12):
+            bs_y, bs_m = bs_y_today, bs_m_today
+    except (ValueError, TypeError):
+        bs_y, bs_m = bs_y_today, bs_m_today
+
+    is_manager = request.user.has_management_access
+    target_employee = request.user
+    emp_id = request.GET.get("employee_id")
+    if is_manager and emp_id:
+        target_employee = get_object_or_404(User, pk=emp_id)
+
+    total_bs_days = _BS[bs_y][bs_m - 1]
+    bs_month_start_ad = bs_to_ad(bs_y, bs_m, 1)
+    bs_month_end_ad = bs_to_ad(bs_y, bs_m, total_bs_days)
+
+    monthly_summary = get_monthly_attendance_summary(target_employee, bs_month_start_ad, bs_month_end_ad)
+    days_summary = monthly_summary["days"]
+
+    first_weekday_py = bs_month_start_ad.weekday()  # Monday=0, Sunday=6
+    first_weekday_sun = (first_weekday_py + 1) % 7   # Sunday=0, Saturday=6
+
+    days_flat = [{}] * first_weekday_sun
+    for bs_d in range(1, total_bs_days + 1):
+        ad_date = bs_month_start_ad + timedelta(days=bs_d - 1)
+        day_sum = days_summary.get(ad_date)
+        days_flat.append({
+            "bs_d": bs_d,
+            "ad_date": ad_date,
+            "is_today": ad_date == today,
+            "is_saturday": ad_date.weekday() == 5,
+            "summary": day_sum,
+        })
+
+    remainder = len(days_flat) % 7
+    if remainder:
+        days_flat.extend([{}] * (7 - remainder))
+
+    calendar_weeks = [days_flat[i:i + 7] for i in range(0, len(days_flat), 7)]
+
+    if bs_m == 1:
+        prev_y, prev_m = bs_y - 1, 12
+    else:
+        prev_y, prev_m = bs_y, bs_m - 1
+
+    if bs_m == 12:
+        next_y, next_m = bs_y + 1, 1
+    else:
+        next_y, next_m = bs_y, bs_m + 1
+
+    prev_url = f"?bs_year={prev_y}&bs_month={prev_m}" if prev_y in _BS else None
+    next_url = f"?bs_year={next_y}&bs_month={next_m}" if next_y in _BS else None
+
+    team_employees = None
+    if is_manager:
+        team_employees = User.objects.filter(is_active=True).exclude(role="ceo").order_by("first_name", "username")
+
+    context = {
+        "target_employee": target_employee,
+        "is_manager": is_manager,
+        "team_employees": team_employees,
+        "current_bs_year": bs_y,
+        "current_bs_month": bs_m,
+        "calendar_bs_month_label": f"{bs_month_name(bs_m)} {bs_y}",
+        "calendar_ad_month_label": build_ad_label(bs_month_start_ad, bs_month_end_ad),
+        "calendar_weeks": calendar_weeks,
+        "summary_stats": monthly_summary,
+        "prev_url": prev_url,
+        "next_url": next_url,
+    }
+    return render(request, "leaves/my_attendance.html", context)
+
+
+@login_required
+@manager_required
+def team_attendance(request):
+    today = date.today()
+    date_str = request.GET.get("date")
+    target_date = today
+    if date_str:
+        try:
+            target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            target_date = today
+
+    target_date_bs = ad_to_bs_display(target_date)
+    active_employees = list(User.objects.filter(is_active=True).exclude(role="ceo").order_by("first_name", "username"))
+
+    roster_rows = []
+    present_cnt = 0
+    late_cnt = 0
+    on_leave_cnt = 0
+    not_in_cnt = 0
+
+    for emp in active_employees:
+        summary = get_daily_attendance_summary(emp, target_date)
+        roster_rows.append({
+            "employee": emp,
+            "summary": summary,
+        })
+        st = summary["status"]
+        if st in ("present", "short_hours"):
+            present_cnt += 1
+        elif st == "late":
+            late_cnt += 1
+            present_cnt += 1
+        elif st == "on_leave":
+            on_leave_cnt += 1
+        elif st in ("absent", "not_checked_in"):
+            not_in_cnt += 1
+
+    roster_stats = {
+        "total": len(active_employees),
+        "present": present_cnt,
+        "late": late_cnt,
+        "on_leave": on_leave_cnt,
+        "not_in": not_in_cnt,
+    }
+
+    context = {
+        "target_date": target_date,
+        "target_date_bs_display": target_date_bs,
+        "roster_rows": roster_rows,
+        "roster_stats": roster_stats,
+    }
+    return render(request, "leaves/team_attendance.html", context)
+
+
+@login_required
+def attendance_day_detail_api(request):
+    try:
+        emp_id = request.GET.get("employee_id")
+        date_str = request.GET.get("date")
+
+        if not date_str:
+            return JsonResponse({"success": False, "error": "Missing date parameter"}, status=400)
+
+        try:
+            target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            return JsonResponse({"success": False, "error": "Invalid date format"}, status=400)
+
+        if emp_id and (request.user.has_management_access or str(request.user.id) == str(emp_id)):
+            employee = get_object_or_404(User, pk=emp_id)
+        else:
+            employee = request.user
+
+        summary = get_daily_attendance_summary(employee, target_date)
+
+        in_time_str = timezone.localtime(summary["first_punch"].timestamp).strftime("%I:%M %p") if summary["first_punch"] else "—"
+        out_time_str = timezone.localtime(summary["last_punch"].timestamp).strftime("%I:%M %p") if summary["last_punch"] else "—"
+
+        punches_data = []
+        for p in summary["punches"]:
+            dev_name = "Biometric"
+            if p.device:
+                dev_name = p.device.name or p.device.serial_number or "Biometric"
+            punches_data.append({
+                "time": timezone.localtime(p.timestamp).strftime("%I:%M:%S %p"),
+                "status_display": p.get_status_display(),
+                "verify_mode": p.get_verify_mode_display() if p.verify_mode is not None else "Device",
+                "device": dev_name,
+            })
+
+        return JsonResponse({
+            "success": True,
+            "employee_name": employee.get_full_name() or employee.username,
+            "date_ad": target_date.strftime("%Y-%m-%d"),
+            "date_bs": ad_to_bs_display(target_date),
+            "status": summary["status"],
+            "status_label": summary["status_label"],
+            "in_time_display": in_time_str,
+            "out_time_display": out_time_str,
+            "duration_formatted": summary["duration_formatted"],
+            "has_missing_in": summary.get("has_missing_in", False),
+            "has_missing_out": summary.get("has_missing_out", False),
+            "is_today": target_date == date.today(),
+            "first_punch": bool(summary["first_punch"]),
+            "leave_info": summary["leave_info"],
+            "holiday_name": summary["holiday_name"],
+            "movement_info": summary["movement_info"],
+            "punches": punches_data,
+        })
+    except Exception as e:
+        logger.exception("Error in attendance_day_detail_api: %s", e)
+        return JsonResponse({"success": False, "error": f"Server error: {str(e)}"}, status=500)

@@ -1,0 +1,242 @@
+{% extends "base/base.html" %}
+{% load bs_date %}
+
+{% block title %}Team Attendance{% endblock %}
+{% block page_title %}Team Attendance & Daily Roster{% endblock %}
+
+{% block extra_css %}
+<style>
+  .roster-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .roster-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+  .roster-stat-card {
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    box-shadow: var(--shadow);
+    transition: var(--transition);
+  }
+  .roster-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.05);
+  }
+  .roster-stat-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    letter-spacing: 0.5px;
+  }
+  .roster-stat-val {
+    font-size: 1.55rem;
+    font-weight: 800;
+    margin-top: 4px;
+    color: var(--color-text);
+  }
+  .roster-stat-card.green .roster-stat-val { color: var(--color-success); }
+  .roster-stat-card.yellow .roster-stat-val { color: var(--color-warning); }
+  .roster-stat-card.blue .roster-stat-val { color: var(--color-primary); }
+  .roster-stat-card.red .roster-stat-val { color: var(--color-danger); }
+
+  .roster-table-card {
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .emp-cell {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .emp-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--color-primary-dark);
+    color: var(--color-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .att-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    font-weight: 700;
+  }
+  .badge-present { background: rgba(10, 148, 80, 0.12); color: var(--color-success); border: 1px solid rgba(10, 148, 80, 0.25); }
+  .badge-late { background: rgba(179, 95, 0, 0.12); color: var(--color-warning); border: 1px solid rgba(179, 95, 0, 0.3); }
+  .badge-on_leave { background: rgba(0, 102, 204, 0.12); color: var(--color-accent); border: 1px solid rgba(0, 102, 204, 0.25); }
+  .badge-holiday { background: rgba(139, 63, 209, 0.12); color: var(--color-purple); border: 1px solid rgba(139, 63, 209, 0.25); }
+  .badge-weekend { background: rgba(16, 21, 34, 0.06); color: var(--color-text-muted); }
+  .badge-staff_movement { background: rgba(0, 184, 212, 0.12); color: #0091b3; border: 1px solid rgba(0, 184, 212, 0.3); }
+  .badge-regularized { background: rgba(13, 148, 136, 0.12); color: #0d9488; border: 1px solid rgba(13, 148, 136, 0.3); }
+  .badge-absent { background: rgba(214, 0, 61, 0.1); color: var(--color-danger); border: 1px solid rgba(214, 0, 61, 0.25); }
+  .badge-not_checked_in { background: rgba(16, 21, 34, 0.06); color: var(--color-text-muted); }
+
+  @media (max-width: 768px) {
+    .roster-header {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 14px;
+    }
+    .roster-stats {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+    .roster-stat-val {
+      font-size: 1.35rem;
+    }
+    .roster-table-card .table-responsive {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .roster-table-card table {
+      min-width: 650px;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="roster-header">
+  <form method="get" class="d-flex align-items-center" style="gap:10px;flex-wrap:wrap;">
+    <div style="font-weight:700;font-size:1.1rem;color:var(--color-text);">
+      {{ target_date_bs_display }} <span style="font-size:0.85rem;color:var(--color-text-muted);font-weight:500;">({{ target_date|date:"M d, Y" }})</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <input type="date" name="date" value="{{ target_date|date:'Y-m-d' }}" class="form-control form-control-sm" style="width:145px;" onchange="this.form.submit()">
+      <button type="submit" class="btn btn-outline btn-sm">Filter</button>
+      <a href="{% url 'team_attendance' %}" class="btn btn-secondary btn-sm" title="Jump to Today">Today</a>
+    </div>
+  </form>
+
+  <div>
+    <a href="{% url 'my_attendance' %}" class="btn btn-outline btn-sm">
+      <i class="ri-calendar-line"></i> View Monthly Calendar
+    </a>
+  </div>
+</div>
+
+<!-- Summary Counter Pills -->
+<div class="roster-stats">
+  <div class="roster-stat-card blue">
+    <div class="roster-stat-label">Total Staff</div>
+    <div class="roster-stat-val">{{ roster_stats.total }}</div>
+  </div>
+  <div class="roster-stat-card green">
+    <div class="roster-stat-label">Present</div>
+    <div class="roster-stat-val">{{ roster_stats.present }}</div>
+  </div>
+  <div class="roster-stat-card yellow">
+    <div class="roster-stat-label">Late Arrival</div>
+    <div class="roster-stat-val">{{ roster_stats.late }}</div>
+  </div>
+  <div class="roster-stat-card blue">
+    <div class="roster-stat-label">On Leave</div>
+    <div class="roster-stat-val">{{ roster_stats.on_leave }}</div>
+  </div>
+  <div class="roster-stat-card red">
+    <div class="roster-stat-label">Not In / Absent</div>
+    <div class="roster-stat-val">{{ roster_stats.not_in }}</div>
+  </div>
+</div>
+
+<!-- Daily Roster Table -->
+<div class="roster-table-card">
+  <div class="card-header" style="padding:16px 20px;border-bottom:1px solid var(--color-border);display:flex;justify-content:space-between;align-items:center;">
+    <span class="card-title" style="font-size:1rem;font-weight:700;">Employee Daily Punch Roster</span>
+    <span class="card-meta">{{ roster_rows|length }} employee{{ roster_rows|length|pluralize }}</span>
+  </div>
+  <div class="table-responsive">
+    <table>
+      <thead>
+        <tr>
+          <th>Employee</th>
+          <th>Status</th>
+          <th>First In</th>
+          <th>Last Out</th>
+          <th>Worked Duration</th>
+          <th>Punches</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in roster_rows %}
+          <tr>
+            <td>
+              <div class="emp-cell">
+                <div class="emp-avatar">{{ row.employee.initials }}</div>
+                <div>
+                  <div style="font-weight:600;color:var(--color-text);">{{ row.employee.get_full_name|default:row.employee.username }}</div>
+                  <div style="font-size:0.75rem;color:var(--color-text-muted);">{{ row.employee.department|default:"General" }}</div>
+                </div>
+              </div>
+            </td>
+            <td>
+              <span class="att-badge badge-{{ row.summary.status }}">
+                {{ row.summary.status_label }}
+              </span>
+            </td>
+            <td>
+              {% if row.summary.first_punch %}
+                <strong style="color:var(--color-success);">{{ row.summary.first_punch.timestamp|date:"h:i A" }}</strong>
+              {% else %}
+                <span style="color:var(--color-text-light);">—</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if row.summary.last_punch %}
+                <strong style="color:var(--color-accent);">{{ row.summary.last_punch.timestamp|date:"h:i A" }}</strong>
+              {% elif row.summary.has_missing_out %}
+                <span style="color:var(--color-warning);font-size:0.75rem;font-weight:700;" title="Missing Check-out punch">Out: — ⚠️</span>
+              {% else %}
+                <span style="color:var(--color-text-light);">—</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if row.summary.duration_formatted != "—" %}
+                <strong>{{ row.summary.duration_formatted }}</strong>
+              {% else %}
+                <span style="color:var(--color-text-light);">—</span>
+              {% endif %}
+            </td>
+            <td>
+              <span class="badge" style="background:var(--overlay-3);color:var(--color-text);">{{ row.summary.punch_count }}</span>
+            </td>
+            <td>
+              <a href="{% url 'my_attendance' %}?employee_id={{ row.employee.id }}" class="btn btn-outline btn-sm" title="View Monthly Calendar">
+                <i class="ri-calendar-line"></i> Monthly
+              </a>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="7" class="empty-state">No active employees found.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

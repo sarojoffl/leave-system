@@ -10,10 +10,21 @@ class User(AbstractUser):
         ('ceo', 'CEO'),
     )
 
+    GENDER_CHOICES = (
+        ('male', 'Male'),
+        ('female', 'Female'),
+        ('other', 'Other'),
+    )
+
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='employee')
+    gender = models.CharField(max_length=10, choices=GENDER_CHOICES, blank=True, null=True)
     department = models.CharField(max_length=100, blank=True, null=True)
     position = models.CharField(max_length=100, blank=True, null=True)
     must_change_password = models.BooleanField(default=False)
+    device_user_id = models.CharField(
+        max_length=20, blank=True, null=True, unique=True,
+        help_text="Biometric device User ID / PIN for ZKTeco attendance"
+    )
 
     @property
     def initials(self):
