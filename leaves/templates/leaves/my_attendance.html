@@ -221,6 +221,7 @@
   .badge-weekend { background: rgba(16, 21, 34, 0.06); color: var(--color-text-muted); }
   .badge-staff_movement { background: rgba(0, 184, 212, 0.12); color: #0091b3; border: 1px solid rgba(0, 184, 212, 0.3); }
   .badge-regularized { background: rgba(13, 148, 136, 0.12); color: #0d9488; border: 1px solid rgba(13, 148, 136, 0.3); }
+  .badge-holiday_work { background: rgba(99, 102, 241, 0.14); color: #4f46e5; border: 1px solid rgba(99, 102, 241, 0.35); }
   .badge-absent { background: rgba(214, 0, 61, 0.1); color: var(--color-danger); border: 1px solid rgba(214, 0, 61, 0.25); }
   .badge-not_checked_in { background: rgba(16, 21, 34, 0.06); color: var(--color-text-muted); }
   .badge-upcoming { opacity: 0.5; }
@@ -238,6 +239,19 @@
     font-weight: 700;
     color: var(--color-text);
     margin-top: 2px;
+  }
+  .att-ot-tag {
+    display: inline-block;
+    font-size: 0.64rem;
+    font-weight: 700;
+    color: #4f46e5;
+    background: rgba(79, 70, 229, 0.1);
+    border: 1px solid rgba(79, 70, 229, 0.22);
+    border-radius: 4px;
+    padding: 0px 4px;
+    margin-left: 2px;
+    line-height: 1.25;
+    vertical-align: baseline;
   }
 
   /* List View for Mobile */
@@ -502,7 +516,9 @@
   <div class="att-stat-card blue">
     <div class="att-stat-label">Total Work Hours</div>
     <div class="att-stat-val">{{ summary_stats.total_work_hours }}h</div>
-    <div class="att-stat-sub">Avg {{ summary_stats.avg_daily_hours }} hrs/day</div>
+    <div class="att-stat-sub">
+      Avg {{ summary_stats.avg_daily_hours }} hrs/day{% if summary_stats.total_overtime_hours > 0 %} · <strong style="color:#4f46e5;">{{ summary_stats.total_overtime_hours }}h OT</strong>{% endif %}
+    </div>
   </div>
   <div class="att-stat-card red">
     <div class="att-stat-label">Leaves / Absences</div>
@@ -553,7 +569,12 @@
                       {% endif %}
                     </div>
                     {% if day.summary.duration_formatted != "—" %}
-                      <div class="att-duration-tag">⏱ {{ day.summary.duration_formatted }}</div>
+                      <div class="att-duration-tag">
+                        ⏱ {{ day.summary.duration_formatted }}
+                        {% if day.summary.overtime_formatted %}
+                          <span class="att-ot-tag" title="Overtime: {{ day.summary.overtime_formatted }}">{{ day.summary.overtime_formatted }} OT</span>
+                        {% endif %}
+                      </div>
                     {% endif %}
                   {% elif day.summary.leave_info %}
                     <div class="att-times-row" style="color:var(--color-accent);">{{ day.summary.leave_info }}</div>
@@ -609,7 +630,12 @@
                 {% endif %}
               </div>
               {% if day.summary.duration_formatted != "—" %}
-                <div style="font-size:0.75rem;font-weight:700;color:var(--color-text);margin-top:2px;">⏱ {{ day.summary.duration_formatted }}</div>
+                <div style="font-size:0.75rem;font-weight:700;color:var(--color-text);margin-top:2px;">
+                  ⏱ {{ day.summary.duration_formatted }}
+                  {% if day.summary.overtime_formatted %}
+                    <span class="att-ot-tag" style="font-size:0.68rem;padding:1px 5px;margin-left:4px;" title="Overtime: {{ day.summary.overtime_formatted }}">{{ day.summary.overtime_formatted }} OT</span>
+                  {% endif %}
+                </div>
               {% endif %}
             {% elif day.summary.leave_info %}
               <div style="font-size:0.78rem;color:var(--color-accent);font-weight:600;">{{ day.summary.leave_info }}</div>
@@ -710,10 +736,12 @@
           return;
         }
 
+        let otTag = data.overtime_formatted ? ` <span class="badge" style="background:rgba(99,102,241,0.12);color:#4f46e5;border:1px solid rgba(99,102,241,0.28);font-size:0.75rem;padding:2px 7px;margin-left:6px;">${data.overtime_formatted} OT</span>` : '';
+
         let html = `
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
             <span class="att-badge badge-${data.status}" style="font-size:0.85rem;padding:4px 10px;">${data.status_label}</span>
-            <span style="font-weight:700;font-size:0.95rem;color:var(--color-text);">Total: ${data.duration_formatted}</span>
+            <span style="font-weight:700;font-size:0.95rem;color:var(--color-text);">Total: ${data.duration_formatted}${otTag}</span>
           </div>
         `;
 
@@ -737,6 +765,9 @@
           `;
         }
 
+        if (data.holiday_work_approved) {
+          html += `<div class="alert alert-info" style="font-size:0.85rem;margin-bottom:12px;"><i class="ri-checkbox-circle-line"></i> <strong>Approved Holiday Work:</strong> Holiday / Weekend Work Request is approved for this day.</div>`;
+        }
         if (!data.is_today && data.has_missing_in) {
           html += `<div class="alert alert-warning" style="font-size:0.85rem;margin-bottom:12px;"><i class="ri-alert-line"></i> <strong>Missing Check-in:</strong> Only a check-out punch was recorded on this day. Total hours cannot be calculated.</div>`;
         }

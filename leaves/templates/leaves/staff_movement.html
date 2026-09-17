@@ -795,14 +795,20 @@
       <div class="card-body" style="padding:16px 20px">
         <form method="get" class="staff-filters">
           <div style="display: flex; flex-direction: column; gap: 4px;">
-            <label style="font-size: 0.75rem; color: var(--color-text-muted); font-weight: 600;">Date</label>
-            <input type="date" id="admin-filter-date" name="admin_date" value="{{ admin_filter_date }}" class="staff-search-input" style="max-width:180px;">
-            <small id="admin-filter-date-bs" style="color:var(--color-primary);font-size:0.7rem;min-height:1.1em;display:block;"></small>
+            <label style="font-size: 0.75rem; color: var(--color-text-muted); font-weight: 600;">From Date</label>
+            <input type="date" id="admin-filter-date-from" name="date_from" value="{{ admin_filter_date_from }}" class="staff-search-input" style="max-width:160px;">
+            <small id="admin-filter-date-from-bs" style="color:var(--color-primary);font-size:0.7rem;min-height:1.1em;display:block;"></small>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <label style="font-size: 0.75rem; color: var(--color-text-muted); font-weight: 600;">To Date</label>
+            <input type="date" id="admin-filter-date-to" name="date_to" value="{{ admin_filter_date_to }}" class="staff-search-input" style="max-width:160px;">
+            <small id="admin-filter-date-to-bs" style="color:var(--color-primary);font-size:0.7rem;min-height:1.1em;display:block;"></small>
           </div>
 
           <div style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 0.75rem; color: var(--color-text-muted); font-weight: 600;">Employee</label>
-            <select name="admin_employee" style="min-width: 180px; padding: 10px 16px; background: var(--input-bg); border: 1.5px solid var(--color-border); border-radius: var(--radius-sm); font-size: 0.88rem; color: var(--color-text); font-family: inherit;">
+            <select name="employee" style="min-width: 160px; padding: 10px 16px; background: var(--input-bg); border: 1.5px solid var(--color-border); border-radius: var(--radius-sm); font-size: 0.88rem; color: var(--color-text); font-family: inherit;">
               <option value="">— All Employees —</option>
               {% for emp in admin_employees %}
                 <option value="{{ emp.id }}" {% if admin_filter_employee_id == emp.id %}selected{% endif %}>{{ emp.get_full_name|default:emp.username }}</option>
@@ -813,18 +819,22 @@
 
           <div style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 0.75rem; color: var(--color-text-muted); font-weight: 600;">Client / Location</label>
-            <input type="text" name="admin_client" list="existing-clients" value="{{ admin_filter_client }}" placeholder="Search client..." class="staff-search-input">
+            <input type="text" name="client" list="existing-clients" value="{{ admin_filter_client }}" placeholder="Search client..." class="staff-search-input" style="max-width:160px;">
             <small class="filter-spacer" style="font-size:0.7rem;min-height:1.1em;">&nbsp;</small>
           </div>
 
           <div class="filter-actions" style="display: flex; flex-direction: column; gap: 4px;">
-            <div style="display: flex; gap: 8px;">
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
               <button type="submit" class="btn btn-primary btn-sm">Filter</button>
               {% if not admin_show_all %}
-                <a href="{% url 'staff_movement' %}?admin_all=1" class="btn btn-outline btn-sm">Show All</a>
+                <a href="{% url 'staff_movement' %}?all=1" class="btn btn-outline btn-sm">Show All</a>
               {% else %}
                 <a href="{% url 'staff_movement' %}" class="btn btn-outline btn-sm">Today</a>
               {% endif %}
+              <a href="{% url 'staff_movement_export_pdf' %}?date_from={{ admin_filter_date_from|default:'' }}&date_to={{ admin_filter_date_to|default:'' }}&employee={{ admin_filter_employee_id|default:'' }}&client={{ admin_filter_client|urlencode }}&all={% if admin_show_all %}1{% endif %}" target="_blank" class="btn btn-outline btn-sm" style="display:inline-flex;align-items:center;gap:4px;" title="Export company PDF report for current filters">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                Export PDF Report
+              </a>
             </div>
           </div>
         </form>
@@ -838,8 +848,18 @@
         <span class="card-meta">
           {% if admin_show_all %}
             All records
-          {% elif admin_filter_date and not admin_filter_employee_id and not admin_filter_client %}
-            Showing {{ admin_filter_date_obj|to_bs_short }}
+          {% elif admin_filter_date_from_obj and admin_filter_date_to_obj %}
+            {% if admin_filter_date_from == admin_filter_date_to %}
+              Showing {{ admin_filter_date_from_bs }}
+            {% else %}
+              Showing {{ admin_filter_date_from_bs }} to {{ admin_filter_date_to_bs }}
+            {% endif %}
+          {% elif admin_filter_date_from_obj %}
+            From {{ admin_filter_date_from_bs }}
+          {% elif admin_filter_date_to_obj %}
+            Until {{ admin_filter_date_to_bs }}
+          {% elif admin_filter_date_obj %}
+            Showing {{ admin_filter_date_bs }}
           {% endif %}
           — {{ admin_movements|length }} record{{ admin_movements|length|pluralize }}
         </span>
@@ -1297,16 +1317,28 @@
     showBs('date', 'date-bs');
   }
 
-  const filterDateInput = document.getElementById('filter-date');
-  if (filterDateInput) {
-    filterDateInput.addEventListener('change', () => showBs('filter-date', 'filter-date-bs'));
-    showBs('filter-date', 'filter-date-bs');
+  const filterDateFromInput = document.getElementById('filter-date-from');
+  if (filterDateFromInput) {
+    filterDateFromInput.addEventListener('change', () => showBs('filter-date-from', 'filter-date-from-bs'));
+    showBs('filter-date-from', 'filter-date-from-bs');
   }
 
-  const adminFilterDateInput = document.getElementById('admin-filter-date');
-  if (adminFilterDateInput) {
-    adminFilterDateInput.addEventListener('change', () => showBs('admin-filter-date', 'admin-filter-date-bs'));
-    showBs('admin-filter-date', 'admin-filter-date-bs');
+  const filterDateToInput = document.getElementById('filter-date-to');
+  if (filterDateToInput) {
+    filterDateToInput.addEventListener('change', () => showBs('filter-date-to', 'filter-date-to-bs'));
+    showBs('filter-date-to', 'filter-date-to-bs');
+  }
+
+  const adminFilterDateFromInput = document.getElementById('admin-filter-date-from');
+  if (adminFilterDateFromInput) {
+    adminFilterDateFromInput.addEventListener('change', () => showBs('admin-filter-date-from', 'admin-filter-date-from-bs'));
+    showBs('admin-filter-date-from', 'admin-filter-date-from-bs');
+  }
+
+  const adminFilterDateToInput = document.getElementById('admin-filter-date-to');
+  if (adminFilterDateToInput) {
+    adminFilterDateToInput.addEventListener('change', () => showBs('admin-filter-date-to', 'admin-filter-date-to-bs'));
+    showBs('admin-filter-date-to', 'admin-filter-date-to-bs');
   }
 
   const outTimeField = document.getElementById('out_time');

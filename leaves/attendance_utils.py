@@ -124,6 +124,16 @@ def get_daily_attendance_summary(employee, target_date, preloaded_data=None):
             status="approved",
         ).exists()
 
+    holiday_work_approved = False
+    if preloaded_data and "holiday_works" in preloaded_data:
+        holiday_work_approved = target_date in preloaded_data["holiday_works"]
+    else:
+        holiday_work_approved = HolidayWorkRequest.objects.filter(
+            employee=employee,
+            date=target_date,
+            status="approved",
+        ).exists()
+
     movement_info = None
     if preloaded_data and "movements" in preloaded_data:
         movement_info = preloaded_data["movements"].get(target_date)
@@ -216,6 +226,15 @@ def get_daily_attendance_summary(employee, target_date, preloaded_data=None):
         minutes = int((duration_seconds % 3600) // 60)
         duration_formatted = f"{hours}h {minutes:02d}m"
 
+    # Visual Overtime Calculation (Threshold: >= 8.0 hrs worked, i.e. >= 30m over standard 7.5h)
+    overtime_seconds = 0
+    overtime_formatted = None
+    if duration_seconds >= 28800:
+        overtime_seconds = int(duration_seconds - 27000)
+        ot_hours = overtime_seconds // 3600
+        ot_minutes = (overtime_seconds % 3600) // 60
+        overtime_formatted = f"+{ot_hours}h {ot_minutes:02d}m"
+
     # 3. Determine Status
     status = "absent"
     status_label = "Absent"
@@ -225,7 +244,11 @@ def get_daily_attendance_summary(employee, target_date, preloaded_data=None):
         status = "upcoming"
         status_label = "Upcoming"
         status_badge_class = "badge-muted"
-        if is_saturday:
+        if holiday_work_approved:
+            status = "holiday_work"
+            status_label = "Holiday Work"
+            status_badge_class = "badge-info"
+        elif is_saturday:
             status = "weekend"
             status_label = "Weekend"
             status_badge_class = "badge-weekend"
@@ -239,7 +262,15 @@ def get_daily_attendance_summary(employee, target_date, preloaded_data=None):
             status_badge_class = "badge-leave"
     elif first_punch:
         local_in_time = timezone.localtime(first_punch.timestamp).time()
-        if local_in_time <= GRACE_CUTOFF or has_morning_movement:
+        if holiday_work_approved:
+            status = "holiday_work"
+            status_label = "Holiday Work"
+            status_badge_class = "badge-info"
+        elif regularized:
+            status = "regularized"
+            status_label = "Regularized"
+            status_badge_class = "badge-info"
+        elif local_in_time <= GRACE_CUTOFF or has_morning_movement:
             status = "present"
             status_label = "Present"
             status_badge_class = "badge-success"
@@ -249,9 +280,18 @@ def get_daily_attendance_summary(employee, target_date, preloaded_data=None):
             status_badge_class = "badge-warning"
     elif last_punch:
         # Only an evening punch was recorded, no morning check-in punch
-        status = "late"
-        status_label = "Missing Check-in"
-        status_badge_class = "badge-warning"
+        if holiday_work_approved:
+            status = "holiday_work"
+            status_label = "Holiday Work"
+            status_badge_class = "badge-info"
+        elif regularized:
+            status = "regularized"
+            status_label = "Regularized"
+            status_badge_class = "badge-info"
+        else:
+            status = "late"
+            status_label = "Missing Check-in"
+            status_badge_class = "badge-warning"
     elif leave_info:
         status = "on_leave"
         status_label = f"Leave: {leave_info}"
@@ -259,6 +299,10 @@ def get_daily_attendance_summary(employee, target_date, preloaded_data=None):
     elif regularized:
         status = "regularized"
         status_label = "Regularized"
+        status_badge_class = "badge-info"
+    elif holiday_work_approved:
+        status = "holiday_work"
+        status_label = "Holiday Work"
         status_badge_class = "badge-info"
     elif holiday_name:
         status = "holiday"
@@ -285,6 +329,8 @@ def get_daily_attendance_summary(employee, target_date, preloaded_data=None):
         "punch_count": punch_count,
         "duration_seconds": duration_seconds,
         "duration_formatted": duration_formatted,
+        "overtime_seconds": overtime_seconds,
+        "overtime_formatted": overtime_formatted,
         "has_missing_in": has_missing_in,
         "has_missing_out": has_missing_out,
         "status": status,
@@ -292,6 +338,7 @@ def get_daily_attendance_summary(employee, target_date, preloaded_data=None):
         "status_badge_class": status_badge_class,
         "leave_info": leave_info,
         "holiday_name": holiday_name,
+        "holiday_work_approved": holiday_work_approved,
         "movement_info": movement_info,
         "punches": day_punches,
     }
@@ -349,6 +396,15 @@ def get_monthly_attendance_summary(employee, start_date, end_date):
         ).values_list("date", flat=True)
     )
 
+    # Bulk fetch approved holiday work requests
+    holiday_works = set(
+        HolidayWorkRequest.objects.filter(
+            employee=employee,
+            date__range=(start_date, end_date),
+            status="approved"
+        ).values_list("date", flat=True)
+    )
+
     # Bulk fetch staff movements
     movements_by_date = {}
     for m in StaffMovement.objects.filter(
@@ -394,6 +450,7 @@ def get_monthly_attendance_summary(employee, start_date, end_date):
         "holidays": holidays,
         "leaves": leaves_by_date,
         "regularizations": regularizations,
+        "holiday_works": holiday_works,
         "movements": movements_by_date,
     }
 
@@ -404,6 +461,7 @@ def get_monthly_attendance_summary(employee, start_date, end_date):
     total_absent = 0
     total_leaves = 0
     total_work_seconds = 0
+    total_overtime_seconds = 0
     today = date.today()
 
     curr = start_date
@@ -412,8 +470,9 @@ def get_monthly_attendance_summary(employee, start_date, end_date):
         days_summary[curr] = summary
 
         if curr <= today:
+            total_overtime_seconds += summary.get("overtime_seconds", 0)
             st = summary["status"]
-            if st in ("present", "short_hours"):
+            if st in ("present", "short_hours", "regularized", "holiday_work"):
                 total_present += 1
                 total_work_seconds += summary["duration_seconds"]
             elif st == "late":
@@ -431,6 +490,7 @@ def get_monthly_attendance_summary(employee, start_date, end_date):
         curr += timedelta(days=1)
 
     total_work_hours = round(total_work_seconds / 3600, 1)
+    total_overtime_hours = round(total_overtime_seconds / 3600, 1)
     avg_daily_hours = 0.0
     if total_present > 0:
         avg_daily_hours = round(total_work_hours / total_present, 1)
@@ -443,6 +503,7 @@ def get_monthly_attendance_summary(employee, start_date, end_date):
         "total_absent": total_absent,
         "total_leaves": total_leaves,
         "total_work_hours": total_work_hours,
+        "total_overtime_hours": total_overtime_hours,
         "avg_daily_hours": avg_daily_hours,
     }
 

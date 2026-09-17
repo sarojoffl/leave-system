@@ -1095,4 +1095,52 @@ class AttendanceCalendarTestCase(TestCase):
         male_summary = get_daily_attendance_summary(male_emp, teej_date)
         self.assertEqual(male_summary["status"], "absent")
 
+    def test_visual_overtime_calculation(self):
+        """Working >= 8.0 hours should calculate visual overtime (+duration - 7.5h). Less than 8.0 hours has no OT."""
+        from django.utils import timezone
+        from leaves.models import AttendanceLog
+        from leaves.attendance_utils import get_daily_attendance_summary
+
+        tz = timezone.get_current_timezone()
+        test_date = date(2026, 9, 8)
+        # 10:00 AM to 6:39 PM -> 8 hours 39 minutes = 8.65 hrs (>= 8.0 hrs threshold, OT = 8h 39m - 7h 30m = 1h 09m)
+        in_punch = timezone.make_aware(datetime(2026, 9, 8, 10, 0, 0), tz)
+        out_punch = timezone.make_aware(datetime(2026, 9, 8, 18, 39, 0), tz)
+        AttendanceLog.objects.create(employee=self.employee, timestamp=in_punch, status=0)
+        AttendanceLog.objects.create(employee=self.employee, timestamp=out_punch, status=1)
+
+        summary = get_daily_attendance_summary(self.employee, test_date)
+        self.assertEqual(summary["duration_formatted"], "8h 39m")
+        self.assertEqual(summary["overtime_formatted"], "+1h 09m")
+
+        # Day with 7h 45m (>= 7.5h but < 8.0h threshold) -> No visual OT
+        test_date_2 = date(2026, 9, 9)
+        in_punch_2 = timezone.make_aware(datetime(2026, 9, 9, 10, 0, 0), tz)
+        out_punch_2 = timezone.make_aware(datetime(2026, 9, 9, 17, 45, 0), tz)
+        AttendanceLog.objects.create(employee=self.employee, timestamp=in_punch_2, status=0)
+        AttendanceLog.objects.create(employee=self.employee, timestamp=out_punch_2, status=1)
+
+        summary_2 = get_daily_attendance_summary(self.employee, test_date_2)
+        self.assertEqual(summary_2["duration_formatted"], "7h 45m")
+        self.assertIsNone(summary_2["overtime_formatted"])
+
+    def test_approved_holiday_work_status(self):
+        """Approved HolidayWorkRequest marks the day as 'holiday_work' (Holiday Work) with badge-info."""
+        from leaves.models import HolidayWorkRequest
+        from leaves.attendance_utils import get_daily_attendance_summary
+
+        sat_date = date(2026, 9, 12)  # Saturday
+        HolidayWorkRequest.objects.create(
+            employee=self.employee,
+            date=sat_date,
+            status="approved",
+            reason="Urgent project release",
+        )
+
+        summary = get_daily_attendance_summary(self.employee, sat_date)
+        self.assertEqual(summary["status"], "holiday_work")
+        self.assertEqual(summary["status_label"], "Holiday Work")
+        self.assertEqual(summary["status_badge_class"], "badge-info")
+        self.assertTrue(summary["holiday_work_approved"])
+
 

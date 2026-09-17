@@ -2068,23 +2068,50 @@ def staff_movement(request):
         # Full-visibility admin table — everyone's records, same filter pattern
         # as the manager view, but reachable without needing manager role.
         if is_staff_movement_admin:
-            admin_filter_date = request.GET.get("admin_date")
-            admin_filter_employee_id = request.GET.get("admin_employee")
-            admin_filter_client = request.GET.get("admin_client", "").strip()
-            admin_show_all = request.GET.get("admin_all") == "1"
+            admin_filter_date = request.GET.get("admin_date") or request.GET.get("date")
+            admin_filter_date_from = request.GET.get("admin_date_from") or request.GET.get("date_from")
+            admin_filter_date_to = request.GET.get("admin_date_to") or request.GET.get("date_to")
+            admin_filter_employee_id = request.GET.get("admin_employee") or request.GET.get("employee")
+            admin_filter_client = (request.GET.get("admin_client") or request.GET.get("client") or "").strip()
+            admin_show_all = (request.GET.get("admin_all") == "1") or (request.GET.get("all") == "1")
 
             admin_movements = StaffMovement.objects.all().select_related(
                 "employee", "logged_by"
             ).prefetch_related("assistant_links__employee")
 
-            if not admin_filter_date and not admin_show_all and not admin_filter_employee_id and not admin_filter_client:
-                admin_filter_date = today.strftime("%Y-%m-%d")
+            if not admin_filter_date and not admin_filter_date_from and not admin_filter_date_to and not admin_show_all and not admin_filter_employee_id and not admin_filter_client:
+                admin_filter_date_from = today.strftime("%Y-%m-%d")
+                admin_filter_date_to = today.strftime("%Y-%m-%d")
+
+            from leaves.bs_convert import ad_to_bs_display
 
             admin_filter_date_obj = None
+            admin_filter_date_bs = ""
             if admin_filter_date:
                 try:
                     admin_filter_date_obj = datetime.strptime(admin_filter_date, "%Y-%m-%d").date()
                     admin_movements = admin_movements.filter(date=admin_filter_date_obj)
+                    admin_filter_date_bs = ad_to_bs_display(admin_filter_date_obj)
+                except ValueError:
+                    pass
+
+            admin_filter_date_from_obj = None
+            admin_filter_date_from_bs = ""
+            if admin_filter_date_from:
+                try:
+                    admin_filter_date_from_obj = datetime.strptime(admin_filter_date_from, "%Y-%m-%d").date()
+                    admin_movements = admin_movements.filter(date__gte=admin_filter_date_from_obj)
+                    admin_filter_date_from_bs = ad_to_bs_display(admin_filter_date_from_obj)
+                except ValueError:
+                    pass
+
+            admin_filter_date_to_obj = None
+            admin_filter_date_to_bs = ""
+            if admin_filter_date_to:
+                try:
+                    admin_filter_date_to_obj = datetime.strptime(admin_filter_date_to, "%Y-%m-%d").date()
+                    admin_movements = admin_movements.filter(date__lte=admin_filter_date_to_obj)
+                    admin_filter_date_to_bs = ad_to_bs_display(admin_filter_date_to_obj)
                 except ValueError:
                     pass
 
@@ -2131,6 +2158,13 @@ def staff_movement(request):
                 "existing_clients": existing_clients,
                 "admin_filter_date": admin_filter_date,
                 "admin_filter_date_obj": admin_filter_date_obj,
+                "admin_filter_date_bs": admin_filter_date_bs,
+                "admin_filter_date_from": admin_filter_date_from,
+                "admin_filter_date_from_obj": admin_filter_date_from_obj,
+                "admin_filter_date_from_bs": admin_filter_date_from_bs,
+                "admin_filter_date_to": admin_filter_date_to,
+                "admin_filter_date_to_obj": admin_filter_date_to_obj,
+                "admin_filter_date_to_bs": admin_filter_date_to_bs,
                 "admin_filter_employee_id": admin_filter_employee_id,
                 "admin_filter_client": admin_filter_client,
                 "admin_show_all": admin_show_all,
@@ -2540,19 +2574,21 @@ def staff_movement_cancel(request, id):
 def staff_movement_export_pdf(request):
     from accounts.models import User
     from accounts.utils import exclude_staff_movement_ineligible, get_view_mode
+    from django.conf import settings
     from django.db.models import Q
 
-    is_manager = get_view_mode(request) == 'manager' and request.user.has_management_access
+    is_staff_movement_admin = request.user.username in getattr(settings, "STAFF_MOVEMENT_PROXY_LOGGER_USERNAMES", [])
+    is_manager = (get_view_mode(request) == 'manager' and request.user.has_management_access) or is_staff_movement_admin
     if not is_manager:
-        messages.error(request, "Permission denied. Company report export is only available in Manager View.")
+        messages.error(request, "Permission denied. Company report export is only available in Manager View or for proxy loggers.")
         return redirect("staff_movement")
 
-    filter_date = request.GET.get("date")
-    filter_date_from = request.GET.get("date_from")
-    filter_date_to = request.GET.get("date_to")
-    filter_employee_id = request.GET.get("employee")
-    filter_client = request.GET.get("client", "").strip()
-    show_all = request.GET.get("all") == "1"
+    filter_date = request.GET.get("date") or request.GET.get("admin_date")
+    filter_date_from = request.GET.get("date_from") or request.GET.get("admin_date_from")
+    filter_date_to = request.GET.get("date_to") or request.GET.get("admin_date_to")
+    filter_employee_id = request.GET.get("employee") or request.GET.get("admin_employee")
+    filter_client = (request.GET.get("client") or request.GET.get("admin_client") or "").strip()
+    show_all = (request.GET.get("all") == "1") or (request.GET.get("admin_all") == "1")
 
     movements = StaffMovement.objects.all().select_related(
         "employee", "logged_by"
@@ -2839,12 +2875,14 @@ def attendance_day_detail_api(request):
             "in_time_display": in_time_str,
             "out_time_display": out_time_str,
             "duration_formatted": summary["duration_formatted"],
+            "overtime_formatted": summary.get("overtime_formatted"),
             "has_missing_in": summary.get("has_missing_in", False),
             "has_missing_out": summary.get("has_missing_out", False),
             "is_today": target_date == date.today(),
             "first_punch": bool(summary["first_punch"]),
             "leave_info": summary["leave_info"],
             "holiday_name": summary["holiday_name"],
+            "holiday_work_approved": summary.get("holiday_work_approved", False),
             "movement_info": summary["movement_info"],
             "punches": punches_data,
         })
