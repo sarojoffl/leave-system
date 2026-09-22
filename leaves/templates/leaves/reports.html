@@ -9,6 +9,9 @@
     {% if can_view_leave_reports %}
       <a href="?tab=leave" class="tab {% if active_tab == 'leave' %}active{% endif %}">Leave Reports</a>
     {% endif %}
+    {% if can_view_attendance_reports %}
+      <a href="?tab=attendance" class="tab {% if active_tab == 'attendance' %}active{% endif %}">Attendance Reports</a>
+    {% endif %}
     <a href="?tab=movement" class="tab {% if active_tab == 'movement' %}active{% endif %}">Staff Movement Reports</a>
   </div>
   {% if active_tab == 'leave' and can_view_leave_reports %}
@@ -261,6 +264,349 @@
       </div>
     </div>
   </div>
+
+{% elif active_tab == 'attendance' and can_view_attendance_reports %}
+
+  <!-- ===== ATTENDANCE REPORTS TAB ===== -->
+  <div class="card" style="margin-bottom:20px;">
+    <div class="card-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+      <div>
+        <span class="card-title" id="att-card-title">Attendance Reports — {{ att_bs_month_name }} {{ att_bs_year }}</span>
+        <span class="card-meta" id="att-card-meta" style="margin-left:10px;">{{ total_team_present }} total present day{{ total_team_present|pluralize }} across team</span>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <button type="button" id="att-prev-btn" data-month="{{ att_prev_month }}" data-year="{{ att_prev_year }}" class="btn btn-outline btn-sm" style="padding:4px 12px; font-size:0.8rem;">← Prev Month</button>
+        <button type="button" id="att-next-btn" data-month="{{ att_next_month }}" data-year="{{ att_next_year }}" class="btn btn-outline btn-sm" style="padding:4px 12px; font-size:0.8rem;">Next Month →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Metric Overview Cards -->
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 20px;">
+    <div class="card" style="padding: 16px; border-left: 4px solid var(--color-success, #10b981);">
+      <div style="font-size: 0.8rem; font-weight: 600; text-transform: uppercase; color: var(--color-text-muted); margin-bottom: 4px;">Total Present</div>
+      <div style="font-size: 1.6rem; font-weight: 700; color: var(--color-text);" id="att-metric-present">{{ total_team_present }} <span style="font-size: 0.85rem; font-weight: 500; color: var(--color-text-muted);">days</span></div>
+      <div style="font-size: 0.78rem; color: var(--color-text-muted); margin-top: 4px;">Team total for this month</div>
+    </div>
+    <div class="card" style="padding: 16px; border-left: 4px solid var(--color-warning, #f59e0b);">
+      <div style="font-size: 0.8rem; font-weight: 600; text-transform: uppercase; color: var(--color-text-muted); margin-bottom: 4px;">Late Arrivals</div>
+      <div style="font-size: 1.6rem; font-weight: 700; color: var(--color-warning, #f59e0b);" id="att-metric-late">{{ total_team_late }} <span style="font-size: 0.85rem; font-weight: 500; color: var(--color-text-muted);">times</span></div>
+      <div style="font-size: 0.78rem; color: var(--color-text-muted); margin-top: 4px;">Arrived after 10:15 AM</div>
+    </div>
+    <div class="card" style="padding: 16px; border-left: 4px solid var(--color-primary, #3b82f6);">
+      <div style="font-size: 0.8rem; font-weight: 600; text-transform: uppercase; color: var(--color-text-muted); margin-bottom: 4px;">Total Work Hours</div>
+      <div style="font-size: 1.6rem; font-weight: 700; color: var(--color-text);" id="att-metric-hours">{{ total_team_work_hours }}h <span id="att-metric-ot" style="font-size: 0.82rem; font-weight: 600; color: var(--color-primary); margin-left: 4px;">(+{{ total_team_ot_hours }}h OT)</span></div>
+      <div style="font-size: 0.78rem; color: var(--color-text-muted); margin-top: 4px;">Logged work duration</div>
+    </div>
+    <div class="card" style="padding: 16px; border-left: 4px solid var(--color-danger, #ef4444);">
+      <div style="font-size: 0.8rem; font-weight: 600; text-transform: uppercase; color: var(--color-text-muted); margin-bottom: 4px;">Leaves &amp; Absences</div>
+      <div style="font-size: 1.6rem; font-weight: 700; color: var(--color-danger, #ef4444);" id="att-metric-leaves">{{ total_team_leaves }} <span style="font-size: 0.85rem; font-weight: 500; color: var(--color-text-muted);">leaves</span> / <span id="att-metric-absent">{{ total_team_absent }}</span> <span style="font-size: 0.85rem; font-weight: 500; color: var(--color-text-muted);">absent</span></div>
+      <div style="font-size: 0.78rem; color: var(--color-text-muted); margin-top: 4px;">{{ total_team_missing }} missing punch{{ total_team_missing|pluralize:"es" }}</div>
+    </div>
+  </div>
+
+  <!-- Monthly Trend Chart -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Monthly Attendance Trend — {{ att_bs_year }}</span>
+    </div>
+    <div class="card-body">
+      <div class="trend-chart" id="att-trend-chart">
+        {% for m in attendance_monthly_trend %}
+          <div class="trend-col">
+            <div class="trend-bar {% if m.is_current %}current{% elif m.is_future %}future{% endif %}"
+                 style="height:{{ m.bar_height }}%;"
+                 title="{{ m.label }}: {{ m.count }} present day{{ m.count|pluralize }}"></div>
+            <div class="trend-label {% if m.is_current %}current{% endif %}">{{ m.label }}</div>
+          </div>
+        {% endfor %}
+      </div>
+      <div class="trend-note">Total active employee present days logged per BS month</div>
+    </div>
+  </div>
+
+  <!-- Two Column: Department Attendance & Status Distribution -->
+  <div class="two-col">
+    <div class="card">
+      <div class="card-header"><span class="card-title">Department Attendance Summary</span></div>
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th>Department</th>
+              <th>Headcount</th>
+              <th>Present</th>
+              <th>Late</th>
+              <th>Work Hours</th>
+              <th>Overtime</th>
+            </tr>
+          </thead>
+          <tbody id="att-dept-tbody">
+            {% for d in dept_attendance_summary %}
+              <tr>
+                <td style="font-weight:600;">{{ d.name }}</td>
+                <td>{{ d.headcount }}</td>
+                <td><span class="badge approved" style="font-weight:600;">{{ d.present_days }} d</span></td>
+                <td>{% if d.late_count > 0 %}<span class="badge pending" style="font-weight:600;">{{ d.late_count }}</span>{% else %}<span style="color:var(--color-text-muted);">-</span>{% endif %}</td>
+                <td>{{ d.work_hours }}h <span style="font-size:0.75rem; color:var(--color-text-muted);">({{ d.avg_hours }}h/d)</span></td>
+                <td>{% if d.overtime_hours > 0 %}<span style="color:var(--color-primary); font-weight:600;">{{ d.overtime_hours }}h</span>{% else %}<span style="color:var(--color-text-muted);">-</span>{% endif %}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="6" class="empty-state">No department attendance records available.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><span class="card-title">Attendance Status Distribution</span></div>
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Days Count</th>
+              <th>Percentage</th>
+            </tr>
+          </thead>
+          <tbody id="att-status-tbody">
+            {% for s in att_status_distribution %}
+              <tr>
+                <td style="font-weight:600;">{{ s.name }}</td>
+                <td><span class="badge {% if s.name == 'Present' %}approved{% elif s.name == 'Late Arrival' %}pending{% elif s.name == 'Absent' %}rejected{% else %}active{% endif %}" style="font-size:0.82rem; font-weight:600;">{{ s.count }} day{{ s.count|pluralize }}</span></td>
+                <td><span style="font-weight:600;">{{ s.percentage }}%</span></td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="3" class="empty-state">No status distribution records available.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Per-Employee Monthly Attendance Table -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Employee Attendance Breakdown — {{ att_bs_month_name }} {{ att_bs_year }}</span>
+    </div>
+    <div class="table-responsive">
+      <table>
+        <thead>
+          <tr>
+            <th>Employee</th>
+            <th>Department</th>
+            <th>Present Days</th>
+            <th>Late Count</th>
+            <th>Total Work Hours</th>
+            <th>Avg Daily</th>
+            <th>Overtime</th>
+            <th>Leaves / Absences</th>
+            <th>Missing Punches</th>
+          </tr>
+        </thead>
+        <tbody id="att-emp-tbody">
+          {% for e in employee_att_stats %}
+            <tr>
+              <td style="font-weight:600;">
+                <a href="{% url 'employee_detail' e.id %}" style="color:var(--color-primary); text-decoration:none;">{{ e.name }}</a>
+              </td>
+              <td style="font-size:0.85rem; color:var(--color-text-muted);">{{ e.department }}</td>
+              <td><span class="badge approved" style="font-weight:600;">{{ e.present_days }} day{{ e.present_days|pluralize }}</span></td>
+              <td>
+                {% if e.late_count > 0 %}
+                  <span class="badge pending" style="font-weight:600;">{{ e.late_count }} late</span>
+                {% else %}
+                  <span style="color:var(--color-text-muted); font-size:0.85rem;">0</span>
+                {% endif %}
+              </td>
+              <td style="font-weight:600;">{{ e.work_hours }}h</td>
+              <td style="font-size:0.85rem; color:var(--color-text-muted);">{{ e.avg_hours }}h/d</td>
+              <td>
+                {% if e.overtime_hours > 0 %}
+                  <span style="color:var(--color-primary); font-weight:600;">{{ e.overtime_hours }}h</span>
+                {% else %}
+                  <span style="color:var(--color-text-muted); font-size:0.85rem;">-</span>
+                {% endif %}
+              </td>
+              <td style="font-size:0.85rem;">
+                {% if e.leaves > 0 %}<span style="color:var(--color-warning); font-weight:600;">{{ e.leaves }} L</span>{% endif %}
+                {% if e.leaves > 0 and e.absences > 0 %} / {% endif %}
+                {% if e.absences > 0 %}<span style="color:var(--color-danger); font-weight:600;">{{ e.absences }} A</span>{% endif %}
+                {% if e.leaves == 0 and e.absences == 0 %}<span style="color:var(--color-text-muted);">-</span>{% endif %}
+              </td>
+              <td>
+                {% if e.missing_punches > 0 %}
+                  <span class="badge rejected" style="font-size:0.78rem; font-weight:600;">{{ e.missing_punches }} missing</span>
+                {% else %}
+                  <span style="color:var(--color-text-muted); font-size:0.85rem;">-</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="9" class="empty-state">No attendance logs available for {{ att_bs_month_name }} {{ att_bs_year }}.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+  document.addEventListener("DOMContentLoaded", function() {
+    const attPrevBtn = document.getElementById("att-prev-btn");
+    const attNextBtn = document.getElementById("att-next-btn");
+    const attTitleEl = document.getElementById("att-card-title");
+    const attMetaEl = document.getElementById("att-card-meta");
+    const attTrendChart = document.getElementById("att-trend-chart");
+    const attDeptTbody = document.getElementById("att-dept-tbody");
+    const attStatusTbody = document.getElementById("att-status-tbody");
+    const attEmpTbody = document.getElementById("att-emp-tbody");
+
+    const metricPresent = document.getElementById("att-metric-present");
+    const metricLate = document.getElementById("att-metric-late");
+    const metricHours = document.getElementById("att-metric-hours");
+    const metricLeaves = document.getElementById("att-metric-leaves");
+
+    function loadAttendanceReports(month, year) {
+      if (attDeptTbody) attDeptTbody.style.opacity = "0.4";
+      if (attStatusTbody) attStatusTbody.style.opacity = "0.4";
+      if (attEmpTbody) attEmpTbody.style.opacity = "0.4";
+
+      fetch("{% url 'attendance_reports_api' %}?att_month=" + month + "&att_year=" + year)
+        .then(response => response.json())
+        .then(data => {
+          const monthYearStr = data.att_bs_month_name + " " + data.att_bs_year;
+          if (attTitleEl) attTitleEl.textContent = "Attendance Reports — " + monthYearStr;
+          if (attMetaEl) attMetaEl.textContent = data.total_team_present + " total present day" + (data.total_team_present === 1 ? "" : "s") + " across team";
+
+          if (attPrevBtn) {
+            attPrevBtn.setAttribute("data-month", data.att_prev_month);
+            attPrevBtn.setAttribute("data-year", data.att_prev_year);
+          }
+          if (attNextBtn) {
+            attNextBtn.setAttribute("data-month", data.att_next_month);
+            attNextBtn.setAttribute("data-year", data.att_next_year);
+          }
+
+          if (metricPresent) metricPresent.innerHTML = `${data.total_team_present} <span style="font-size: 0.85rem; font-weight: 500; color: var(--color-text-muted);">days</span>`;
+          if (metricLate) metricLate.innerHTML = `${data.total_team_late} <span style="font-size: 0.85rem; font-weight: 500; color: var(--color-text-muted);">times</span>`;
+          if (metricHours) metricHours.innerHTML = `${data.total_team_work_hours}h <span style="font-size: 0.82rem; font-weight: 600; color: var(--color-primary); margin-left: 4px;">(+${data.total_team_ot_hours}h OT)</span>`;
+          if (metricLeaves) metricLeaves.innerHTML = `${data.total_team_leaves} <span style="font-size: 0.85rem; font-weight: 500; color: var(--color-text-muted);">leaves</span> / <span>${data.total_team_absent}</span> <span style="font-size: 0.85rem; font-weight: 500; color: var(--color-text-muted);">absent</span>`;
+
+          if (attTrendChart && data.attendance_monthly_trend) {
+            attTrendChart.innerHTML = "";
+            data.attendance_monthly_trend.forEach(m => {
+              const col = document.createElement("div");
+              col.className = "trend-col";
+              col.innerHTML = `
+                <div class="trend-bar ${m.is_current ? 'current' : ''} ${m.is_future ? 'future' : ''}" style="height:${m.bar_height}%;" title="${m.label}: ${m.count} present day${m.count === 1 ? '' : 's'}"></div>
+                <div class="trend-label ${m.is_current ? 'current' : ''}">${m.label}</div>
+              `;
+              attTrendChart.appendChild(col);
+            });
+          }
+
+          if (attDeptTbody) {
+            attDeptTbody.innerHTML = "";
+            if (data.dept_attendance_summary.length === 0) {
+              attDeptTbody.innerHTML = `<tr><td colspan="6" class="empty-state">No department attendance records for ${monthYearStr}.</td></tr>`;
+            } else {
+              data.dept_attendance_summary.forEach(d => {
+                const tr = document.createElement("tr");
+                const lateBadge = d.late_count > 0 ? `<span class="badge pending" style="font-weight:600;">${d.late_count}</span>` : `<span style="color:var(--color-text-muted);">-</span>`;
+                const otBadge = d.overtime_hours > 0 ? `<span style="color:var(--color-primary); font-weight:600;">${d.overtime_hours}h</span>` : `<span style="color:var(--color-text-muted);">-</span>`;
+                tr.innerHTML = `
+                  <td style="font-weight:600;">${d.name}</td>
+                  <td>${d.headcount}</td>
+                  <td><span class="badge approved" style="font-weight:600;">${d.present_days} d</span></td>
+                  <td>${lateBadge}</td>
+                  <td>${d.work_hours}h <span style="font-size:0.75rem; color:var(--color-text-muted);">(${d.avg_hours}h/d)</span></td>
+                  <td>${otBadge}</td>
+                `;
+                attDeptTbody.appendChild(tr);
+              });
+            }
+          }
+
+          if (attStatusTbody) {
+            attStatusTbody.innerHTML = "";
+            if (data.att_status_distribution.length === 0) {
+              attStatusTbody.innerHTML = `<tr><td colspan="3" class="empty-state">No status distribution records for ${monthYearStr}.</td></tr>`;
+            } else {
+              data.att_status_distribution.forEach(s => {
+                const tr = document.createElement("tr");
+                let badgeCls = 'active';
+                if (s.name === 'Present') badgeCls = 'approved';
+                else if (s.name === 'Late Arrival') badgeCls = 'pending';
+                else if (s.name === 'Absent') badgeCls = 'rejected';
+
+                const dayLabel = s.count === 1 ? ' day' : ' days';
+                tr.innerHTML = `
+                  <td style="font-weight:600;">${s.name}</td>
+                  <td><span class="badge ${badgeCls}" style="font-size:0.82rem; font-weight:600;">${s.count}${dayLabel}</span></td>
+                  <td><span style="font-weight:600;">${s.percentage}%</span></td>
+                `;
+                attStatusTbody.appendChild(tr);
+              });
+            }
+          }
+
+          if (attEmpTbody) {
+            attEmpTbody.innerHTML = "";
+            if (data.employee_att_stats.length === 0) {
+              attEmpTbody.innerHTML = `<tr><td colspan="9" class="empty-state">No employee attendance records for ${monthYearStr}.</td></tr>`;
+            } else {
+              data.employee_att_stats.forEach(e => {
+                const tr = document.createElement("tr");
+                const lateBadge = e.late_count > 0 ? `<span class="badge pending" style="font-weight:600;">${e.late_count} late</span>` : `<span style="color:var(--color-text-muted); font-size:0.85rem;">0</span>`;
+                const otDisplay = e.overtime_hours > 0 ? `<span style="color:var(--color-primary); font-weight:600;">${e.overtime_hours}h</span>` : `<span style="color:var(--color-text-muted); font-size:0.85rem;">-</span>`;
+                
+                let leaveAbsentParts = [];
+                if (e.leaves > 0) leaveAbsentParts.push(`<span style="color:var(--color-warning); font-weight:600;">${e.leaves} L</span>`);
+                if (e.absences > 0) leaveAbsentParts.push(`<span style="color:var(--color-danger); font-weight:600;">${e.absences} A</span>`);
+                const leaveAbsentDisplay = leaveAbsentParts.length > 0 ? leaveAbsentParts.join(" / ") : `<span style="color:var(--color-text-muted);">-</span>`;
+
+                const missingDisplay = e.missing_punches > 0 ? `<span class="badge rejected" style="font-size:0.78rem; font-weight:600;">${e.missing_punches} missing</span>` : `<span style="color:var(--color-text-muted); font-size:0.85rem;">-</span>`;
+
+                tr.innerHTML = `
+                  <td style="font-weight:600;"><a href="/leaves/employee/${e.id}/" style="color:var(--color-primary); text-decoration:none;">${e.name}</a></td>
+                  <td style="font-size:0.85rem; color:var(--color-text-muted);">${e.department}</td>
+                  <td><span class="badge approved" style="font-weight:600;">${e.present_days} day${e.present_days === 1 ? '' : 's'}</span></td>
+                  <td>${lateBadge}</td>
+                  <td style="font-weight:600;">${e.work_hours}h</td>
+                  <td style="font-size:0.85rem; color:var(--color-text-muted);">${e.avg_hours}h/d</td>
+                  <td>${otDisplay}</td>
+                  <td style="font-size:0.85rem;">${leaveAbsentDisplay}</td>
+                  <td>${missingDisplay}</td>
+                `;
+                attEmpTbody.appendChild(tr);
+              });
+            }
+          }
+
+          if (attDeptTbody) attDeptTbody.style.opacity = "1";
+          if (attStatusTbody) attStatusTbody.style.opacity = "1";
+          if (attEmpTbody) attEmpTbody.style.opacity = "1";
+        })
+        .catch(err => {
+          console.error("Failed to load attendance reports:", err);
+          if (attDeptTbody) attDeptTbody.style.opacity = "1";
+          if (attStatusTbody) attStatusTbody.style.opacity = "1";
+          if (attEmpTbody) attEmpTbody.style.opacity = "1";
+        });
+    }
+
+    if (attPrevBtn && attNextBtn) {
+      attPrevBtn.addEventListener("click", function() {
+        loadAttendanceReports(this.getAttribute("data-month"), this.getAttribute("data-year"));
+      });
+      attNextBtn.addEventListener("click", function() {
+        loadAttendanceReports(this.getAttribute("data-month"), this.getAttribute("data-year"));
+      });
+    }
+  });
+  </script>
 
 {% else %}
 

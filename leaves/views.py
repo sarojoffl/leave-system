@@ -26,7 +26,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle, HRFlowable
 
-from .models import AttendanceRequest, HolidayWorkRequest, LeaveBalance, LeaveRequest, LeaveType, StaffMovement, StaffMovementAssistant, StaffMovementStop
+from .models import AttendanceLog, AttendanceRequest, HolidayWorkRequest, LeaveBalance, LeaveRequest, LeaveType, StaffMovement, StaffMovementAssistant, StaffMovementStop
 from .permissions import manager_required
 
 logger = logging.getLogger(__name__)
@@ -1279,6 +1279,236 @@ def _get_staff_movement_reports_data(bs_year, bs_month):
     }
 
 
+def _get_attendance_reports_data(bs_year, bs_month):
+    from leaves.bs_convert import _BS, bs_to_ad, bs_month_name, ad_to_bs
+    from datetime import time, timedelta
+    from leaves.attendance_utils import get_monthly_attendance_summary
+
+    today = date.today()
+    total_bs_days = _BS.get(bs_year, [30] * 12)[bs_month - 1]
+    month_start_ad = bs_to_ad(bs_year, bs_month, 1)
+    month_end_ad = bs_to_ad(bs_year, bs_month, total_bs_days)
+
+    active_employees = list(
+        User.objects.filter(is_active=True)
+        .order_by("department", "first_name", "username")
+    )
+
+    employee_att_stats = []
+    dept_map = {}
+
+    total_team_present = 0
+    total_team_late = 0
+    total_team_work_hours = 0.0
+    total_team_ot_hours = 0.0
+    total_team_leaves = 0
+    total_team_absent = 0
+    total_team_missing = 0
+
+    status_counts = {
+        "Present": 0,
+        "Late Arrival": 0,
+        "On Leave": 0,
+        "Absent": 0,
+        "Regularized": 0,
+        "Holiday Work": 0,
+    }
+
+    for emp in active_employees:
+        summary = get_monthly_attendance_summary(emp, month_start_ad, month_end_ad)
+
+        missing_count = sum(
+            1 for day_sum in summary["days"].values()
+            if (day_sum.get("has_missing_in") or day_sum.get("has_missing_out")) and day_sum.get("date") <= today
+        )
+
+        emp_name = emp.get_full_name() or emp.username
+        dept_name = emp.department or "General / Unassigned"
+
+        emp_stat = {
+            "id": emp.id,
+            "name": emp_name,
+            "department": dept_name,
+            "present_days": summary["total_present"],
+            "late_count": summary["total_late"],
+            "work_hours": summary["total_work_hours"],
+            "avg_hours": summary["avg_daily_hours"],
+            "overtime_hours": summary["total_overtime_hours"],
+            "leaves": summary["total_leaves"],
+            "absences": summary["total_absent"],
+            "missing_punches": missing_count,
+        }
+        employee_att_stats.append(emp_stat)
+
+        if dept_name not in dept_map:
+            dept_map[dept_name] = {
+                "name": dept_name,
+                "headcount": 0,
+                "present_days": 0,
+                "late_count": 0,
+                "work_hours": 0.0,
+                "overtime_hours": 0.0,
+                "leaves": 0,
+                "absences": 0,
+            }
+        d = dept_map[dept_name]
+        d["headcount"] += 1
+        d["present_days"] += summary["total_present"]
+        d["late_count"] += summary["total_late"]
+        d["work_hours"] += summary["total_work_hours"]
+        d["overtime_hours"] += summary["total_overtime_hours"]
+        d["leaves"] += summary["total_leaves"]
+        d["absences"] += summary["total_absent"]
+
+        total_team_present += summary["total_present"]
+        total_team_late += summary["total_late"]
+        total_team_work_hours += summary["total_work_hours"]
+        total_team_ot_hours += summary["total_overtime_hours"]
+        total_team_leaves += summary["total_leaves"]
+        total_team_absent += summary["total_absent"]
+        total_team_missing += missing_count
+
+        for day_sum in summary["days"].values():
+            if day_sum.get("date") <= today:
+                st = day_sum.get("status")
+                if st in ("present", "short_hours"):
+                    status_counts["Present"] += 1
+                elif st == "late":
+                    status_counts["Late Arrival"] += 1
+                elif st == "on_leave":
+                    status_counts["On Leave"] += 1
+                elif st == "absent":
+                    status_counts["Absent"] += 1
+                elif st == "regularized":
+                    status_counts["Regularized"] += 1
+                elif st == "holiday_work":
+                    status_counts["Holiday Work"] += 1
+
+    dept_attendance_summary = []
+    for d in dept_map.values():
+        avg_h = round(d["work_hours"] / d["present_days"], 1) if d["present_days"] > 0 else 0.0
+        dept_attendance_summary.append({
+            "name": d["name"],
+            "headcount": d["headcount"],
+            "present_days": d["present_days"],
+            "late_count": d["late_count"],
+            "work_hours": round(d["work_hours"], 1),
+            "overtime_hours": round(d["overtime_hours"], 1),
+            "avg_hours": avg_h,
+            "leaves": d["leaves"],
+            "absences": d["absences"],
+        })
+    dept_attendance_summary.sort(key=lambda x: -x["present_days"])
+
+    employee_att_stats.sort(key=lambda x: (-x["late_count"], -x["present_days"]))
+
+    total_team_work_hours = round(total_team_work_hours, 1)
+    total_team_ot_hours = round(total_team_ot_hours, 1)
+
+    # 12-month BS attendance trend
+    monthly_present_counts = {m: 0 for m in range(1, 13)}
+    try:
+        y_start_ad = bs_to_ad(bs_year, 1, 1)
+        y_end_ad = bs_to_ad(bs_year, 12, _BS.get(bs_year, [30] * 12)[11])
+        tz = timezone.get_current_timezone()
+        dt_y_start = timezone.make_aware(datetime.combine(y_start_ad, time.min), tz)
+        dt_y_end = timezone.make_aware(datetime.combine(y_end_ad, time.max), tz)
+
+        emp_punch_dates = (
+            AttendanceLog.objects.filter(timestamp__range=(dt_y_start, dt_y_end))
+            .values_list("employee_id", "timestamp")
+        )
+        seen_emp_days = set()
+        for emp_id, ts in emp_punch_dates:
+            local_dt = timezone.localtime(ts).date()
+            if (emp_id, local_dt) not in seen_emp_days:
+                seen_emp_days.add((emp_id, local_dt))
+                try:
+                    by, bm, _ = ad_to_bs(local_dt)
+                    if by == bs_year and 1 <= bm <= 12:
+                        monthly_present_counts[bm] += 1
+                except Exception:
+                    pass
+    except Exception as e:
+        logger.warning(f"Error computing yearly attendance trend: {e}")
+
+    max_presents = max(monthly_present_counts.values()) or 1
+    today_bs_y, today_bs_m, _ = ad_to_bs(today)
+
+    attendance_monthly_trend = [{
+        "label": bs_month_name(m)[:3],
+        "month_num": m,
+        "count": monthly_present_counts[m],
+        "bar_height": round((monthly_present_counts[m] / max_presents) * 100),
+        "is_current": m == bs_month,
+        "is_future": (bs_year > today_bs_y) or (bs_year == today_bs_y and m > today_bs_m),
+    } for m in range(1, 13)]
+
+    total_status_days = sum(status_counts.values()) or 1
+    att_status_distribution = [
+        {
+            "name": k,
+            "count": v,
+            "percentage": round((v / total_status_days) * 100, 1),
+        }
+        for k, v in status_counts.items() if v > 0
+    ]
+    att_status_distribution.sort(key=lambda x: -x["count"])
+
+    if bs_month == 1:
+        att_prev_month, att_prev_year = 12, bs_year - 1
+    else:
+        att_prev_month, att_prev_year = bs_month - 1, bs_year
+
+    if bs_month == 12:
+        att_next_month, att_next_year = 1, bs_year + 1
+    else:
+        att_next_month, att_next_year = bs_month + 1, bs_year
+
+    return {
+        "att_bs_year": bs_year,
+        "att_bs_month": bs_month,
+        "att_bs_month_name": bs_month_name(bs_month),
+        "att_prev_month": att_prev_month,
+        "att_prev_year": att_prev_year,
+        "att_next_month": att_next_month,
+        "att_next_year": att_next_year,
+        "total_team_present": total_team_present,
+        "total_team_late": total_team_late,
+        "total_team_work_hours": total_team_work_hours,
+        "total_team_ot_hours": total_team_ot_hours,
+        "total_team_leaves": total_team_leaves,
+        "total_team_absent": total_team_absent,
+        "total_team_missing": total_team_missing,
+        "dept_attendance_summary": dept_attendance_summary,
+        "employee_att_stats": employee_att_stats,
+        "attendance_monthly_trend": attendance_monthly_trend,
+        "att_status_distribution": att_status_distribution,
+    }
+
+
+@manager_required
+def attendance_reports_api(request):
+    today = date.today()
+    from leaves.bs_convert import ad_to_bs
+    bs_y_today, bs_m_today, _ = ad_to_bs(today)
+
+    try:
+        att_month = int(request.GET.get("att_month", bs_m_today))
+        if att_month < 1 or att_month > 12:
+            att_month = bs_m_today
+    except ValueError:
+        att_month = bs_m_today
+
+    try:
+        att_year = int(request.GET.get("att_year", bs_y_today))
+    except ValueError:
+        att_year = bs_y_today
+
+    att_data = _get_attendance_reports_data(att_year, att_month)
+    return JsonResponse(att_data)
+
+
 @login_required
 def movement_stats_api(request):
     is_staff_movement_admin = request.user.username in getattr(settings, "STAFF_MOVEMENT_PROXY_LOGGER_USERNAMES", [])
@@ -1309,9 +1539,10 @@ def movement_stats_api(request):
 def reports(request):
     is_staff_movement_admin = request.user.username in getattr(settings, "STAFF_MOVEMENT_PROXY_LOGGER_USERNAMES", [])
     can_view_leave_reports = request.user.has_management_access
+    can_view_attendance_reports = request.user.has_management_access
     can_view_movement_reports = can_view_leave_reports or is_staff_movement_admin
 
-    if not can_view_movement_reports:
+    if not (can_view_leave_reports or can_view_movement_reports or can_view_attendance_reports):
         raise PermissionDenied("You don't have permission to access reports.")
 
     active_tab = request.GET.get("tab")
@@ -1319,7 +1550,9 @@ def reports(request):
         active_tab = "leave" if can_view_leave_reports else "movement"
     elif active_tab == "leave" and not can_view_leave_reports:
         active_tab = "movement"
-    elif active_tab not in ("leave", "movement"):
+    elif active_tab == "attendance" and not can_view_attendance_reports:
+        active_tab = "movement"
+    elif active_tab not in ("leave", "movement", "attendance"):
         active_tab = "leave" if can_view_leave_reports else "movement"
 
     department_usage, leave_type_breakdown, monthly_trend, bs_year = _get_reports_data()
@@ -1378,9 +1611,24 @@ def reports(request):
 
     movement_reports_data = _get_staff_movement_reports_data(mov_bs_year, mov_bs_month)
 
+    try:
+        att_bs_month = int(request.GET.get("att_month", bs_m_today))
+        if att_bs_month < 1 or att_bs_month > 12:
+            att_bs_month = bs_m_today
+    except ValueError:
+        att_bs_month = bs_m_today
+
+    try:
+        att_bs_year = int(request.GET.get("att_year", bs_y_today))
+    except ValueError:
+        att_bs_year = bs_y_today
+
+    attendance_reports_data = _get_attendance_reports_data(att_bs_year, att_bs_month)
+
     ctx = {
         "active_tab": active_tab,
         "can_view_leave_reports": can_view_leave_reports,
+        "can_view_attendance_reports": can_view_attendance_reports,
         "can_view_movement_reports": can_view_movement_reports,
         "department_usage": department_usage,
         "leave_type_breakdown": leave_type_breakdown,
@@ -1394,6 +1642,7 @@ def reports(request):
     }
     ctx.update(stats_data)
     ctx.update(movement_reports_data)
+    ctx.update(attendance_reports_data)
 
     return render(request, "leaves/reports.html", ctx)
 
@@ -1728,8 +1977,17 @@ def export_holiday_work_request_pdf(request, id):
     return response
 
 
+from leaves.movement_constants import (
+    AMC_CLIENTS,
+    SERVICE_CHECKBOXES,
+    SERVICE_REPAIR_SUPPORT,
+    SERVICE_SETUP_INSTALL,
+    DEPARTMENT_CHOICES,
+)
+
+
 def _get_client_suggestions():
-    clients = set()
+    clients = set(AMC_CLIENTS)
     for name in StaffMovementStop.objects.values_list("client", flat=True):
         if name and name.strip():
             clients.add(name.strip())
@@ -1739,7 +1997,9 @@ def _get_client_suggestions():
                 part_clean = part.strip()
                 if part_clean:
                     clients.add(part_clean)
-    return sorted(list(clients))
+    amc_set = set(AMC_CLIENTS)
+    other_clients = sorted([c for c in clients if c not in amc_set])
+    return AMC_CLIENTS + other_clients
 
 
 @login_required
@@ -1748,6 +2008,7 @@ def staff_movement(request):
     from accounts.models import User
     from django.conf import settings
     from django.db.models import Q
+    from leaves.models import StaffMovementDepartmentWork
 
     today = date.today()
     is_manager = get_view_mode(request) == 'manager' and request.user.has_management_access
@@ -1763,7 +2024,7 @@ def staff_movement(request):
 
         movements = StaffMovement.objects.all().select_related(
             "employee", "logged_by"
-        ).prefetch_related("assistant_links__employee")
+        ).prefetch_related("assistant_links__employee", "stops__department_works")
 
         if not filter_date and not filter_date_from and not filter_date_to and not show_all and not filter_employee_id and not filter_client:
             filter_date_from = today.strftime("%Y-%m-%d")
@@ -1818,7 +2079,6 @@ def staff_movement(request):
                     client_q |= Q(client__icontains=term) | Q(stops__client__icontains=term)
                 movements = movements.filter(client_q).distinct()
 
-        movements = movements.prefetch_related("stops")
         movements_list = list(movements)
         client_terms_lower = [c.strip().lower() for c in filter_client.split(",") if c.strip()] if filter_client else []
         for m in movements_list:
@@ -1842,6 +2102,12 @@ def staff_movement(request):
             "movements": movements_list,
             "employees": employees,
             "existing_clients": existing_clients,
+            "amc_clients": AMC_CLIENTS,
+            "service_checkboxes": SERVICE_CHECKBOXES,
+            "service_repair_support": SERVICE_REPAIR_SUPPORT,
+            "service_setup_install": SERVICE_SETUP_INSTALL,
+            "department_choices": DEPARTMENT_CHOICES,
+            "purpose_choices": StaffMovement.PURPOSE_CHOICES,
             "filter_date": filter_date,
             "filter_date_obj": filter_date_obj,
             "filter_date_bs": filter_date_bs,
@@ -1861,9 +2127,6 @@ def staff_movement(request):
             User.objects.exclude(id=request.user.id).exclude(role="ceo")
         ).order_by("first_name", "username")
 
-        # Same username list now grants two things: logging visits on behalf of
-        # others, AND full read/edit authority over every staff movement record
-        # (used to cover people who can't fill their own times in).
         is_staff_movement_admin = request.user.username in getattr(settings, "STAFF_MOVEMENT_PROXY_LOGGER_USERNAMES", [])
         can_log_on_behalf = is_staff_movement_admin
         proxy_employees = (
@@ -1879,17 +2142,67 @@ def staff_movement(request):
             client_str = request.POST.get("client", "").strip()
             work_done_for_str = request.POST.get("work_done_for", "").strip()
             stop_clients = [c.strip() for c in request.POST.getlist("stop_client") if c.strip()]
+            stop_out_times = request.POST.getlist("stop_out_time")
             stop_contacts = [w.strip() for w in request.POST.getlist("stop_work_done_for")]
             stop_purposes = [p.strip() for p in request.POST.getlist("stop_purpose")]
+            stop_purpose_types = [pt.strip() for pt in request.POST.getlist("stop_purpose_type")]
             in_time_str = request.POST.get("in_time")
             purpose_type = request.POST.get("purpose_type", "").strip()
             purpose = request.POST.get("purpose", "").strip()
-            problem_description = request.POST.get("problem_description", "").strip()
             assistant_ids = request.POST.getlist("assistants")
             on_behalf_of_id = request.POST.get("on_behalf_of", "").strip()
 
-            # If multi-stop payload submitted, construct client_str, work_done_for_str, and purpose
+            out_time = datetime.now().time()
+            errors = []
+
+            if not date_str:
+                errors.append("Please select a date.")
+            if not client_str and not stop_clients:
+                errors.append("Please specify at least one client / destination.")
+            if in_time_str:
+                errors.append("Return time must be filled in after the movement is logged.")
+            if purpose_type and purpose_type not in dict(StaffMovement.PURPOSE_CHOICES):
+                errors.append("Please select a valid purpose.")
+
+            # Parse and validate per-stop data
+            parsed_stops = []
             if stop_clients:
+                for idx, cname in enumerate(stop_clients):
+                    s_out_str = stop_out_times[idx].strip() if idx < len(stop_out_times) else ""
+                    s_contact = stop_contacts[idx].strip() if idx < len(stop_contacts) else ""
+                    s_purp = stop_purposes[idx].strip() if idx < len(stop_purposes) else ""
+                    s_ptype = stop_purpose_types[idx].strip() if idx < len(stop_purpose_types) else ""
+                    if not s_ptype or s_ptype not in dict(StaffMovement.PURPOSE_CHOICES):
+                        s_ptype = "amc" if ("amc" in cname.lower() or cname in AMC_CLIENTS) else "repair"
+
+                    # Service checkboxes per stop
+                    s_svcs = request.POST.getlist(f"stop_services_{idx}") or request.POST.getlist(f"stop_services_{idx}[]")
+
+                    parsed_s_out = None
+                    if s_out_str:
+                        try:
+                            parsed_s_out = datetime.strptime(s_out_str, "%H:%M").time()
+                        except ValueError:
+                            try:
+                                parsed_s_out = datetime.strptime(s_out_str, "%H:%M:%S").time()
+                            except ValueError:
+                                errors.append(f"Invalid Out Time format for stop #{idx+1}: {cname}.")
+                    else:
+                        parsed_s_out = out_time or datetime.now().time()
+
+                    parsed_stops.append({
+                        "order": idx + 1,
+                        "client": cname,
+                        "out_time": parsed_s_out,
+                        "services": s_svcs,
+                        "purpose": s_purp,
+                        "work_done_for": s_contact,
+                        "purpose_type": s_ptype,
+                    })
+
+                if not purpose_type:
+                    purpose_type = parsed_stops[0]["purpose_type"] if parsed_stops else ("amc" if any("amc" in c.lower() or c in AMC_CLIENTS for c in stop_clients) else "repair")
+
                 client_str = " , ".join(stop_clients)
                 if any(stop_contacts):
                     work_done_for_str = " , ".join(c for c in stop_contacts if c)
@@ -1898,20 +2211,33 @@ def staff_movement(request):
                         purpose = " , ".join(f"[{c}]: {p}" for c, p in zip(stop_clients, stop_purposes) if p)
                     elif stop_purposes:
                         purpose = stop_purposes[0]
+            elif client_str:
+                single_out_str = request.POST.get("out_time", "").strip()
+                s_svcs = request.POST.getlist("services") or request.POST.getlist("services[]")
+                parsed_s_out = None
+                if single_out_str:
+                    try:
+                        parsed_s_out = datetime.strptime(single_out_str, "%H:%M").time()
+                    except ValueError:
+                        try:
+                            parsed_s_out = datetime.strptime(single_out_str, "%H:%M:%S").time()
+                        except ValueError:
+                            errors.append("Invalid Out Time format.")
+                else:
+                    parsed_s_out = out_time or datetime.now().time()
 
-            out_time = datetime.now().time()
+                parsed_stops.append({
+                    "order": 1,
+                    "client": client_str,
+                    "out_time": parsed_s_out,
+                    "services": s_svcs,
+                    "purpose": purpose,
+                    "work_done_for": work_done_for_str,
+                })
 
-            errors = []
-            if not date_str:
-                errors.append("Please select a date.")
-            if not client_str and not stop_clients:
-                errors.append("Please specify the client / location.")
-            if in_time_str:
-                errors.append("Return time must be filled in after the movement is logged.")
-            if purpose_type not in dict(StaffMovement.PURPOSE_CHOICES):
-                errors.append("Please select a purpose.")
-            if purpose_type == "problem_solving" and not problem_description:
-                errors.append("Please describe the problem being addressed.")
+            valid_stop_outs = [s["out_time"] for s in parsed_stops if s["out_time"]]
+            if valid_stop_outs:
+                out_time = min(valid_stop_outs)
 
             target_employee = request.user
             if can_log_on_behalf and on_behalf_of_id:
@@ -1929,7 +2255,6 @@ def staff_movement(request):
                 except ValueError:
                     errors.append("Invalid date format.")
 
-            # Parse assistant ids up front so we can validate against them.
             assistant_id_ints = []
             if not errors:
                 try:
@@ -1937,8 +2262,6 @@ def staff_movement(request):
                 except ValueError:
                     errors.append("Invalid assistant selection.")
 
-            # Block logging a movement for anyone (primary or assistant) who is
-            # already out on another unresolved movement for the same date.
             if not errors:
                 check_ids = set(assistant_id_ints)
                 check_ids.add(target_employee.id)
@@ -1972,29 +2295,17 @@ def staff_movement(request):
                     in_time=None,
                     purpose_type=purpose_type,
                     purpose=purpose,
-                    problem_description=problem_description,
-                    resolution_status="",
                 )
-                if stop_clients:
-                    for idx, s_client in enumerate(stop_clients, start=1):
-                        s_contact = stop_contacts[idx - 1] if idx - 1 < len(stop_contacts) else ""
-                        s_purpose = stop_purposes[idx - 1] if idx - 1 < len(stop_purposes) else ""
-                        StaffMovementStop.objects.create(
-                            movement=movement,
-                            order=idx,
-                            client=s_client,
-                            purpose=s_purpose,
-                            work_done_for=s_contact,
-                            purpose_type=purpose_type,
-                        )
-                elif client_str:
+                for s_data in parsed_stops:
                     StaffMovementStop.objects.create(
                         movement=movement,
-                        order=1,
-                        client=client_str,
-                        purpose=purpose,
-                        work_done_for=work_done_for_str,
-                        purpose_type=purpose_type,
+                        order=s_data["order"],
+                        client=s_data["client"],
+                        out_time=s_data["out_time"],
+                        services=s_data["services"],
+                        purpose=s_data["purpose"],
+                        work_done_for=s_data["work_done_for"],
+                        purpose_type=s_data.get("purpose_type") or purpose_type,
                     )
                 if assistant_id_ints:
                     movement.assistants.set(
@@ -2017,7 +2328,7 @@ def staff_movement(request):
         movements = list(
             StaffMovement.objects.filter(
                 Q(employee=request.user) | Q(assistants=request.user) | Q(logged_by=request.user)
-            ).distinct().select_related("employee", "logged_by").prefetch_related("assistant_links__employee")
+            ).distinct().select_related("employee", "logged_by").prefetch_related("assistant_links__employee", "stops__department_works")
         )
 
         my_links = {
@@ -2029,8 +2340,10 @@ def staff_movement(request):
         for m in movements:
             m.my_assistant_link = my_links.get(m.id)
             m.is_primary_for_me = request.user.id in (m.employee_id, m.logged_by_id)
+            m.matching_stops = list(m.stops.all())
+            m.filtered_completion_notes = m.completion_notes or ""
+            m.filtered_purpose = m.purpose or ""
             
-            # Active movement alert only applies to today's active movements
             if m.date == today and not m.is_cancelled:
                 is_active = False
                 if m.is_primary_for_me:
@@ -2040,16 +2353,17 @@ def staff_movement(request):
                 if is_active:
                     active_movements.append(m)
 
-        # "Who's Out in Field Today" — today's active (still-out, not cancelled)
-        # movements for all staff. Shown to every employee as a read-only toggle panel.
         today_field_movements = list(
             StaffMovement.objects.filter(
                 date=today,
                 is_cancelled=False,
                 in_time__isnull=True,
-            ).select_related("employee").prefetch_related("assistant_links__employee")
+            ).select_related("employee").prefetch_related("assistant_links__employee", "stops__department_works")
             .order_by("out_time")
         )
+        for m in today_field_movements:
+            m.matching_stops = list(m.stops.all())
+            m.filtered_purpose = m.purpose or ""
 
         context = {
             "movements": movements,
@@ -2058,15 +2372,18 @@ def staff_movement(request):
             "today": today,
             "other_employees": other_employees,
             "purpose_choices": StaffMovement.PURPOSE_CHOICES,
-            "resolution_choices": StaffMovement.RESOLUTION_CHOICES,
+            "existing_clients": existing_clients,
+            "amc_clients": AMC_CLIENTS,
+            "service_checkboxes": SERVICE_CHECKBOXES,
+            "service_repair_support": SERVICE_REPAIR_SUPPORT,
+            "service_setup_install": SERVICE_SETUP_INSTALL,
+            "department_choices": DEPARTMENT_CHOICES,
             "can_log_on_behalf": can_log_on_behalf,
             "proxy_employees": proxy_employees,
             "is_staff_movement_admin": is_staff_movement_admin,
             "today_field_movements": today_field_movements,
         }
 
-        # Full-visibility admin table — everyone's records, same filter pattern
-        # as the manager view, but reachable without needing manager role.
         if is_staff_movement_admin:
             admin_filter_date = request.GET.get("admin_date") or request.GET.get("date")
             admin_filter_date_from = request.GET.get("admin_date_from") or request.GET.get("date_from")
@@ -2077,7 +2394,7 @@ def staff_movement(request):
 
             admin_movements = StaffMovement.objects.all().select_related(
                 "employee", "logged_by"
-            ).prefetch_related("assistant_links__employee")
+            ).prefetch_related("assistant_links__employee", "stops__department_works")
 
             if not admin_filter_date and not admin_filter_date_from and not admin_filter_date_to and not admin_show_all and not admin_filter_employee_id and not admin_filter_client:
                 admin_filter_date_from = today.strftime("%Y-%m-%d")
@@ -2132,7 +2449,6 @@ def staff_movement(request):
                         admin_client_q |= Q(client__icontains=term) | Q(stops__client__icontains=term)
                     admin_movements = admin_movements.filter(admin_client_q).distinct()
 
-            admin_movements = admin_movements.prefetch_related("stops")
             admin_movements_list = list(admin_movements)
             admin_terms_lower = [c.strip().lower() for c in admin_filter_client.split(",") if c.strip()] if admin_filter_client else []
             for m in admin_movements_list:
@@ -2155,7 +2471,6 @@ def staff_movement(request):
             context.update({
                 "admin_movements": admin_movements_list,
                 "admin_employees": admin_employees,
-                "existing_clients": existing_clients,
                 "admin_filter_date": admin_filter_date,
                 "admin_filter_date_obj": admin_filter_date_obj,
                 "admin_filter_date_bs": admin_filter_date_bs,
@@ -2173,40 +2488,130 @@ def staff_movement(request):
         return render(request, "leaves/staff_movement.html", context)
 
 
+def _sync_movement_stops_and_assistants(movement, request):
+    edit_clients = request.POST.getlist("edit_stop_client")
+    edit_out_times = request.POST.getlist("edit_stop_out_time")
+    edit_purposes = request.POST.getlist("edit_stop_purpose")
+    edit_purpose_types = request.POST.getlist("edit_stop_purpose_type")
+    edit_ids = request.POST.getlist("edit_stop_id")
+    errors = []
+
+    if edit_clients:
+        cleaned = []
+        for idx, (cid, cname) in enumerate(zip(edit_ids, edit_clients)):
+            if cname.strip():
+                cpur = edit_purposes[idx].strip() if idx < len(edit_purposes) else ""
+                cptype = edit_purpose_types[idx].strip() if idx < len(edit_purpose_types) else ""
+                if not cptype or cptype not in dict(StaffMovement.PURPOSE_CHOICES):
+                    cptype = "amc" if ("amc" in cname.lower() or cname in AMC_CLIENTS) else "repair"
+                cout_str = edit_out_times[idx].strip() if idx < len(edit_out_times) else ""
+                csvcs = request.POST.getlist(f"edit_stop_services_{idx}") or request.POST.getlist(f"edit_stop_services_{idx}[]")
+                p_out = None
+                if cout_str:
+                    try:
+                        p_out = datetime.strptime(cout_str, "%H:%M").time()
+                    except ValueError:
+                        try:
+                            p_out = datetime.strptime(cout_str, "%H:%M:%S").time()
+                        except ValueError:
+                            pass
+                cleaned.append((cid.strip(), cname.strip(), cpur, cptype, p_out, csvcs))
+
+        if not cleaned:
+            errors.append("Please enter at least one destination.")
+        else:
+            existing_stop_ids = set(str(s.id) for s in movement.stops.all())
+            kept_ids = set()
+
+            for order, (stop_id, client_name, stop_purpose, stop_ptype, stop_out, stop_svcs) in enumerate(cleaned, start=1):
+                if stop_id and stop_id in existing_stop_ids:
+                    stop = StaffMovementStop.objects.get(id=int(stop_id), movement=movement)
+                    stop.client = client_name
+                    stop.purpose = stop_purpose
+                    stop.purpose_type = stop_ptype
+                    if stop_out:
+                        stop.out_time = stop_out
+                    if stop_svcs is not None:
+                        stop.services = stop_svcs
+                    stop.order = order
+                    stop.save()
+                    kept_ids.add(stop_id)
+                else:
+                    new_stop = StaffMovementStop.objects.create(
+                        movement=movement,
+                        client=client_name,
+                        purpose=stop_purpose,
+                        purpose_type=stop_ptype,
+                        out_time=stop_out or movement.out_time,
+                        services=stop_svcs or [],
+                        order=order,
+                    )
+                    kept_ids.add(str(new_stop.id))
+
+            for old_id in existing_stop_ids - kept_ids:
+                StaffMovementStop.objects.filter(id=int(old_id), movement=movement).delete()
+
+            all_stops = list(movement.stops.order_by("order", "id"))
+            if all_stops:
+                movement.client = ", ".join(s.client for s in all_stops)
+                if len(all_stops) > 1:
+                    movement.purpose = " , ".join(f"[{s.client}]: {s.purpose}" for s in all_stops if s.purpose)
+                elif all_stops:
+                    movement.purpose = all_stops[0].purpose
+                valid_stop_outs = [s.out_time for s in all_stops if s.out_time]
+                if valid_stop_outs:
+                    movement.out_time = min(valid_stop_outs)
+                movement.save(update_fields=["client", "purpose", "out_time"])
+
+    # Update assistants if rendered
+    if "assistants_present" in request.POST:
+        target_ids = set(int(aid) for aid in request.POST.getlist("assistants") if aid.isdigit())
+        current_ids = set(movement.assistants.values_list("id", flat=True))
+        for aid in target_ids - current_ids:
+            StaffMovementAssistant.objects.create(movement=movement, employee_id=aid)
+        for aid in current_ids - target_ids:
+            StaffMovementAssistant.objects.filter(movement=movement, employee_id=aid).delete()
+
+    return errors
+
+
 @login_required
 def staff_movement_edit(request, id):
     from accounts.models import User
     from accounts.utils import exclude_staff_movement_ineligible
     from django.conf import settings
     from django.db.models import Q
+    from leaves.models import StaffMovementDepartmentWork, StaffMovementStop
 
     is_staff_movement_admin = request.user.username in getattr(settings, "STAFF_MOVEMENT_PROXY_LOGGER_USERNAMES", [])
+    is_manager = request.user.has_management_access
+    can_edit_all = is_staff_movement_admin or is_manager
 
-    if is_staff_movement_admin:
-        # Admins can reach and fix any record, not just ones they're party to.
+    if can_edit_all:
+        # Managers and proxy loggers can reach and edit any record, not just ones they're party to.
         movement = get_object_or_404(
-            StaffMovement.objects.select_related("employee", "logged_by").prefetch_related("assistant_links__employee"),
+            StaffMovement.objects.select_related("employee", "logged_by").prefetch_related("assistant_links__employee", "stops__department_works"),
             id=id
         )
     else:
         movement = get_object_or_404(
             StaffMovement.objects.filter(
                 Q(employee=request.user) | Q(logged_by=request.user) | Q(assistants=request.user)
-            ).distinct().select_related("employee").prefetch_related("assistant_links__employee"),
+            ).distinct().select_related("employee").prefetch_related("assistant_links__employee", "stops__department_works"),
             id=id
         )
 
     is_primary = request.user.id in (movement.employee_id, movement.logged_by_id)
-    acting_as_primary = is_primary or is_staff_movement_admin
+    acting_as_primary = is_primary or can_edit_all
 
     my_assistant_link = None
-    if not is_primary and not is_staff_movement_admin:
+    if not is_primary and not can_edit_all:
         my_assistant_link = get_object_or_404(StaffMovementAssistant, movement=movement, employee=request.user)
 
-    # Hard lock: once a person's own in_time is set, it's final for that person,
-    # and old records close after the day ends. Staff movement admins are exempt
-    # from both — they're the designated fallback for people who can't self-correct.
-    if not is_staff_movement_admin:
+    # Hard lock for regular employees: once a person's own in_time is set, it's final for that person,
+    # and old records close after the day ends. Managers and staff movement admins are exempt
+    # from both — they have full access to edit even after completion and across past dates.
+    if not can_edit_all:
         if is_primary:
             if movement.in_time:
                 messages.error(request, "This record already has a return time and can no longer be edited.")
@@ -2228,9 +2633,7 @@ def staff_movement_edit(request, id):
         User.objects.exclude(id=request.user.id).exclude(role="ceo")
     ).order_by("first_name", "username")
 
-    # Admins see and can correct every participant's slot, filled or not.
-    # A regular primary logger can still only fill slots that are blank.
-    if is_staff_movement_admin:
+    if can_edit_all:
         open_assistant_links = list(movement.assistant_links.all())
     elif is_primary:
         open_assistant_links = list(movement.assistant_links.filter(in_time__isnull=True))
@@ -2241,65 +2644,14 @@ def staff_movement_edit(request, id):
         action_type = request.POST.get("action_type", "").strip()
         manage_stops = request.POST.get("manage_stops") == "1"
         in_time_str = request.POST.get("in_time", "").strip()
-        resolution_status = request.POST.get("resolution_status", "").strip()
         work_done_for = request.POST.get("work_done_for", "").strip()
         completion_notes = request.POST.get("completion_notes", "").strip()
         separate_returns = request.POST.get("separate_returns") == "1"
 
-        # --- Proxy Logger: Save Destinations Only (Staff Still OUT) ---
-        if action_type == "update_stops_only" or (manage_stops and is_staff_movement_admin and not movement.in_time and not in_time_str):
-            from leaves.models import StaffMovementStop
-            edit_clients = request.POST.getlist("edit_stop_client")
-            edit_purposes = request.POST.getlist("edit_stop_purpose")
-            edit_ids = request.POST.getlist("edit_stop_id")
-            errors = []
-
-            # Validate at least one non-empty client
-            cleaned = []
-            for idx, (cid, cname) in enumerate(zip(edit_ids, edit_clients)):
-                if cname.strip():
-                    cpur = edit_purposes[idx].strip() if idx < len(edit_purposes) else ""
-                    cleaned.append((cid.strip(), cname.strip(), cpur))
-
-            if not cleaned:
-                errors.append("Please enter at least one destination.")
-
+        # --- Proxy Logger / Manager: Save Destinations Only (Staff Still OUT) ---
+        if action_type == "update_stops_only":
+            errors = _sync_movement_stops_and_assistants(movement, request)
             if not errors:
-                existing_stop_ids = set(str(s.id) for s in movement.stops.all())
-                kept_ids = set()
-
-                for order, (stop_id, client_name, stop_purpose) in enumerate(cleaned, start=1):
-                    if stop_id and stop_id in existing_stop_ids:
-                        # Rename existing stop
-                        stop = StaffMovementStop.objects.get(id=int(stop_id), movement=movement)
-                        stop.client = client_name
-                        stop.purpose = stop_purpose
-                        stop.order = order
-                        stop.save()
-                        kept_ids.add(stop_id)
-                    else:
-                        # Add new stop
-                        StaffMovementStop.objects.create(
-                            movement=movement,
-                            client=client_name,
-                            purpose=stop_purpose,
-                            order=order,
-                        )
-
-                # Remove stops that were deleted by the admin
-                for old_id in existing_stop_ids - kept_ids:
-                    StaffMovementStop.objects.filter(id=int(old_id), movement=movement).delete()
-
-                # Update parent client field (comma-joined summary) and purpose
-                all_stops = list(movement.stops.order_by("order", "id"))
-                if all_stops:
-                    movement.client = ", ".join(s.client for s in all_stops)
-                    if len(all_stops) > 1:
-                        movement.purpose = " , ".join(f"[{s.client}]: {s.purpose}" for s in all_stops if s.purpose)
-                    elif all_stops:
-                        movement.purpose = all_stops[0].purpose
-                    movement.save(update_fields=["client", "purpose"])
-
                 messages.success(request, "Destinations updated successfully. Staff member remains active (OUT).")
                 return redirect("staff_movement")
 
@@ -2308,7 +2660,8 @@ def staff_movement_edit(request, id):
             return render(request, "leaves/staff_movement.html", {
                 "movement": movement,
                 "is_edit": True,
-                "is_manager": False,
+                "is_manager": is_manager,
+                "can_edit_all": can_edit_all,
                 "is_primary": is_primary,
                 "is_staff_movement_admin": is_staff_movement_admin,
                 "my_assistant_link": my_assistant_link,
@@ -2316,102 +2669,123 @@ def staff_movement_edit(request, id):
                 "open_assistant_links": open_assistant_links,
                 "selected_assistant_ids": list(movement.assistants.values_list("id", flat=True)),
                 "purpose_choices": StaffMovement.PURPOSE_CHOICES,
-                "resolution_choices": StaffMovement.RESOLUTION_CHOICES,
                 "existing_clients": _get_client_suggestions(),
+                "amc_clients": AMC_CLIENTS,
+                "service_checkboxes": SERVICE_CHECKBOXES,
+                "service_repair_support": SERVICE_REPAIR_SUPPORT,
+                "service_setup_install": SERVICE_SETUP_INSTALL,
+                "department_choices": DEPARTMENT_CHOICES,
             })
 
-        # --- Record Return Flow (Marks return and saves all details) ---
-        # Sync any edited stops first if submitted together with return:
-        if manage_stops and is_staff_movement_admin and not movement.in_time:
-            from leaves.models import StaffMovementStop
-            edit_clients = request.POST.getlist("edit_stop_client")
-            edit_purposes = request.POST.getlist("edit_stop_purpose")
-            edit_ids = request.POST.getlist("edit_stop_id")
-            cleaned = []
-            for idx, (cid, cname) in enumerate(zip(edit_ids, edit_clients)):
-                if cname.strip():
-                    cpur = edit_purposes[idx].strip() if idx < len(edit_purposes) else ""
-                    cleaned.append((cid.strip(), cname.strip(), cpur))
-            if cleaned:
-                existing_stop_ids = set(str(s.id) for s in movement.stops.all())
-                kept_ids = set()
-                for order, (stop_id, client_name, stop_purpose) in enumerate(cleaned, start=1):
-                    if stop_id and stop_id in existing_stop_ids:
-                        stop = StaffMovementStop.objects.get(id=int(stop_id), movement=movement)
-                        stop.client = client_name
-                        stop.purpose = stop_purpose
-                        stop.order = order
-                        stop.save()
-                        kept_ids.add(stop_id)
-                    else:
-                        StaffMovementStop.objects.create(
-                            movement=movement,
-                            client=client_name,
-                            purpose=stop_purpose,
-                            order=order,
-                        )
-                for old_id in existing_stop_ids - kept_ids:
-                    StaffMovementStop.objects.filter(id=int(old_id), movement=movement).delete()
-                all_stops = list(movement.stops.order_by("order", "id"))
-                if all_stops:
-                    movement.client = ", ".join(s.client for s in all_stops)
-                    if len(all_stops) > 1:
-                        movement.purpose = " , ".join(f"[{s.client}]: {s.purpose}" for s in all_stops if s.purpose)
-                    elif all_stops:
-                        movement.purpose = all_stops[0].purpose
-                    movement.save(update_fields=["client", "purpose"])
-
+        # --- Record Return Flow (Marks return and saves all stop & department details) ---
         errors = []
-        in_time = None
-        if not in_time_str:
-            errors.append("Please enter the return time.")
-        else:
-            try:
-                in_time = datetime.strptime(in_time_str, "%H:%M").time()
-            except ValueError:
-                try:
-                    in_time = datetime.strptime(in_time_str, "%H:%M:%S").time()
-                except ValueError:
-                    errors.append("Invalid return time format.")
-
-        # Compare against the record's actual date, not just today's clock —
-        # otherwise a clock-time comparison alone wrongly flags a perfectly
-        # valid past-day time (e.g. 5:30 PM yesterday) as "in the future"
-        # whenever it's currently earlier in the day than that.
         now_dt = datetime.now()
-        if in_time is not None:
-            if in_time <= movement.out_time:
-                errors.append("Return time must be later than the departure time.")
-            if datetime.combine(movement.date, in_time) > now_dt:
-                errors.append("Return time can't be in the future.")
 
-        stops_list = list(movement.stops.all())
-        stop_notes_parts = []
+        if can_edit_all:
+            sync_errors = _sync_movement_stops_and_assistants(movement, request)
+            if sync_errors:
+                errors.extend(sync_errors)
+
+        stops_list = list(movement.stops.prefetch_related("department_works").all())
+
+        if not stops_list and movement.client:
+            s_initial = StaffMovementStop.objects.create(
+                movement=movement,
+                order=1,
+                client=movement.client,
+                out_time=movement.out_time,
+                purpose=movement.purpose,
+                purpose_type=movement.purpose_type,
+            )
+            stops_list = [s_initial]
+
+        stop_parsed_data = {}
         for s in stops_list:
-            snote = request.POST.get(f"stop_completion_notes_{s.id}", "").strip()
-            if snote:
-                stop_notes_parts.append(f"[{s.client}]: {snote}")
+            s_out_str = request.POST.get(f"stop_out_time_{s.id}", "").strip() or request.POST.get("out_time", "").strip()
+            s_in_str = request.POST.get(f"stop_in_time_{s.id}", "").strip() or in_time_str
+            s_svcs = request.POST.getlist(f"stop_services_{s.id}") or request.POST.getlist(f"stop_services_{s.id}[]")
+            s_snote = request.POST.get(f"stop_completion_notes_{s.id}", "").strip() or completion_notes
+            s_swdf = request.POST.get(f"stop_work_done_for_{s.id}", "").strip() or work_done_for
 
-        if stop_notes_parts and not completion_notes:
-            completion_notes = "\n\n".join(stop_notes_parts)
+            dept_names = request.POST.getlist(f"dept_department_{s.id}") or request.POST.getlist(f"dept_department_{s.id}[]")
+            dept_wdf = request.POST.getlist(f"dept_work_done_for_{s.id}") or request.POST.getlist(f"dept_work_done_for_{s.id}[]")
+            dept_desc = request.POST.getlist(f"dept_work_description_{s.id}") or request.POST.getlist(f"dept_work_description_{s.id}[]")
 
-        if not completion_notes and not stop_notes_parts:
-            errors.append("Please enter completion / return notes.")
+            s_out_time = None
+            if s_out_str:
+                try:
+                    s_out_time = datetime.strptime(s_out_str, "%H:%M").time()
+                except ValueError:
+                    try:
+                        s_out_time = datetime.strptime(s_out_str, "%H:%M:%S").time()
+                    except ValueError:
+                        errors.append(f"Invalid Out Time format for {s.client}.")
+            else:
+                s_out_time = s.out_time or movement.out_time or datetime.now().time()
 
-        if stops_list:
-            for s in stops_list:
-                swdf = request.POST.get(f"stop_work_done_for_{s.id}", "").strip() or work_done_for
-                if not swdf:
-                    errors.append(f"Please enter Work Done For / Contact Person for {s.client}.")
-        else:
-            if not work_done_for:
-                errors.append("Please enter Work Done For / Contact Person.")
+            s_in_time = None
+            if not s_in_str:
+                errors.append(f"Return time (In Time) is compulsory for {s.client}.")
+            else:
+                try:
+                    s_in_time = datetime.strptime(s_in_str, "%H:%M").time()
+                except ValueError:
+                    try:
+                        s_in_time = datetime.strptime(s_in_str, "%H:%M:%S").time()
+                    except ValueError:
+                        errors.append(f"Invalid Return Time format for {s.client}.")
 
-        if movement.purpose_type == "problem_solving":
-            if resolution_status not in dict(StaffMovement.RESOLUTION_CHOICES):
-                errors.append("Please select whether the problem was solved.")
+            if s_out_time and s_in_time:
+                if s_in_time <= s_out_time:
+                    errors.append(f"Return time must be later than departure time for {s.client}.")
+                if datetime.combine(movement.date, s_in_time) > now_dt:
+                    errors.append(f"Return time can't be in the future for {s.client}.")
 
-        # Validate per-assistant entries typed by the primary/admin (only for open ones)
+            cleaned_depts = []
+            for d_idx, (d_name, d_contact, d_work) in enumerate(zip(dept_names, dept_wdf, dept_desc), start=1):
+                if d_name.strip() or d_contact.strip() or d_work.strip():
+                    cleaned_depts.append({
+                        "order": d_idx,
+                        "department": d_name.strip() or "General",
+                        "work_done_for": d_contact.strip(),
+                        "work_description": d_work.strip(),
+                    })
+
+            stop_parsed_data[s.id] = {
+                "out_time": s_out_time,
+                "in_time": s_in_time,
+                "services": s_svcs,
+                "completion_notes": s_snote,
+                "work_done_for": s_swdf,
+                "departments": cleaned_depts,
+            }
+
+        overall_in_time = None
+        if in_time_str:
+            try:
+                overall_in_time = datetime.strptime(in_time_str, "%H:%M").time()
+            except ValueError:
+                pass
+        
+        all_stop_in_times = [d["in_time"] for d in stop_parsed_data.values() if d["in_time"]]
+        if all_stop_in_times:
+            calculated_max_in = max(all_stop_in_times)
+            if not overall_in_time or overall_in_time < calculated_max_in:
+                overall_in_time = calculated_max_in
+
+        if not overall_in_time and not all_stop_in_times:
+            errors.append("Please enter the return time.")
+
+        # Validate work_done_for / contact person is provided (via top-level or per-stop or department works)
+        has_any_contact = bool(work_done_for)
+        if not has_any_contact:
+            for s_id, pdata in stop_parsed_data.items():
+                if pdata["work_done_for"] or pdata["departments"]:
+                    has_any_contact = True
+                    break
+        if not has_any_contact:
+            errors.append("Please enter Work Done For / Contact Person for at least one stop.")
+
         assistant_updates = {}
         assistant_still_out = set()
         if acting_as_primary and separate_returns:
@@ -2429,11 +2803,8 @@ def staff_movement_edit(request, id):
                     continue
 
                 if not val:
-                    if is_staff_movement_admin:
-                        # Admin left this one untouched — whether it already has a
-                        # time or is still blank, don't force a re-entry.
+                    if can_edit_all:
                         continue
-                    # Neither a time nor "still out" was given — ambiguous, must be explicit.
                     errors.append(
                         f"Please enter a return time for {name}, or check 'Still out' if they haven't returned."
                     )
@@ -2454,30 +2825,60 @@ def staff_movement_edit(request, id):
 
         if not errors:
             if acting_as_primary:
-                movement.in_time = in_time
-                movement.resolution_status = resolution_status
-                if work_done_for:
-                    movement.work_done_for = work_done_for
-                movement.completion_notes = completion_notes
-                movement.save()
+                movement.in_time = overall_in_time
 
-                if stops_list:
-                    for s in stops_list:
-                        snote = request.POST.get(f"stop_completion_notes_{s.id}", "").strip()
-                        sres = request.POST.get(f"stop_resolution_status_{s.id}", "").strip()
-                        swdf = request.POST.get(f"stop_work_done_for_{s.id}", "").strip() or work_done_for
-                        if snote:
-                            s.completion_notes = snote
-                        if sres:
-                            s.resolution_status = sres
-                        if swdf:
-                            s.work_done_for = swdf
-                        s.save()
+                summary_notes_list = []
+                summary_contacts_list = []
+                for s in stops_list:
+                    pdata = stop_parsed_data[s.id]
+                    s.out_time = pdata["out_time"]
+                    s.in_time = pdata["in_time"]
+                    s.services = pdata["services"]
+                    s.completion_notes = pdata["completion_notes"]
+                    s.work_done_for = pdata["work_done_for"]
+
+                    StaffMovementDepartmentWork.objects.filter(stop=s).delete()
+                    for dept_item in pdata["departments"]:
+                        StaffMovementDepartmentWork.objects.create(
+                            stop=s,
+                            order=dept_item["order"],
+                            department=dept_item["department"],
+                            work_done_for=dept_item["work_done_for"],
+                            work_description=dept_item["work_description"],
+                        )
+
+                    if not s.completion_notes and pdata["departments"]:
+                        dept_lines = [f"{d['department']}: {d['work_description']}" for d in pdata["departments"] if d['work_description']]
+                        if dept_lines:
+                            s.completion_notes = " ; ".join(dept_lines)
+
+                    if not s.work_done_for and pdata["departments"]:
+                        contact_lines = [f"{d['department']}: {d['work_done_for']}" for d in pdata["departments"] if d['work_done_for']]
+                        if contact_lines:
+                            s.work_done_for = " , ".join(contact_lines)
+
+                    s.save()
+
+                    if s.completion_notes:
+                        summary_notes_list.append(f"[{s.client}]: {s.completion_notes}" if len(stops_list) > 1 else s.completion_notes)
+                    if s.work_done_for:
+                        summary_contacts_list.append(s.work_done_for)
+
+                if summary_notes_list and not completion_notes:
+                    movement.completion_notes = "\n\n".join(summary_notes_list)
+                elif completion_notes:
+                    movement.completion_notes = completion_notes
+
+                if summary_contacts_list and not work_done_for:
+                    movement.work_done_for = " , ".join(summary_contacts_list)
+                elif work_done_for:
+                    movement.work_done_for = work_done_for
+
+                movement.save()
 
                 for link in open_assistant_links:
                     if link.id in assistant_still_out:
-                        if is_staff_movement_admin:
-                            # Admin correction: revert this person to "not returned".
+                        if can_edit_all:
                             link.in_time = None
                             link.save()
                         continue
@@ -2485,18 +2886,16 @@ def staff_movement_edit(request, id):
                         link.in_time = assistant_updates[link.id]
                         link.save()
                     elif link.in_time is None:
-                        link.in_time = in_time
+                        link.in_time = overall_in_time
                         link.save()
-                    # else: already had a time and admin didn't provide an update —
-                    # leave it untouched rather than silently overwriting it.
             else:
-                my_assistant_link.in_time = in_time
+                my_assistant_link.in_time = overall_in_time
                 my_assistant_link.save()
 
                 if work_done_for:
                     movement.work_done_for = work_done_for
-                movement.resolution_status = resolution_status
-                movement.completion_notes = completion_notes
+                if completion_notes:
+                    movement.completion_notes = completion_notes
                 movement.save()
 
             messages.success(request, "Staff movement record updated successfully.")
@@ -2505,10 +2904,17 @@ def staff_movement_edit(request, id):
         for err in errors:
             messages.error(request, err)
 
+    # Backfill stop out_time from movement for legacy stops missing per-stop time
+    for stop in movement.stops.all():
+        if stop.out_time is None and movement.out_time:
+            stop.out_time = movement.out_time
+            stop.save(update_fields=["out_time"])
+
     return render(request, "leaves/staff_movement.html", {
         "movement": movement,
         "is_edit": True,
-        "is_manager": False,
+        "is_manager": is_manager,
+        "can_edit_all": can_edit_all,
         "is_primary": is_primary,
         "is_staff_movement_admin": is_staff_movement_admin,
         "my_assistant_link": my_assistant_link,
@@ -2516,8 +2922,12 @@ def staff_movement_edit(request, id):
         "open_assistant_links": open_assistant_links,
         "selected_assistant_ids": list(movement.assistants.values_list("id", flat=True)),
         "purpose_choices": StaffMovement.PURPOSE_CHOICES,
-        "resolution_choices": StaffMovement.RESOLUTION_CHOICES,
         "existing_clients": _get_client_suggestions(),
+        "amc_clients": AMC_CLIENTS,
+        "service_checkboxes": SERVICE_CHECKBOXES,
+        "service_repair_support": SERVICE_REPAIR_SUPPORT,
+        "service_setup_install": SERVICE_SETUP_INSTALL,
+        "department_choices": DEPARTMENT_CHOICES,
     })
 
 
@@ -2527,8 +2937,9 @@ def staff_movement_cancel(request, id):
     from django.db.models import Q
 
     is_staff_movement_admin = request.user.username in getattr(settings, "STAFF_MOVEMENT_PROXY_LOGGER_USERNAMES", [])
+    can_cancel_all = is_staff_movement_admin or request.user.has_management_access
 
-    if is_staff_movement_admin:
+    if can_cancel_all:
         movement = get_object_or_404(StaffMovement, id=id)
     else:
         # Regular users can only cancel movements they are primary on or logged
@@ -2547,8 +2958,8 @@ def staff_movement_cancel(request, id):
         messages.error(request, "This movement has already been cancelled.")
         return redirect("staff_movement")
 
-    # Only same-day cancellation for non-admin
-    if not is_staff_movement_admin and movement.date != date.today():
+    # Only same-day cancellation for non-admin/non-manager
+    if not can_cancel_all and movement.date != date.today():
         messages.error(request, "Cancellation window for this movement has closed.")
         return redirect("staff_movement")
 
@@ -2592,7 +3003,7 @@ def staff_movement_export_pdf(request):
 
     movements = StaffMovement.objects.all().select_related(
         "employee", "logged_by"
-    ).prefetch_related("assistant_links__employee")
+    ).prefetch_related("assistant_links__employee", "stops__department_works")
 
     if not filter_date and not filter_date_from and not filter_date_to and not show_all and not filter_employee_id and not filter_client:
         today = date.today()
@@ -2648,10 +3059,6 @@ def staff_movement_export_pdf(request):
                 pdf_client_q |= Q(client__icontains=term) | Q(stops__client__icontains=term)
             movements = movements.filter(pdf_client_q).distinct()
 
-    # Prefetch stops for multi-stop display in template
-    movements = movements.prefetch_related("stops")
-
-    # Attach matching_stops to each movement for filtered PDF display
     movements_list = list(movements)
     pdf_terms_lower = [c.strip().lower() for c in filter_client.split(",") if c.strip()] if filter_client else []
     for m in movements_list:
@@ -2661,7 +3068,7 @@ def staff_movement_export_pdf(request):
             matching_purposes = [f"[{s.client}]: {s.purpose}" if len(m.matching_stops) > 1 else s.purpose for s in m.matching_stops if s.purpose]
             m.filtered_purpose = " ".join(matching_purposes) if matching_purposes else (m.purpose or "")
         else:
-            m.matching_stops = stops  # all stops (or empty for single-client legacy)
+            m.matching_stops = stops
             m.filtered_purpose = m.purpose or ""
 
     selected_employee = None
@@ -2686,6 +3093,11 @@ def staff_movement_export_pdf(request):
         "selected_employee": selected_employee,
         "today_ad": today_ad,
         "today_bs": today_bs,
+        "amc_clients": AMC_CLIENTS,
+        "service_checkboxes": SERVICE_CHECKBOXES,
+        "service_repair_support": SERVICE_REPAIR_SUPPORT,
+        "service_setup_install": SERVICE_SETUP_INSTALL,
+        "department_choices": DEPARTMENT_CHOICES,
     }
     return render(request, "leaves/staff_movement_pdf.html", context)
 

@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
@@ -382,8 +382,11 @@ class StaffMovementTestCase(TestCase):
 
         # Set out_time programmatically to 10 minutes ago so we can return in the past
         now_dt = datetime.now()
-        movement.out_time = (now_dt - timedelta(minutes=10)).time()
+        past_out_time = (now_dt - timedelta(minutes=10)).time()
+        movement.out_time = past_out_time
         movement.save()
+        # Also update the stop's out_time to match
+        movement.stops.all().update(out_time=past_out_time)
 
         # Fill in return time (edit) - 5 minutes ago
         in_time_str = (now_dt - timedelta(minutes=5)).strftime("%H:%M")
@@ -402,61 +405,6 @@ class StaffMovementTestCase(TestCase):
         self.assertEqual(movement.purpose, "Technical Demo")
         self.assertEqual(movement.work_done_for, "Mr. Larry Page")
         self.assertEqual(movement.completion_notes, "Technical Demo Completed")
-
-    def test_problem_movement_requires_description_and_solve_status_on_return(self):
-        self.client.login(username="testemployee", password="password123")
-        today_str = date.today().strftime("%Y-%m-%d")
-
-        response = self.client.post(reverse("staff_movement"), {
-            "date": today_str,
-            "client": "Client Site",
-            "purpose_type": "problem_solving",
-        })
-        self.assertContains(response, "Please describe the problem being addressed.")
-
-        response = self.client.post(reverse("staff_movement"), {
-            "date": today_str,
-            "client": "Client Site",
-            "purpose_type": "problem_solving",
-            "problem_description": "Internet is not working",
-        })
-        self.assertRedirects(response, reverse("staff_movement"))
-
-        from leaves.models import StaffMovement
-        from datetime import timedelta
-        movement = StaffMovement.objects.get(client="Client Site")
-        
-        # Set out_time programmatically to 10 minutes ago
-        now_dt = datetime.now()
-        movement.out_time = (now_dt - timedelta(minutes=10)).time()
-        movement.save()
-
-        in_time_str = (now_dt - timedelta(minutes=5)).strftime("%H:%M")
-
-        response = self.client.post(reverse("staff_movement_edit", args=[movement.id]), {
-            "date": today_str,
-            "client": "Client Site",
-            "in_time": in_time_str,
-            "purpose_type": "problem_solving",
-            "problem_description": "Internet is not working",
-            "work_done_for": "IT Manager",
-            "completion_notes": "Reconfigured router",
-        })
-        self.assertContains(response, "Please select whether the problem was solved.")
-
-        response = self.client.post(reverse("staff_movement_edit", args=[movement.id]), {
-            "date": today_str,
-            "client": "Client Site",
-            "in_time": in_time_str,
-            "purpose_type": "problem_solving",
-            "problem_description": "Internet is not working",
-            "resolution_status": "solved",
-            "work_done_for": "IT Manager",
-            "completion_notes": "Reconfigured router",
-        })
-        self.assertRedirects(response, reverse("staff_movement"))
-        movement.refresh_from_db()
-        self.assertEqual(movement.resolution_status, "solved")
 
     def test_return_time_must_be_filled_later_and_after_departure(self):
         self.client.login(username="testemployee", password="password123")
@@ -491,7 +439,7 @@ class StaffMovementTestCase(TestCase):
             "work_done_for": "Contact Person",
             "completion_notes": "Picked up goods",
         })
-        self.assertContains(response, "Return time must be later than the departure time")
+        self.assertContains(response, "Return time must be later than departure time for Client Site.")
 
         # Create a time 1 minute before out_time
         before_out_time_str = (datetime.combine(date.today(), out_time_obj) - timedelta(minutes=1)).strftime("%H:%M")
@@ -503,7 +451,7 @@ class StaffMovementTestCase(TestCase):
             "work_done_for": "Contact Person",
             "completion_notes": "Picked up goods",
         })
-        self.assertContains(response, "Return time must be later than the departure time")
+        self.assertContains(response, "Return time must be later than departure time for Client Site.")
 
     def test_manager_can_view_and_filter_movements(self):
         from leaves.models import StaffMovement
@@ -810,8 +758,11 @@ class StaffMovementTestCase(TestCase):
         self.assertEqual(stops[1].work_done_for, "Ram")
 
         # Set out_time in the past to test valid return
-        movement.out_time = (datetime.now() - timedelta(minutes=30)).time()
+        past_out_time = (datetime.now() - timedelta(minutes=30)).time()
+        movement.out_time = past_out_time
         movement.save()
+        # Also update all stops' out_time to match
+        movement.stops.all().update(out_time=past_out_time)
 
         # Test Return edit with itemized notes
         edit_url = reverse("staff_movement_edit", args=[movement.id])
@@ -865,6 +816,223 @@ class StaffMovementTestCase(TestCase):
             "work_done_for": "",  # Blank contact person
         })
         self.assertContains(response, "Please enter Work Done For / Contact Person")
+
+    def test_manager_and_proxy_logger_can_edit_completed_movement(self):
+        """Managers and proxy loggers can edit movements even after in_time is recorded and on previous dates."""
+        from leaves.models import StaffMovement, StaffMovementStop
+        out_time_obj = time(10, 0)
+        in_time_obj = time(12, 0)
+        movement = StaffMovement.objects.create(
+            employee=self.employee,
+            date=date.today() - timedelta(days=2),
+            client="Previous Site",
+            out_time=out_time_obj,
+            in_time=in_time_obj,
+            purpose_type="repair",
+            work_done_for="Old Contact",
+            completion_notes="Initial notes",
+        )
+        stop = StaffMovementStop.objects.create(
+            movement=movement,
+            client="Previous Site",
+            order=1,
+            out_time=out_time_obj,
+            in_time=in_time_obj,
+            purpose="Repair task",
+            purpose_type="repair",
+        )
+
+        # 1. Regular employee is blocked from editing completed/past-date movement
+        self.client.force_login(self.employee)
+        emp_response = self.client.get(reverse("staff_movement_edit", args=[movement.id]))
+        self.assertEqual(emp_response.status_code, 302)  # redirected with error message
+
+        # 2. Manager CAN access and edit completed movement
+        self.client.force_login(self.manager)
+        mgr_get_resp = self.client.get(reverse("staff_movement_edit", args=[movement.id]))
+        self.assertEqual(mgr_get_resp.status_code, 200)
+
+        # Manager updates the work description & in_time
+        mgr_post_resp = self.client.post(reverse("staff_movement_edit", args=[movement.id]), {
+            f"stop_out_time_{stop.id}": "10:00",
+            f"stop_in_time_{stop.id}": "12:30",
+            f"stop_work_done_for_{stop.id}": "Updated Contact",
+            f"stop_completion_notes_{stop.id}": "Updated Work Description",
+            f"dept_department_{stop.id}[]": ["IT"],
+            f"dept_work_done_for_{stop.id}[]": ["Updated Contact"],
+            f"dept_work_description_{stop.id}[]": ["Replaced RAM and SSD"],
+        })
+        self.assertEqual(mgr_post_resp.status_code, 302)
+        movement.refresh_from_db()
+        stop.refresh_from_db()
+        self.assertEqual(movement.in_time, time(12, 30))
+        self.assertEqual(stop.in_time, time(12, 30))
+        self.assertEqual(stop.department_works.first().work_description, "Replaced RAM and SSD")
+
+    def test_manager_record_return_marks_active_movement_completed(self):
+        """Managers and proxy loggers clicking Record Return & Mark Completed marks an OUT movement completed."""
+        from leaves.models import StaffMovement, StaffMovementStop
+        out_time_obj = time(10, 0)
+        movement = StaffMovement.objects.create(
+            employee=self.employee,
+            date=date.today(),
+            client="Active Site",
+            out_time=out_time_obj,
+            purpose_type="repair",
+        )
+        stop = StaffMovementStop.objects.create(
+            movement=movement,
+            client="Active Site",
+            order=1,
+            out_time=out_time_obj,
+            purpose="Onsite Repair",
+            purpose_type="repair",
+        )
+
+        self.client.force_login(self.manager)
+        resp = self.client.post(reverse("staff_movement_edit", args=[movement.id]), {
+            "action_type": "record_return",
+            f"stop_out_time_{stop.id}": "10:00",
+            f"stop_in_time_{stop.id}": "11:30",
+            f"stop_work_done_for_{stop.id}": "Client Contact",
+            f"stop_completion_notes_{stop.id}": "Fixed switch",
+            f"dept_department_{stop.id}[]": ["IT"],
+            f"dept_work_done_for_{stop.id}[]": ["Client Contact"],
+            f"dept_work_description_{stop.id}[]": ["Fixed switch and cable"],
+        })
+        self.assertEqual(resp.status_code, 302)
+        movement.refresh_from_db()
+        stop.refresh_from_db()
+        self.assertEqual(movement.in_time, time(11, 30))
+        self.assertEqual(stop.in_time, time(11, 30))
+        self.assertIsNotNone(movement.in_time)
+
+    def test_manager_save_destinations_only_does_not_require_return_or_department(self):
+        """Managers clicking Save Destinations Only updates stops and keeps movement OUT without requiring department/return info."""
+        from leaves.models import StaffMovement, StaffMovementStop
+        out_time_obj = time(10, 0)
+        movement = StaffMovement.objects.create(
+            employee=self.employee,
+            date=date.today(),
+            client="Initial Site",
+            out_time=out_time_obj,
+            purpose_type="repair",
+        )
+        stop = StaffMovementStop.objects.create(
+            movement=movement,
+            client="Initial Site",
+            order=1,
+            out_time=out_time_obj,
+            purpose="Initial check",
+            purpose_type="repair",
+        )
+
+        self.client.force_login(self.manager)
+        resp = self.client.post(reverse("staff_movement_edit", args=[movement.id]), {
+            "action_type": "update_stops_only",
+            "edit_stop_id": [str(stop.id), ""],
+            "edit_stop_client": ["Updated Site A", "New Site B"],
+            "edit_stop_out_time": ["10:00", "11:00"],
+            "edit_stop_purpose": ["Site A inspection", "Site B delivery"],
+            "edit_stop_purpose_type": ["repair", "goods_pickup"],
+        })
+        self.assertEqual(resp.status_code, 302)
+        movement.refresh_from_db()
+        self.assertIsNone(movement.in_time)
+        self.assertEqual(movement.stops.count(), 2)
+        self.assertEqual(movement.client, "Updated Site A, New Site B")
+
+    def test_record_return_without_department_succeeds(self):
+        """Recording return with blank department succeeds without validation errors."""
+        from leaves.models import StaffMovement, StaffMovementStop
+        out_time_obj = time(10, 0)
+        movement = StaffMovement.objects.create(
+            employee=self.employee,
+            date=date.today(),
+            client="General Visit",
+            out_time=out_time_obj,
+            purpose_type="repair",
+        )
+        stop = StaffMovementStop.objects.create(
+            movement=movement,
+            client="General Visit",
+            order=1,
+            out_time=out_time_obj,
+            purpose="Routine visit",
+            purpose_type="repair",
+        )
+
+        self.client.force_login(self.employee)
+        resp = self.client.post(reverse("staff_movement_edit", args=[movement.id]), {
+            "action_type": "record_return",
+            f"stop_out_time_{stop.id}": "10:00",
+            f"stop_in_time_{stop.id}": "11:30",
+            f"stop_work_done_for_{stop.id}": "Contact Person",
+            f"stop_completion_notes_{stop.id}": "Routine inspection completed",
+            f"dept_department_{stop.id}[]": [""],  # Left blank
+            f"dept_work_done_for_{stop.id}[]": ["Contact Person"],
+            f"dept_work_description_{stop.id}[]": ["Inspected cabling and devices"],
+        })
+        self.assertEqual(resp.status_code, 302)
+        movement.refresh_from_db()
+        stop.refresh_from_db()
+        self.assertEqual(movement.in_time, time(11, 30))
+        self.assertEqual(stop.department_works.first().department, "General")
+
+    def test_manager_can_edit_destinations_and_assistants_on_completed_record(self):
+        """Manager can edit destination details and assistant list on an already completed record."""
+        from leaves.models import StaffMovement, StaffMovementStop, StaffMovementAssistant
+        out_time_obj = time(10, 0)
+        in_time_obj = time(12, 0)
+        movement = StaffMovement.objects.create(
+            employee=self.employee,
+            date=date.today(),
+            client="Old Hospital",
+            out_time=out_time_obj,
+            in_time=in_time_obj,
+            purpose_type="repair",
+        )
+        stop = StaffMovementStop.objects.create(
+            movement=movement,
+            client="Old Hospital",
+            order=1,
+            out_time=out_time_obj,
+            in_time=in_time_obj,
+            purpose="Old purpose",
+            purpose_type="repair",
+        )
+        assistant_user = User.objects.create_user(username="assist_emp", password="password123", role="employee")
+
+        self.client.force_login(self.manager)
+        resp = self.client.post(reverse("staff_movement_edit", args=[movement.id]), {
+            "action_type": "record_return",
+            "edit_stop_id": [str(stop.id)],
+            "edit_stop_client": ["Patan Hospital (Corrected)"],
+            "edit_stop_out_time": ["10:15"],
+            "edit_stop_purpose": ["Updated Inspection"],
+            "edit_stop_purpose_type": ["repair"],
+            f"stop_out_time_{stop.id}": "10:15",
+            f"stop_in_time_{stop.id}": "12:45",
+            f"stop_work_done_for_{stop.id}": "Dr. Sharma",
+            f"stop_completion_notes_{stop.id}": "Replaced motherboard",
+            f"dept_department_{stop.id}[]": ["IT"],
+            f"dept_work_done_for_{stop.id}[]": ["Dr. Sharma"],
+            f"dept_work_description_{stop.id}[]": ["Replaced motherboard"],
+            "assistants_present": "1",
+            "assistants": [str(assistant_user.id)],
+        })
+        self.assertEqual(resp.status_code, 302)
+        movement.refresh_from_db()
+        stop.refresh_from_db()
+        self.assertEqual(movement.client, "Patan Hospital (Corrected)")
+        self.assertEqual(stop.client, "Patan Hospital (Corrected)")
+        self.assertEqual(movement.out_time, time(10, 15))
+        self.assertEqual(movement.in_time, time(12, 45))
+        self.assertEqual(list(movement.assistants.values_list("id", flat=True)), [assistant_user.id])
+
+
+
+
 
 
 class IClockIntegrationTestCase(TestCase):
@@ -1142,5 +1310,35 @@ class AttendanceCalendarTestCase(TestCase):
         self.assertEqual(summary["status_label"], "Holiday Work")
         self.assertEqual(summary["status_badge_class"], "badge-info")
         self.assertTrue(summary["holiday_work_approved"])
+
+    def test_attendance_reports_tab_and_api(self):
+        """Test Attendance Reports tab rendering, AJAX API endpoint, and access control."""
+        # 1. Manager can access reports with tab=attendance
+        self.client.force_login(self.manager)
+        response = self.client.get(reverse("reports") + "?tab=attendance")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Attendance Reports")
+        self.assertContains(response, "Department Attendance Summary")
+        self.assertContains(response, "Attendance Status Distribution")
+        self.assertContains(response, "Employee Attendance Breakdown")
+
+        # 2. Manager can query attendance_reports_api
+        api_response = self.client.get(reverse("attendance_reports_api") + "?att_month=5&att_year=2083")
+        self.assertEqual(api_response.status_code, 200)
+        data = api_response.json()
+        self.assertEqual(data["att_bs_year"], 2083)
+        self.assertEqual(data["att_bs_month"], 5)
+        self.assertIn("total_team_present", data)
+        self.assertIn("total_team_late", data)
+        self.assertIn("dept_attendance_summary", data)
+        self.assertIn("employee_att_stats", data)
+        self.assertIn("attendance_monthly_trend", data)
+        self.assertIn("att_status_distribution", data)
+
+        # 3. Regular employee without management access is denied
+        self.client.force_login(self.employee)
+        emp_api_response = self.client.get(reverse("attendance_reports_api"))
+        self.assertEqual(emp_api_response.status_code, 403)
+
 
 

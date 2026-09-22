@@ -174,9 +174,32 @@
     background: rgba(0, 145, 179, 0.06);
     border: 2px solid var(--color-primary);
   }
-  .att-cal-cell.weekend {
-    background: rgba(16, 21, 34, 0.02);
+  /* Colorful status backgrounds for weekend, holiday, leave */
+  .att-cal-cell.weekend, .att-cal-cell.cell-weekend {
+    background: rgba(225, 29, 72, 0.045);
   }
+  .att-cal-cell.weekend:hover, .att-cal-cell.cell-weekend:hover {
+    background: rgba(225, 29, 72, 0.08);
+  }
+  .att-cal-cell.cell-holiday {
+    background: rgba(147, 51, 234, 0.065);
+  }
+  .att-cal-cell.cell-holiday:hover {
+    background: rgba(147, 51, 234, 0.11);
+  }
+  .att-cal-cell.cell-on_leave {
+    background: rgba(14, 165, 233, 0.065);
+  }
+  .att-cal-cell.cell-on_leave:hover {
+    background: rgba(14, 165, 233, 0.11);
+  }
+  .att-cal-cell.cell-holiday_work {
+    background: rgba(99, 102, 241, 0.065);
+  }
+  .att-cal-cell.cell-holiday_work:hover {
+    background: rgba(99, 102, 241, 0.11);
+  }
+
   .att-cal-date-row {
     display: flex;
     align-items: baseline;
@@ -189,7 +212,10 @@
     color: var(--color-text);
   }
   .att-cal-cell.today .att-bs-num { color: var(--color-primary); }
-  .att-cal-cell.weekend .att-bs-num { color: var(--color-danger); }
+  .att-cal-cell.weekend .att-bs-num, .att-cal-cell.cell-weekend .att-bs-num { color: #e11d48; }
+  .att-cal-cell.cell-holiday .att-bs-num { color: #7e22ce; }
+  .att-cal-cell.cell-on_leave .att-bs-num { color: #0284c7; }
+  .att-cal-cell.cell-holiday_work .att-bs-num { color: #4f46e5; }
   .att-ad-num {
     font-size: 0.75rem;
     color: var(--color-text-light);
@@ -218,13 +244,19 @@
   .badge-late { background: rgba(179, 95, 0, 0.12); color: var(--color-warning); border: 1px solid rgba(179, 95, 0, 0.3); }
   .badge-on_leave { background: rgba(0, 102, 204, 0.12); color: var(--color-accent); border: 1px solid rgba(0, 102, 204, 0.25); }
   .badge-holiday { background: rgba(139, 63, 209, 0.12); color: var(--color-purple); border: 1px solid rgba(139, 63, 209, 0.25); }
-  .badge-weekend { background: rgba(16, 21, 34, 0.06); color: var(--color-text-muted); }
+  .badge-weekend { background: rgba(225, 29, 72, 0.1); color: #e11d48; border: 1px solid rgba(225, 29, 72, 0.22); }
   .badge-staff_movement { background: rgba(0, 184, 212, 0.12); color: #0091b3; border: 1px solid rgba(0, 184, 212, 0.3); }
   .badge-regularized { background: rgba(13, 148, 136, 0.12); color: #0d9488; border: 1px solid rgba(13, 148, 136, 0.3); }
   .badge-holiday_work { background: rgba(99, 102, 241, 0.14); color: #4f46e5; border: 1px solid rgba(99, 102, 241, 0.35); }
   .badge-absent { background: rgba(214, 0, 61, 0.1); color: var(--color-danger); border: 1px solid rgba(214, 0, 61, 0.25); }
   .badge-not_checked_in { background: rgba(16, 21, 34, 0.06); color: var(--color-text-muted); }
   .badge-upcoming { opacity: 0.5; }
+
+  /* List Card Colored Backgrounds */
+  .att-list-card.cell-holiday { background: rgba(147, 51, 234, 0.05); border-left: 3px solid #9333ea; }
+  .att-list-card.cell-on_leave { background: rgba(14, 165, 233, 0.05); border-left: 3px solid #0284c7; }
+  .att-list-card.weekend, .att-list-card.cell-weekend { background: rgba(225, 29, 72, 0.04); border-left: 3px solid #e11d48; }
+  .att-list-card.cell-holiday_work { background: rgba(99, 102, 241, 0.05); border-left: 3px solid #4f46e5; }
 
   .att-times-row {
     font-size: 0.72rem;
@@ -542,7 +574,7 @@
       {% for week in calendar_weeks %}
         {% for day in week %}
           {% if day.bs_d %}
-            <div class="att-cal-cell {% if day.is_today %}today{% endif %} {% if day.is_saturday %}weekend{% endif %}"
+            <div class="att-cal-cell {% if day.is_today %}today{% endif %} {% if day.is_saturday %}weekend cell-weekend{% endif %} {% if day.summary %}cell-{{ day.summary.status }}{% endif %}"
                  onclick="openDayDetailModal('{{ day.ad_date|date:'Y-m-d' }}', '{{ day.bs_d }} {{ calendar_bs_month_label }}', '{{ day.ad_date|date:'M d, Y' }}')">
               <div class="att-cal-date-row">
                 <span class="att-bs-num">{{ day.bs_d }}</span>
@@ -577,9 +609,9 @@
                       </div>
                     {% endif %}
                   {% elif day.summary.leave_info %}
-                    <div class="att-times-row" style="color:var(--color-accent);">{{ day.summary.leave_info }}</div>
+                    <div class="att-times-row" style="color:var(--color-accent);font-weight:700;">{{ day.summary.leave_info }}</div>
                   {% elif day.summary.holiday_name %}
-                    <div class="att-times-row" style="color:var(--color-purple);">{{ day.summary.holiday_name }}</div>
+                    <div class="att-times-row" style="color:var(--color-purple);font-weight:700;">{{ day.summary.holiday_name }}</div>
                   {% endif %}
                 {% endif %}
               </div>
@@ -598,7 +630,7 @@
   {% for week in calendar_weeks %}
     {% for day in week %}
       {% if day.bs_d %}
-        <div class="att-list-card {% if day.is_today %}today{% endif %} {% if day.is_saturday %}weekend{% endif %}"
+        <div class="att-list-card {% if day.is_today %}today{% endif %} {% if day.is_saturday %}weekend cell-weekend{% endif %} {% if day.summary %}cell-{{ day.summary.status }}{% endif %}"
              onclick="openDayDetailModal('{{ day.ad_date|date:'Y-m-d' }}', '{{ day.bs_d }} {{ calendar_bs_month_label }}', '{{ day.ad_date|date:'M d, Y' }}')">
           <div class="att-list-date-box">
             <div class="att-list-day-circle">

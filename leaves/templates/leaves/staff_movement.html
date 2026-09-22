@@ -58,16 +58,16 @@
     background: var(--input-bg);
     border: 1.5px solid var(--color-border);
     border-radius: var(--radius-sm);
-    padding: 18px 20px;
+    padding: 16px 18px;
     margin-bottom: 4px;
   }
   .form-section-label {
-    font-size: 0.72rem;
+    font-size: 0.75rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--color-primary);
-    margin-bottom: 14px;
+    margin-bottom: 12px;
     display: flex;
     align-items: center;
     gap: 7px;
@@ -77,78 +77,256 @@
     opacity: 0.8;
   }
 
-  /* Destination row cards */
-  .dest-row {
-    display: flex;
-    gap: 10px;
-    align-items: stretch;
-    flex-wrap: wrap;
-    padding: 12px 14px;
+  /* Destination card / container */
+  .dest-card {
     background: var(--color-bg);
-    border: 1px solid var(--color-border);
-    border-radius: 8px;
-    transition: border-color 0.2s ease;
+    border: 1.5px solid var(--color-border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    position: relative;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
   }
-  .dest-row:hover,
-  .dest-row:focus-within {
+  .dest-card:hover,
+  .dest-card:focus-within {
     border-color: var(--color-primary);
+    box-shadow: 0 2px 8px rgba(0, 145, 179, 0.06);
   }
-  .dest-row .dest-field {
+  .dest-card-header {
     display: flex;
-    flex-direction: column;
-    gap: 4px;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--color-border-light);
   }
-  .dest-row .dest-field label {
-    font-size: 0.68rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--color-text-light);
-    font-weight: 600;
+  .dest-card-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 0.88rem;
+    color: var(--color-text);
   }
-  .dest-row .dest-field input {
-    padding: 9px 12px;
-    font-size: 0.84rem;
-    border: 1px solid var(--color-border-light);
-    background: var(--input-bg);
-  }
-  .dest-row .dest-field input:focus {
-    border-color: var(--color-primary);
-    background: var(--input-bg-focus);
-  }
-
-  /* Destination number badge */
   .dest-badge {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
     border-radius: 50%;
     background: linear-gradient(135deg, var(--color-accent), var(--color-primary));
     color: #fff;
-    font-size: 0.68rem;
+    font-size: 0.7rem;
     font-weight: 800;
     flex-shrink: 0;
-    align-self: center;
   }
 
-  /* Remove destination button */
-  .dest-remove-btn {
-    background: var(--color-rejected-bg);
-    color: var(--color-rejected-text);
-    border: 1px solid var(--color-rejected-border);
-    padding: 6px 10px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 0.82rem;
+  /* Modern Pill Tag Services */
+  .service-group-title {
+    font-size: 0.68rem;
     font-weight: 700;
-    transition: var(--transition);
-    align-self: center;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-text-muted);
+    margin: 8px 0 5px 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
   }
-  .dest-remove-btn:hover {
-    background: var(--color-danger);
-    color: #fff;
-    border-color: var(--color-danger);
+  .service-pill-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .service-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 11px;
+    background: var(--input-bg);
+    border: 1.2px solid var(--color-border);
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--color-text);
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.15s ease;
+  }
+  .service-pill:hover {
+    border-color: var(--color-primary);
+    background: rgba(0, 145, 179, 0.05);
+  }
+  .service-pill input[type="checkbox"] {
+    display: none;
+  }
+  .service-pill:has(input:checked) {
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+    font-weight: 700;
+    box-shadow: 0 0 0 1px var(--color-focus-glow);
+  }
+  .service-pill .pill-check {
+    display: none;
+    font-size: 0.72rem;
+  }
+  .service-pill:has(input:checked) .pill-check {
+    display: inline-block;
+  }
+
+  /* Client Selector Dropdown + Custom Field */
+  .client-select-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .client-select-wrap select {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1.5px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--input-bg);
+    color: var(--color-text);
+    font-family: inherit;
+    font-size: 0.88rem;
+    cursor: pointer;
+  }
+  .client-select-wrap select:focus {
+    border-color: var(--color-primary);
+    outline: none;
+  }
+  .client-custom-input {
+    padding: 8px 12px;
+    border: 1.5px solid var(--color-primary);
+    border-radius: var(--radius-sm);
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: inherit;
+    font-size: 0.85rem;
+    animation: fadeIn 0.2s ease;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Trip Details Aesthetic Cards */
+  .trip-details-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  @media (max-width: 600px) {
+    .trip-details-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+  .trip-info-box {
+    background: var(--color-bg);
+    border: 1.5px solid var(--color-border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .trip-info-box:hover {
+    border-color: var(--color-primary);
+    box-shadow: 0 2px 8px rgba(0, 145, 179, 0.05);
+  }
+  .trip-info-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .trip-info-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-text-muted);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .live-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #28a745;
+    background: rgba(40, 167, 69, 0.1);
+    padding: 2px 7px;
+    border-radius: 10px;
+  }
+  .live-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #28a745;
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse {
+    0% { transform: scale(0.9); opacity: 0.7; }
+    50% { transform: scale(1.3); opacity: 1; }
+    100% { transform: scale(0.9); opacity: 0.7; }
+  }
+
+  /* Department repeater card */
+  .dept-card {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    padding: 10px 12px;
+    background: var(--input-bg);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+  .dept-card .dept-field {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .dept-card .dept-field label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--color-text-light);
+  }
+
+  /* Service tag badges in tables */
+  .service-tag {
+    display: inline-block;
+    padding: 2px 7px;
+    margin: 2px 2px 2px 0;
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+    border: 1px solid var(--color-focus-glow);
+    border-radius: 12px;
+    font-size: 0.72rem;
+    font-weight: 600;
+  }
+
+  /* Stop numbering badge in tables */
+  .stop-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    margin-bottom: 3px;
+    letter-spacing: 0.01em;
   }
 
   /* Assist grid */
@@ -188,6 +366,23 @@
     border-color: var(--color-primary);
     background: rgba(0, 145, 179, 0.06);
     box-shadow: 0 0 0 1px var(--color-focus-glow);
+  }
+
+  .dest-remove-btn {
+    background: var(--color-rejected-bg);
+    color: var(--color-rejected-text);
+    border: 1px solid var(--color-rejected-border);
+    padding: 4px 9px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: 700;
+    transition: var(--transition);
+  }
+  .dest-remove-btn:hover {
+    background: var(--color-danger);
+    color: #fff;
+    border-color: var(--color-danger);
   }
 </style>
 
@@ -229,13 +424,28 @@
 {% endblock %}
 
 {% block content %}
+<!-- Standard AMC Clients Datalist -->
+<datalist id="amc-clients-list">
+  {% for ac in amc_clients %}
+    <option value="{{ ac }}"></option>
+  {% endfor %}
+</datalist>
+
+<!-- Existing Clients Datalist -->
 <datalist id="existing-clients">
   {% for c in existing_clients %}
     <option value="{{ c }}"></option>
   {% endfor %}
 </datalist>
 
-{% if is_manager %}
+<!-- Department Choices Datalist -->
+<datalist id="dept-choices-list">
+  {% for dept in department_choices %}
+    <option value="{{ dept }}"></option>
+  {% endfor %}
+</datalist>
+
+{% if not is_edit and is_manager %}
 
   <!-- ===== Manager View: Filters ===== -->
   <div class="card" style="margin-bottom:20px">
@@ -266,7 +476,7 @@
 
         <div style="display: flex; flex-direction: column; gap: 4px;">
           <label style="font-size: 0.75rem; color: var(--color-text-muted); font-weight: 600;">Client / Location</label>
-          <input type="text" name="client" list="existing-clients" value="{{ filter_client }}" placeholder="Search client..." class="staff-search-input" style="max-width:160px;">
+          <input type="text" name="client" list="existing-clients" value="{{ filter_client }}" placeholder="Type or select client..." class="staff-search-input" style="min-width: 180px; max-width: 240px; padding: 10px 14px; background: var(--input-bg); border: 1.5px solid var(--color-border); border-radius: var(--radius-sm); font-size: 0.88rem; color: var(--color-text); font-family: inherit;">
           <small class="filter-spacer" style="font-size:0.7rem;min-height:1.1em;">&nbsp;</small>
         </div>
 
@@ -317,14 +527,13 @@
           <tr>
             <th>Employee</th>
             <th>Date (AD / BS)</th>
-            <th>Client / Location</th>
+            <th>Client / Destinations</th>
             <th>Assist(s)</th>
             <th>Out Time</th>
             <th>In Time</th>
-            <th>Purpose</th>
-            <th>Additional Notes</th>
-            <th>Problem / Solve Status</th>
-            <th>Completion Notes</th>
+            <th>Services</th>
+            <th>Work Description &amp; Department Notes</th>
+            <th>Action</th>
           </tr>
         </thead>
         <tbody>
@@ -343,31 +552,53 @@
                 {{ m.date|date:"Y-m-d" }}
                 <span style="display:block;font-size:0.75rem;color:var(--color-primary);">{{ m.date_bs }}</span>
               </td>
-              <td style="font-weight: 600;" class="clickable-cell" title="{{ m.client }}" data-full-text="{% if m.work_done_for %}Client: {{ m.client }}&#10;Work Done For: {{ m.work_done_for }}{% else %}{{ m.client }}{% endif %}" data-modal-title="Client & Contact Details">
+              <td style="font-weight: 600;">
                 {% if m.matching_stops %}
                   <div style="font-size:0.85rem;">
                     {% for s in m.matching_stops %}
-                      <div style="margin-bottom:3px;">
-                        <span style="font-weight:600;color:var(--color-text);">{% if m.matching_stops|length > 1 %}{{ forloop.counter }}. {% endif %}{{ s.client }}</span>
-                        {% if s.work_done_for %}<span style="display:block;font-size:0.75rem;color:var(--color-primary);font-weight:500;">For: {{ s.work_done_for }}</span>{% endif %}
+                      <div style="margin-bottom:6px;padding-bottom:4px;{% if not forloop.last %}border-bottom:1px dashed var(--color-border-light);{% endif %}">
+                        <span style="font-weight:700;color:var(--color-text);">{% if m.matching_stops|length > 1 %}{{ forloop.counter }}. {% endif %}{{ s.client }}</span>
+                        {% if s.purpose_type %}
+                          <span class="badge" style="background:var(--color-primary-light);color:var(--color-primary);font-size:0.68rem;padding:1px 6px;border-radius:10px;margin-left:4px;">{{ s.get_purpose_type_display }}</span>
+                        {% endif %}
                       </div>
                     {% endfor %}
                   </div>
                 {% else %}
                   {{ m.client }}
-                  {% if m.work_done_for %}
-                    <span style="display:block;font-size:0.75rem;color:var(--color-primary);font-weight:500;">For: {{ m.work_done_for }}</span>
+                  {% if m.purpose_type %}
+                    <span class="badge" style="background:var(--color-primary-light);color:var(--color-primary);font-size:0.68rem;padding:1px 6px;border-radius:10px;margin-left:4px;">{{ m.get_purpose_type_display }}</span>
                   {% endif %}
                 {% endif %}
               </td>
               <td style="font-size:0.85rem;color:var(--color-text-muted);">{{ m.assistants_display }}</td>
-              <td><span class="badge pending">{{ m.out_time|time:"H:i" }}</span></td>
+              <td>
+                {% if m.matching_stops %}
+                  {% for s in m.matching_stops %}
+                    <div style="margin-bottom:4px;">
+                      <span class="badge pending">{{ s.out_time|default:m.out_time|time:"H:i" }}</span>
+                    </div>
+                  {% endfor %}
+                {% else %}
+                  <span class="badge pending">{{ m.out_time|time:"H:i" }}</span>
+                {% endif %}
+              </td>
               <td>
                 {% if m.is_cancelled %}
                   <span class="badge" style="background:#fff3cd;color:#856404;border:1px solid #ffc107;">Cancelled</span>
                   {% if m.cancellation_reason %}
                     <span class="clickable-cell" style="display:block;font-size:0.75rem;color:var(--color-text-muted);" title="{{ m.cancellation_reason }}" data-full-text="{{ m.cancellation_reason }}" data-modal-title="Cancellation Reason">{{ m.cancellation_reason|truncatechars:30 }}</span>
                   {% endif %}
+                {% elif m.matching_stops %}
+                  {% for s in m.matching_stops %}
+                    <div style="margin-bottom:4px;">
+                      {% if s.in_time %}
+                        <span class="badge approved">{{ s.in_time|time:"H:i" }}</span>
+                      {% else %}
+                        <a href="{% url 'staff_movement_edit' m.id %}" class="badge rejected" style="text-decoration:none;cursor:pointer;" title="Click to mark return">Out</a>
+                      {% endif %}
+                    </div>
+                  {% endfor %}
                 {% elif m.uniform_in_time %}
                   <span class="badge approved">{{ m.uniform_in_time|time:"H:i" }}</span>
                 {% elif m.all_out %}
@@ -385,37 +616,75 @@
                   {% endfor %}
                 {% endif %}
               </td>
-              <td>{{ m.get_purpose_type_display|default:"—" }}</td>
-              <td class="clickable-cell" title="{{ m.filtered_purpose|default:m.purpose }}" data-full-text="{{ m.filtered_purpose|default:m.purpose }}" data-modal-title="Additional Notes">{{ m.filtered_purpose|default:m.purpose|default:"—"|truncatechars:50 }}</td>
               <td>
-                {% if m.purpose_type == "problem_solving" %}
-                  <div class="clickable-cell" title="{{ m.problem_description }}" data-full-text="{{ m.problem_description }}" data-modal-title="Problem Description">{{ m.problem_description|default:"—"|truncatechars:50 }}</div>
-                  {% if m.resolution_status %}
-                    <span class="badge {% if m.resolution_status == 'solved' %}approved{% else %}rejected{% endif %}" style="margin-top:5px;">{{ m.get_resolution_status_display }}</span>
-                  {% elif m.in_time %}
-                    <span class="badge pending" style="margin-top:5px;">Status missing</span>
-                  {% endif %}
-                {% else %}
-                  <span style="color:var(--color-text-muted);">—</span>
-                {% endif %}
-              </td>
-              <td class="clickable-cell" title="{{ m.filtered_completion_notes }}" data-full-text="{{ m.filtered_completion_notes }}" data-modal-title="Completion Notes">
-                {% if filter_client and m.matching_stops %}
+                {% if m.matching_stops %}
                   {% for s in m.matching_stops %}
-                    {% if s.completion_notes %}
-                      <div>{% if m.matching_stops|length > 1 %}<strong>[{{ s.client }}]:</strong> {% endif %}{{ s.completion_notes }}</div>
-                    {% endif %}
-                  {% empty %}
-                    —
+                    <div style="margin-bottom:6px; {% if not forloop.last %}padding-bottom:4px; border-bottom:1px dashed var(--color-border-light);{% endif %}">
+                      {% if m.matching_stops|length > 1 %}
+                        <span class="stop-badge">Stop {{ forloop.counter }}</span>
+                      {% endif %}
+                      {% for svc in s.services %}
+                        <span class="service-tag">{{ svc }}</span>
+                      {% empty %}
+                        <span style="color:var(--color-text-muted); font-size:0.75rem;">—</span>
+                      {% endfor %}
+                    </div>
+                  {% endfor %}
+                {% elif m.services %}
+                  {% for svc in m.services %}
+                    <span class="service-tag">{{ svc }}</span>
                   {% endfor %}
                 {% else %}
-                  {{ m.completion_notes|default:"—"|truncatechars:50 }}
+                  <span style="color:var(--color-text-muted); font-size:0.85rem;">—</span>
+                {% endif %}
+                {% if m.filtered_purpose %}
+                  <div style="font-size:0.78rem;color:var(--color-text-muted);margin-top:2px;">{{ m.filtered_purpose }}</div>
+                {% endif %}
+              </td>
+              <td>
+                {% if m.matching_stops %}
+                  {% for s in m.matching_stops %}
+                    <div style="margin-bottom:6px; {% if not forloop.last %}padding-bottom:4px; border-bottom:1px dashed var(--color-border-light);{% endif %}">
+                      {% if m.matching_stops|length > 1 %}
+                        <span class="stop-badge">Stop {{ forloop.counter }}</span>
+                      {% endif %}
+                      {% if s.department_works.all %}
+                        {% for dw in s.department_works.all %}
+                          <div style="font-size:0.8rem; margin-bottom:2px; line-height:1.35;">
+                            <strong style="color:var(--color-text);">{{ dw.department }}</strong>: {{ dw.work_description|default:"—" }}
+                            {% if dw.work_done_for %}
+                              <span style="color:var(--color-primary);font-size:0.73rem;font-weight:600;display:inline-block;margin-left:3px;">(For: {{ dw.work_done_for }})</span>
+                            {% endif %}
+                          </div>
+                        {% endfor %}
+                      {% else %}
+                        {% if s.work_done_for %}<div style="color:var(--color-primary);font-size:0.74rem;font-weight:600;">For: {{ s.work_done_for }}</div>{% endif %}
+                        {% if s.completion_notes %}<div style="font-size:0.8rem;">{{ s.completion_notes }}</div>{% endif %}
+                        {% if not s.work_done_for and not s.completion_notes %}<span style="color:var(--color-text-muted); font-size:0.85rem;">—</span>{% endif %}
+                      {% endif %}
+                    </div>
+                  {% endfor %}
+                {% else %}
+                  {% if m.work_done_for %}<div style="color:var(--color-primary);font-size:0.74rem;font-weight:600;">For: {{ m.work_done_for }}</div>{% endif %}
+                  {{ m.completion_notes|default:"—" }}
+                {% endif %}
+              </td>
+              <td>
+                {% if m.is_cancelled %}
+                  <span style="color:var(--color-text-muted);">—</span>
+                {% elif not m.in_time %}
+                  <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                    <a href="{% url 'staff_movement_edit' m.id %}" class="btn btn-outline btn-sm" style="white-space:nowrap;">Manage Visit</a>
+                    <button type="button" class="btn btn-sm" style="background:#fff3cd;color:#856404;border:1px solid #ffc107;white-space:nowrap;" onclick="openCancelModal({{ m.id }}, '{{ m.client|escapejs }}')">Cancel Visit</button>
+                  </div>
+                {% else %}
+                  <a href="{% url 'staff_movement_edit' m.id %}" class="btn btn-outline btn-sm" style="white-space:nowrap;">Edit</a>
                 {% endif %}
               </td>
             </tr>
           {% empty %}
             <tr>
-              <td colspan="10" class="empty-state">No staff movements logged.</td>
+              <td colspan="9" class="empty-state">No staff movements logged.</td>
             </tr>
           {% endfor %}
         </tbody>
@@ -424,8 +693,6 @@
   </div>
 
 {% else %}
-
-
 
   <!-- ===== Employee View: Back link (edit mode only) ===== -->
   {% if is_edit %}
@@ -439,9 +706,8 @@
 
   <!-- ===== Employee View: Log / Edit Form ===== -->
   {% if not is_edit and active_movements and not is_staff_movement_admin %}
-  <!-- Employee has an active visit — show a focused prompt instead of the log form (proxy loggers bypass this) -->
+  <!-- Employee has an active visit — show prompt to log return -->
   <div class="card" style="margin-bottom: 20px; overflow: hidden; border: 1px solid var(--color-focus-glow);">
-    <!-- Coloured top strip -->
     <div style="height: 4px; background: linear-gradient(90deg, var(--color-primary), var(--color-primary-light));"></div>
     <div class="card-header" style="border-bottom: 1px solid var(--color-border);">
       <span class="card-title">Log Client Visit / Movement</span>
@@ -449,7 +715,6 @@
     </div>
     <div class="card-body" style="display:flex;align-items:center;justify-content:space-between;gap:20px;padding:24px 28px;flex-wrap:wrap;">
       <div style="display:flex;align-items:center;gap:16px;">
-        <!-- Icon -->
         <div style="width:44px;height:44px;border-radius:50%;background:var(--color-primary-dark);border:1px solid var(--color-focus-glow);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
           <svg width="20" height="20" fill="none" stroke="var(--color-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
             <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
@@ -460,12 +725,12 @@
             Visit in progress — <span style="color:var(--color-primary);">{{ active_movements.0.client }}</span>
           </div>
           <div style="font-size:0.82rem;color:var(--color-text-muted);">
-            Departed at {{ active_movements.0.out_time|time:"H:i" }}. Log your return time to unlock the form.
+            Departed at {{ active_movements.0.out_time|time:"H:i" }}. Log your return time and completed work details to finish.
           </div>
         </div>
       </div>
       <a href="{% url 'staff_movement_edit' active_movements.0.id %}" class="btn btn-sm" style="background:var(--color-primary-dark);color:var(--color-primary);border:1px solid var(--color-focus-glow);font-weight:600;white-space:nowrap;transition:var(--transition);">
-        Log Return Time
+        Log Return &amp; Work Details
         <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" style="margin-left:5px;vertical-align:middle;"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
       </a>
     </div>
@@ -473,7 +738,7 @@
   {% else %}
   <div class="card" id="log-movement-card" style="margin-bottom: 20px;">
     <div class="card-header" style="display:flex;align-items:center;justify-content:space-between;{% if not is_edit and is_staff_movement_admin %}cursor:pointer;{% endif %}" {% if not is_edit and is_staff_movement_admin %}onclick="toggleLogForm()"{% endif %}>
-      <span class="card-title">{% if is_edit %}Edit Movement Record{% else %}Log Client Visit / Movement{% endif %}</span>
+      <span class="card-title">{% if is_edit %}Edit Movement &amp; Work Details{% else %}Log Client Visit / Movement{% endif %}</span>
       {% if not is_edit and is_staff_movement_admin %}
         <button type="button" class="btn btn-primary btn-sm" id="toggle-log-form-btn" onclick="event.stopPropagation(); toggleLogForm();">
           <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
@@ -484,7 +749,7 @@
     <form method="post" action="{% if is_edit %}{% url 'staff_movement_edit' movement.id %}{% else %}{% url 'staff_movement' %}{% endif %}" class="card-body" id="log-movement-form-body" {% if not is_edit and is_staff_movement_admin %}style="display:none;"{% endif %}>
       {% csrf_token %}
 
-      {% if is_edit and is_staff_movement_admin %}
+      {% if is_edit and can_edit_all %}
         <div style="margin-bottom:16px;padding:10px 14px;background:var(--color-primary-light);border-radius:var(--radius-sm);font-size:0.85rem;color:var(--color-primary);">
           Editing record for <strong>{{ movement.employee.get_full_name|default:movement.employee.username }}</strong>
           — {{ movement.client }} on {{ movement.date_bs }} ({{ movement.date|date:"Y-m-d" }})
@@ -493,29 +758,45 @@
 
       <div class="form-grid">
         {% if not is_edit %}
-          {# --- Section 1: Trip Info (Date + On Behalf) --- #}
+          {# --- Section 1: Trip Info (Date + Live Global Departure Time + On Behalf) --- #}
           <div class="form-group full">
             <div class="form-section">
               <div class="form-section-label">
                 <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                 Trip Details
               </div>
-              <div class="form-grid" style="gap:16px;">
-                <div class="form-group">
-                  <label for="date">Date *</label>
-                  <input type="date" id="date" value="{{ today|date:'Y-m-d' }}" disabled class="out-time-field">
+              <div class="trip-details-grid">
+                <!-- Date Card -->
+                <div class="trip-info-box">
+                  <div class="trip-info-header">
+                    <span class="trip-info-label">
+                      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                      Date *
+                    </span>
+                    <span id="date-bs-badge" style="font-size:0.72rem;font-weight:700;color:var(--color-primary);background:var(--color-primary-light);padding:2px 8px;border-radius:12px;"></span>
+                  </div>
+                  <input type="date" id="date" value="{{ today|date:'Y-m-d' }}" disabled style="width:100%;font-size:0.92rem;font-weight:600;padding:8px 10px;background:var(--input-bg);border:1.2px solid var(--color-border);border-radius:6px;color:var(--color-text);cursor:default;">
                   <input type="hidden" name="date" value="{{ today|date:'Y-m-d' }}">
-                  <small id="date-bs" style="color:var(--color-primary);font-size:0.75rem;min-height:1.2em;display:block;"></small>
+                  <small id="date-bs" style="display:none;"></small>
                 </div>
-                <div class="form-group">
-                  <label for="out_time">Departure Time (Out) *</label>
-                  <input type="time" id="out_time" name="out_time" readonly class="out-time-field">
-                  <small style="color:var(--color-text-muted);font-size:0.75rem;display:block;">Auto-set to the current time when you submit.</small>
+
+                <!-- Live Departure Time Card -->
+                <div class="trip-info-box">
+                  <div class="trip-info-header">
+                    <span class="trip-info-label">
+                      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                      Departure Time (Out)
+                    </span>
+                    <span class="live-pill"><span class="live-dot"></span> Live</span>
+                  </div>
+                  <input type="time" id="out_time" name="out_time" readonly class="dest-out-time-input" style="width:100%;font-size:0.92rem;font-weight:700;padding:8px 10px;background:var(--input-bg);border:1.2px solid var(--color-border);border-radius:6px;color:var(--color-primary);cursor:default;">
+                  <small style="color:var(--color-text-muted);font-size:0.72rem;display:block;">Auto-captured when you submit departure</small>
                 </div>
               </div>
+
               {% if can_log_on_behalf %}
               <div class="form-group" style="margin-top:14px;">
-                <label for="on_behalf_of">Log On Behalf Of</label>
+                <label for="on_behalf_of" style="font-size:0.78rem;font-weight:600;">Log On Behalf Of</label>
                 <select id="on_behalf_of" name="on_behalf_of">
                   <option value="">— Myself —</option>
                   {% for emp in proxy_employees %}
@@ -528,70 +809,268 @@
             </div>
           </div>
 
-          {# --- Section 2: Destinations --- #}
+          {# --- Section 2: Destinations with Client Dropdown & Grouped Service Pills --- #}
           <div class="form-group full" id="destination-section">
             <div class="form-section">
               <div class="form-section-label">
                 <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                Destination(s)
+                Destination(s) &amp; Services Required
               </div>
-              <div id="destinations-list" style="display:flex;flex-direction:column;gap:10px;">
-                <div class="destination-row dest-row">
-                  <span class="dest-badge">1</span>
-                  <div class="dest-field" style="flex:1.2;min-width:180px;">
-                    <label>Client / Location *</label>
-                    <input type="text" name="stop_client" list="existing-clients" placeholder="e.g. Nepal Telecom, PM Office" required>
+              <div id="destinations-list" style="display:flex;flex-direction:column;gap:14px;">
+                <!-- Stop 1 Default Card -->
+                <div class="destination-card dest-card" data-stop-index="0">
+                  <div class="dest-card-header">
+                    <span class="dest-card-title">
+                      <span class="dest-badge">1</span>
+                      Destination #1
+                    </span>
                   </div>
-                  <div class="dest-field" style="flex:1.5;min-width:200px;">
-                    <label>Notes / Remarks</label>
-                    <input type="text" name="stop_purpose" placeholder="e.g. Laptop repair, Cheque pickup">
+
+                  <div class="form-grid" style="gap:12px;margin-bottom:10px;">
+                    <div class="form-group" style="flex:1.5;">
+                      <label>Client / Location *</label>
+                      <div class="client-select-wrap">
+                        <select name="stop_client" class="client-dropdown" onchange="handleClientSelectChange(this)" required>
+                          <option value="">— Select AMC Client / Location —</option>
+                          <optgroup label="🏢 AMC Clients (17)">
+                            {% for ac in amc_clients %}
+                              <option value="{{ ac }}">{{ ac }}</option>
+                            {% endfor %}
+                          </optgroup>
+                          <optgroup label="✨ Custom / Other">
+                            <option value="__custom__">➕ Type Custom Location / Client...</option>
+                          </optgroup>
+                        </select>
+                        <input type="text" class="client-custom-input" placeholder="Type company or client office name..." style="display:none;margin-top:4px;">
+                      </div>
+                    </div>
+                    <div class="form-group" style="flex:1;min-width:160px;">
+                      <label>Purpose Type *</label>
+                      <select name="stop_purpose_type" class="purpose-type-select" style="width:100%;padding:9px 12px;border:1.5px solid var(--color-border);border-radius:var(--radius-sm);background:var(--input-bg);color:var(--color-text);font-family:inherit;font-size:0.88rem;">
+                        {% for code, label in purpose_choices %}
+                          <option value="{{ code }}" {% if code == 'amc' %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                  </div>
+
+                  <!-- Grouped Service Pills -->
+                  <div class="service-group-title">
+                    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                    Repair &amp; Support
+                  </div>
+                  <div class="service-pill-row">
+                    {% for svc in service_repair_support %}
+                      <label class="service-pill">
+                        <input type="checkbox" name="stop_services_0" value="{{ svc }}">
+                        <span class="pill-check">✓</span>
+                        <span>{{ svc }}</span>
+                      </label>
+                    {% endfor %}
+                  </div>
+
+                  <div class="service-group-title">
+                    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                    Setup &amp; Installation
+                  </div>
+                  <div class="service-pill-row">
+                    {% for svc in service_setup_install %}
+                      <label class="service-pill">
+                        <input type="checkbox" name="stop_services_0" value="{{ svc }}">
+                        <span class="pill-check">✓</span>
+                        <span>{{ svc }}</span>
+                      </label>
+                    {% endfor %}
+                  </div>
+
+                  <div class="form-group" style="margin-top:6px;margin-bottom:0;">
+                    <label style="font-size:0.75rem;">Specific Notes / Purpose Remarks</label>
+                    <input type="text" name="stop_purpose" placeholder="e.g. 3rd floor accounts, contact Mr. Sharma..." style="font-size:0.84rem;">
                   </div>
                 </div>
               </div>
+
               <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-top:12px;padding-top:12px;border-top:1px dashed var(--color-border);">
                 <button type="button" class="btn btn-outline btn-sm" id="add-destination-btn" onclick="addDestinationRow()" style="font-size:0.78rem;">
                   <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
                   Add Another Destination
                 </button>
-                <small style="color:var(--color-text-muted);font-size:0.72rem;">Multiple clients? Add separate stops.</small>
+                <small style="color:var(--color-text-muted);font-size:0.72rem;">Visiting multiple offices? Add separate client stops.</small>
               </div>
             </div>
           </div>
         {% endif %}
 
-        {% if is_edit and is_staff_movement_admin and not movement.in_time %}
-          {# --- Proxy Logger: Manage Destinations on Active Record --- #}
+        {% if is_edit and can_edit_all %}
+          {# --- Proxy Logger / Manager: Manage Destinations on Record --- #}
           <div class="form-group full" id="edit-destination-section">
             <div class="form-section">
               <div class="form-section-label">
                 <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-                Manage Destinations &amp; Notes (Staff Still OUT)
+                Manage Destinations &amp; Services
               </div>
-              <div id="edit-destinations-list" style="display:flex;flex-direction:column;gap:10px;">
+              <div id="edit-destinations-list" style="display:flex;flex-direction:column;gap:14px;">
                 {% for s in movement.stops.all %}
-                  <div class="edit-destination-row dest-row">
-                    <span class="dest-badge">{{ forloop.counter }}</span>
-                    <div class="dest-field" style="flex:1.2;min-width:180px;">
-                      <label>Client / Location *</label>
-                      <input type="text" name="edit_stop_client" list="existing-clients" value="{{ s.client }}" placeholder="Client / Location *" required>
+                  <div class="edit-destination-card dest-card" data-stop-index="{{ forloop.counter0 }}">
+                    <div class="dest-card-header">
+                      <span class="dest-card-title">
+                        <span class="dest-badge">{{ forloop.counter }}</span>
+                        Destination #{{ forloop.counter }}
+                      </span>
+                      {% if forloop.counter > 1 %}
+                        <button type="button" class="dest-remove-btn" onclick="removeEditDestinationRow(this)">✕ Remove</button>
+                      {% endif %}
                     </div>
-                    <div class="dest-field" style="flex:1.5;min-width:200px;">
-                      <label>Notes / Remarks</label>
-                      <input type="text" name="edit_stop_purpose" value="{{ s.purpose }}" placeholder="Additional Notes / Remarks (Optional)">
+                    <div class="form-grid" style="gap:12px;margin-bottom:8px;">
+                      <div class="form-group" style="flex:1.5;">
+                        <label>Client / Location *</label>
+                        <div class="client-select-wrap">
+                          <select class="client-dropdown" onchange="handleClientSelectChange(this)"
+                            {% if not s.client or s.client in amc_clients %}name="edit_stop_client" required{% endif %}>
+                            <option value="">— Select AMC Client / Location —</option>
+                            <optgroup label="🏢 AMC Clients (17)">
+                              {% for ac in amc_clients %}
+                                <option value="{{ ac }}" {% if s.client == ac %}selected{% endif %}>{{ ac }}</option>
+                              {% endfor %}
+                            </optgroup>
+                            <optgroup label="✨ Custom / Other">
+                              <option value="__custom__" {% if s.client and s.client not in amc_clients %}selected{% endif %}>➕ Type Custom Location / Client...</option>
+                            </optgroup>
+                          </select>
+                          <input type="text" class="client-custom-input" placeholder="Type company or client office name..."
+                            {% if s.client and s.client not in amc_clients %}
+                              name="edit_stop_client" value="{{ s.client }}" required style="display:block;margin-top:4px;"
+                            {% else %}
+                              style="display:none;margin-top:4px;"
+                            {% endif %}>
+                        </div>
+                      </div>
+                      <div class="form-group" style="flex:1;min-width:150px;">
+                        <label>Purpose Type *</label>
+                        <select name="edit_stop_purpose_type" class="purpose-type-select" style="width:100%;padding:9px 12px;border:1.5px solid var(--color-border);border-radius:var(--radius-sm);background:var(--input-bg);color:var(--color-text);font-family:inherit;font-size:0.88rem;">
+                          {% for code, label in purpose_choices %}
+                            <option value="{{ code }}" {% if s.purpose_type == code or not s.purpose_type and code == 'amc' %}selected{% endif %}>{{ label }}</option>
+                          {% endfor %}
+                        </select>
+                      </div>
+                      <div class="form-group" style="flex:0.8;min-width:120px;">
+                        <label>Out Time *</label>
+                        <input type="time" name="edit_stop_out_time" value="{{ s.out_time|time:'H:i' }}" required style="width:100%;">
+                      </div>
+                    </div>
+
+                    <!-- Grouped Service Pills -->
+                    <div class="service-group-title">
+                      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                      Repair &amp; Support
+                    </div>
+                    <div class="service-pill-row">
+                      {% for svc in service_repair_support %}
+                        <label class="service-pill">
+                          <input type="checkbox" name="edit_stop_services_{{ forloop.parentloop.counter0 }}" value="{{ svc }}" {% if s.services and svc in s.services %}checked{% endif %}>
+                          <span class="pill-check">✓</span>
+                          <span>{{ svc }}</span>
+                        </label>
+                      {% endfor %}
+                    </div>
+
+                    <div class="service-group-title">
+                      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                      Setup &amp; Installation
+                    </div>
+                    <div class="service-pill-row">
+                      {% for svc in service_setup_install %}
+                        <label class="service-pill">
+                          <input type="checkbox" name="edit_stop_services_{{ forloop.parentloop.counter0 }}" value="{{ svc }}" {% if s.services and svc in s.services %}checked{% endif %}>
+                          <span class="pill-check">✓</span>
+                          <span>{{ svc }}</span>
+                        </label>
+                      {% endfor %}
+                    </div>
+
+                    <div class="form-group" style="margin-top:6px;margin-bottom:0;">
+                      <label style="font-size:0.75rem;">Purpose / Notes</label>
+                      <input type="text" name="edit_stop_purpose" value="{{ s.purpose }}" placeholder="Additional notes...">
                     </div>
                     <input type="hidden" name="edit_stop_id" value="{{ s.id }}">
-                    <button type="button" class="dest-remove-btn" onclick="removeEditDestinationRow(this)" title="Remove destination">✕</button>
                   </div>
                 {% empty %}
-                  <div class="edit-destination-row dest-row">
-                    <span class="dest-badge">1</span>
-                    <div class="dest-field" style="flex:1.2;min-width:180px;">
-                      <label>Client / Location *</label>
-                      <input type="text" name="edit_stop_client" list="existing-clients" value="{{ movement.client }}" placeholder="Client / Location *" required>
+                  <div class="edit-destination-card dest-card" data-stop-index="0">
+                    <div class="dest-card-header">
+                      <span class="dest-card-title">
+                        <span class="dest-badge">1</span>
+                        Destination #1
+                      </span>
                     </div>
-                    <div class="dest-field" style="flex:1.5;min-width:200px;">
-                      <label>Notes / Remarks</label>
-                      <input type="text" name="edit_stop_purpose" value="{{ movement.purpose }}" placeholder="Additional Notes / Remarks (Optional)">
+                    <div class="form-grid" style="gap:12px;margin-bottom:8px;">
+                      <div class="form-group" style="flex:1.5;">
+                        <label>Client / Location *</label>
+                        <div class="client-select-wrap">
+                          <select class="client-dropdown" onchange="handleClientSelectChange(this)"
+                            {% if not movement.client or movement.client in amc_clients %}name="edit_stop_client" required{% endif %}>
+                            <option value="">— Select AMC Client / Location —</option>
+                            <optgroup label="🏢 AMC Clients (17)">
+                              {% for ac in amc_clients %}
+                                <option value="{{ ac }}" {% if movement.client == ac %}selected{% endif %}>{{ ac }}</option>
+                              {% endfor %}
+                            </optgroup>
+                            <optgroup label="✨ Custom / Other">
+                              <option value="__custom__" {% if movement.client and movement.client not in amc_clients %}selected{% endif %}>➕ Type Custom Location / Client...</option>
+                            </optgroup>
+                          </select>
+                          <input type="text" class="client-custom-input" placeholder="Type company or client office name..."
+                            {% if movement.client and movement.client not in amc_clients %}
+                              name="edit_stop_client" value="{{ movement.client }}" required style="display:block;margin-top:4px;"
+                            {% else %}
+                              style="display:none;margin-top:4px;"
+                            {% endif %}>
+                        </div>
+                      </div>
+                      <div class="form-group" style="flex:1;min-width:150px;">
+                        <label>Purpose Type *</label>
+                        <select name="edit_stop_purpose_type" class="purpose-type-select" style="width:100%;padding:9px 12px;border:1.5px solid var(--color-border);border-radius:var(--radius-sm);background:var(--input-bg);color:var(--color-text);font-family:inherit;font-size:0.88rem;">
+                          {% for code, label in purpose_choices %}
+                            <option value="{{ code }}" {% if movement.purpose_type == code or not movement.purpose_type and code == 'amc' %}selected{% endif %}>{{ label }}</option>
+                          {% endfor %}
+                        </select>
+                      </div>
+                      <div class="form-group" style="flex:0.8;min-width:120px;">
+                        <label>Departure Time (Out) *</label>
+                        <input type="time" name="edit_stop_out_time" value="{{ movement.out_time|time:'H:i' }}" required style="width:100%;">
+                      </div>
+                    </div>
+
+                    <div class="service-group-title">
+                      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                      Repair &amp; Support
+                    </div>
+                    <div class="service-pill-row">
+                      {% for svc in service_repair_support %}
+                        <label class="service-pill">
+                          <input type="checkbox" name="edit_stop_services_0" value="{{ svc }}">
+                          <span class="pill-check">✓</span>
+                          <span>{{ svc }}</span>
+                        </label>
+                      {% endfor %}
+                    </div>
+
+                    <div class="service-group-title">
+                      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                      Setup &amp; Installation
+                    </div>
+                    <div class="service-pill-row">
+                      {% for svc in service_setup_install %}
+                        <label class="service-pill">
+                          <input type="checkbox" name="edit_stop_services_0" value="{{ svc }}">
+                          <span class="pill-check">✓</span>
+                          <span>{{ svc }}</span>
+                        </label>
+                      {% endfor %}
+                    </div>
+
+                    <div class="form-group" style="margin-top:6px;margin-bottom:0;">
+                      <label style="font-size:0.75rem;">Purpose / Notes</label>
+                      <input type="text" name="edit_stop_purpose" value="{{ movement.purpose }}" placeholder="Additional notes...">
                     </div>
                     <input type="hidden" name="edit_stop_id" value="">
                   </div>
@@ -602,118 +1081,189 @@
                   <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
                   Add Another Destination
                 </button>
-                <button type="submit" name="action_type" value="update_stops_only" class="btn btn-outline btn-sm" style="font-weight:600;">
-                  Save Destinations Only (Staff Still Out)
-                </button>
+                {% if not movement.in_time %}
+                  <button type="submit" name="action_type" value="update_stops_only" formnovalidate class="btn btn-outline btn-sm" style="font-weight:600;">
+                    Save Destinations Only (Staff Still Out)
+                  </button>
+                {% endif %}
               </div>
-              <small style="color:var(--color-text-muted);font-size:0.72rem;display:block;margin-top:6px;">Clicking "Save Destinations Only" will update destinations without closing the visit or setting return time.</small>
             </div>
           </div>
-
-          <input type="hidden" name="manage_stops" value="1">
         {% endif %}
 
         {% if is_edit %}
-          <div class="form-group">
-            <label for="in_time">{% if is_staff_movement_admin and not movement.in_time %}Return Time (In) <span style="font-weight:normal;opacity:0.6;">(fill only when staff has returned)</span>{% elif is_staff_movement_admin %}Return Time (In) *{% else %}Your Return Time (In) *{% endif %}</label>
-            <input type="time" id="in_time" name="in_time" value="{{ movement.in_time|time:'H:i' }}" {% if not is_staff_movement_admin or movement.in_time %}required{% endif %}>
-          </div>
-        {% endif %}
-
-        {% if not is_edit %}
-          {# --- Section 3: Purpose --- #}
+          {# --- Return Form: Stop Times, Services & Dynamic Department Repeater --- #}
           <div class="form-group full">
             <div class="form-section">
               <div class="form-section-label">
-                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.5L17 7.5V19a2 2 0 0 1-2 2z"/></svg>
-                Purpose &amp; Objective
-              </div>
-              <div class="form-group">
-                <label for="purpose_type">Purpose Type *</label>
-                <select id="purpose_type" name="purpose_type" required>
-                  <option value="">— Select purpose —</option>
-                  {% for value, label in purpose_choices %}
-                    <option value="{{ value }}">{{ label }}</option>
-                  {% endfor %}
-                </select>
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                Record Return &amp; Work Details Per Destination
               </div>
 
-              <div class="form-group" id="problem-description-group" hidden style="margin-top:12px;">
-                <label for="problem_description">Problem Description *</label>
-                <textarea id="problem_description" name="problem_description" placeholder="Describe the problem that needs to be solved..." style="min-height:75px;"></textarea>
-              </div>
-            </div>
-          </div>
-        {% endif %}
-
-        {% if is_edit and movement.purpose_type == "problem_solving" %}
-          <div class="form-group full">
-            <label for="resolution_status">Solve Status *</label>
-            <select id="resolution_status" name="resolution_status">
-              <option value="">— Was the problem solved? —</option>
-              {% for value, label in resolution_choices %}
-                <option value="{{ value }}" {% if movement.resolution_status == value %}selected{% endif %}>{{ label }}</option>
-              {% endfor %}
-            </select>
-            <small style="color:var(--color-text-muted);font-size:0.75rem;">
-              Required when filling in the return time for a problem-solving visit. This is shared for the
-              whole visit — if it's already been answered, feel free to update it if it's changed.
-            </small>
-          </div>
-        {% endif %}
-
-        {% if is_edit %}
-          {% if movement.has_multiple_stops %}
-            <div class="form-group full" style="margin-bottom:16px;padding:14px 16px;background:var(--input-bg);border:1.5px solid var(--color-border);border-radius:var(--radius-sm);">
-              <div style="font-weight:600;font-size:0.9rem;margin-bottom:12px;color:var(--color-primary);display:flex;align-items:center;gap:6px;">
-                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-                Return Details per Destination:
-              </div>
               {% for s in movement.stops.all %}
-                <div style="margin-bottom:12px;padding:12px;background:var(--color-bg);border-radius:var(--radius-sm);border:1px solid var(--color-border);">
-                  <div style="font-weight:600;font-size:0.88rem;color:var(--color-text);margin-bottom:10px;">
-                    📍 Destination #{{ s.order }}: {{ s.client }}
+                <div class="dest-card" style="border:1.5px solid var(--color-primary-light);">
+                  <div class="dest-card-header">
+                    <span class="dest-card-title">
+                      <span class="dest-badge">{{ s.order }}</span>
+                      📍 {{ s.client }}
+                    </span>
                   </div>
-                  <div class="form-grid" style="margin-bottom:8px;">
-                    <div class="form-group full" style="margin-bottom:8px;">
-                      <label style="font-size:0.78rem;">Work Done For / Contact Person(s) for {{ s.client }} *</label>
-                      <input type="text" name="stop_work_done_for_{{ s.id }}" value="{{ s.work_done_for }}" placeholder="e.g. Mr. Sharma (Finance), Ms. Sita (IT Dept)..." {% if not is_staff_movement_admin or movement.in_time %}required{% endif %}>
+
+                  <!-- Compulsory Times per Stop -->
+                  <div class="form-grid" style="gap:14px;margin-bottom:12px;">
+                    <div class="form-group">
+                      <label>Departure Time (Out) *</label>
+                      <input type="time" name="stop_out_time_{{ s.id }}" value="{{ s.out_time|time:'H:i' }}" {% if not can_edit_all %}readonly style="background:var(--input-bg);cursor:default;"{% endif %} required>
+                      {% if not can_edit_all %}
+                        <small style="color:var(--color-text-muted);font-size:0.72rem;display:block;">Auto-captured on departure</small>
+                      {% endif %}
                     </div>
-                    <div class="form-group full" style="margin-bottom:0;">
-                      <label style="font-size:0.78rem;">Completion Notes for {{ s.client }} *</label>
-                      <textarea name="stop_completion_notes_{{ s.id }}" placeholder="Describe work completed at {{ s.client }}..." style="min-height:65px;font-size:0.85rem;" {% if not is_staff_movement_admin or movement.in_time %}required{% endif %}>{{ s.completion_notes }}</textarea>
+                    <div class="form-group">
+                      <label>Return Time (In) *</label>
+                      <input type="time" name="stop_in_time_{{ s.id }}" class="return-in-time-input" value="{{ s.in_time|time:'H:i' }}" {% if not can_edit_all %}readonly style="background:var(--input-bg);cursor:default;"{% endif %} required>
+                      {% if not can_edit_all %}
+                        <small style="color:var(--color-text-muted);font-size:0.72rem;display:block;">Auto-captured on return</small>
+                      {% endif %}
                     </div>
                   </div>
+
+                  <!-- Services Checklist for this Stop -->
+                  <div class="service-group-title">
+                    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                    Repair &amp; Support Performed
+                  </div>
+                  <div class="service-pill-row">
+                    {% for svc in service_repair_support %}
+                      <label class="service-pill">
+                        <input type="checkbox" name="stop_services_{{ s.id }}[]" value="{{ svc }}" {% if s.services and svc in s.services %}checked{% endif %}>
+                        <span class="pill-check">✓</span>
+                        <span>{{ svc }}</span>
+                      </label>
+                    {% endfor %}
+                  </div>
+
+                  <div class="service-group-title">
+                    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                    Setup &amp; Installation Performed
+                  </div>
+                  <div class="service-pill-row">
+                    {% for svc in service_setup_install %}
+                      <label class="service-pill">
+                        <input type="checkbox" name="stop_services_{{ s.id }}[]" value="{{ svc }}" {% if s.services and svc in s.services %}checked{% endif %}>
+                        <span class="pill-check">✓</span>
+                        <span>{{ svc }}</span>
+                      </label>
+                    {% endfor %}
+                  </div>
+
+                  <!-- Department / Section / Position Breakdown Repeater -->
+                  <div style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--color-border);">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                      <span style="font-size:0.75rem;font-weight:700;text-transform:uppercase;color:var(--color-primary);display:flex;align-items:center;gap:5px;">
+                        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+                        Department / Section Breakdown (Who &amp; What was done):
+                      </span>
+                    </div>
+
+                    <div id="dept-repeater-{{ s.id }}" style="display:flex;flex-direction:column;gap:8px;">
+                      {% for dw in s.department_works.all %}
+                        <div class="dept-card">
+                          <div class="dept-field" style="flex:1.2;min-width:160px;">
+                            <label>Department / Section</label>
+                            <div class="dept-select-wrap">
+                              <select class="dept-dropdown" onchange="handleDeptSelectChange(this)"
+                                {% if not dw.department or dw.department in department_choices %}name="dept_department_{{ s.id }}[]"{% endif %}>
+                                <option value="">— Select Department —</option>
+                                {% for dept in department_choices %}
+                                  <option value="{{ dept }}" {% if dw.department == dept %}selected{% endif %}>{{ dept }}</option>
+                                {% endfor %}
+                                <option value="__custom__" {% if dw.department and dw.department not in department_choices %}selected{% endif %}>➕ Type Other...</option>
+                              </select>
+                              <input type="text" class="dept-custom-input" placeholder="Type department name..."
+                                {% if dw.department and dw.department not in department_choices %}
+                                  name="dept_department_{{ s.id }}[]" value="{{ dw.department }}" style="display:block;margin-top:4px;"
+                                {% else %}
+                                  style="display:none;margin-top:4px;"
+                                {% endif %}>
+                            </div>
+                          </div>
+                          <div class="dept-field" style="flex:1.2;min-width:160px;">
+                            <label>Contact Person / Designation</label>
+                            <input type="text" name="dept_work_done_for_{{ s.id }}[]" value="{{ dw.work_done_for }}" placeholder="e.g. Mr. Sharma (Accountant)">
+                          </div>
+                          <div class="dept-field" style="flex:2;min-width:220px;">
+                            <label>Work Description *</label>
+                            <input type="text" name="dept_work_description_{{ s.id }}[]" value="{{ dw.work_description }}" placeholder="e.g. Repaired network switch, solved printer jam" required>
+                          </div>
+                          <button type="button" class="dest-remove-btn" onclick="this.closest('.dept-card').remove()" style="margin-top:18px;">✕</button>
+                        </div>
+                      {% empty %}
+                        <div class="dept-card">
+                          <div class="dept-field" style="flex:1.2;min-width:160px;">
+                            <label>Department / Section</label>
+                            <div class="dept-select-wrap">
+                              <select class="dept-dropdown" name="dept_department_{{ s.id }}[]" onchange="handleDeptSelectChange(this)">
+                                <option value="">— Select Department —</option>
+                                {% for dept in department_choices %}
+                                  <option value="{{ dept }}">{{ dept }}</option>
+                                {% endfor %}
+                                <option value="__custom__">➕ Type Other...</option>
+                              </select>
+                              <input type="text" class="dept-custom-input" placeholder="Type department name..." style="display:none;margin-top:4px;">
+                            </div>
+                          </div>
+                          <div class="dept-field" style="flex:1.2;min-width:160px;">
+                            <label>Contact Person / Designation</label>
+                            <input type="text" name="dept_work_done_for_{{ s.id }}[]" value="{{ s.work_done_for }}" placeholder="e.g. Mr. Sharma (Accountant)">
+                          </div>
+                          <div class="dept-field" style="flex:2;min-width:220px;">
+                            <label>Work Description *</label>
+                            <input type="text" name="dept_work_description_{{ s.id }}[]" value="{{ s.completion_notes }}" placeholder="e.g. Repaired network switch, solved printer jam" required>
+                          </div>
+                        </div>
+                      {% endfor %}
+                    </div>
+
+                    <button type="button" class="btn btn-outline btn-sm" onclick="addDepartmentRow({{ s.id }})" style="margin-top:8px;font-size:0.75rem;">
+                      <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+                      Add Department / Section Work
+                    </button>
+                  </div>
+                </div>
+              {% empty %}
+                <div class="form-group full">
+                  <label for="in_time">Return Time (In) *</label>
+                  <input type="time" id="in_time" name="in_time" class="return-in-time-input" value="{{ movement.in_time|time:'H:i' }}" {% if not can_edit_all %}readonly style="background:var(--input-bg);cursor:default;"{% endif %} required>
+                  {% if not can_edit_all %}
+                    <small style="color:var(--color-text-muted);font-size:0.72rem;display:block;">Auto-captured on return</small>
+                  {% endif %}
+                </div>
+                <div class="form-group full">
+                  <label for="work_done_for">Work Done For / Contact Person(s) *</label>
+                  <input type="text" id="work_done_for" name="work_done_for" value="{{ movement.work_done_for }}" placeholder="e.g. Mr. Sharma (Finance), Ms. Sita (IT Dept)..." required>
+                </div>
+                <div class="form-group full">
+                  <label for="completion_notes">Completion / Return Notes *</label>
+                  <textarea id="completion_notes" name="completion_notes" placeholder="Describe work completed..." required>{{ movement.completion_notes }}</textarea>
                 </div>
               {% endfor %}
             </div>
-          {% else %}
-            <div class="form-group full">
-              <label for="work_done_for">Work Done For / Contact Person(s) *</label>
-              <input type="text" id="work_done_for" name="work_done_for" value="{{ movement.work_done_for }}" placeholder="e.g. Mr. Sharma (Finance), Ms. Sita (IT Dept)..." {% if not is_staff_movement_admin or movement.in_time %}required{% endif %}>
-            </div>
-
-            <div class="form-group full">
-              <label for="completion_notes">Completion / Return Notes *</label>
-              <textarea id="completion_notes" name="completion_notes" placeholder="Describe work completed (e.g. Finance: Fixed billing issue. IT: Configured router)..." {% if not is_staff_movement_admin or movement.in_time %}required{% endif %}>{{ movement.completion_notes }}</textarea>
-              <small style="color:var(--color-text-muted);font-size:0.75rem;display:block;">Shared for the whole visit — update it if anything's changed since it was last filled in.</small>
-            </div>
-          {% endif %}
+          </div>
         {% endif %}
 
         {% if is_edit and open_assistant_links %}
-        {% if is_primary or is_staff_movement_admin %}
+        {% if is_primary or can_edit_all %}
           <div class="form-group full">
             <label style="display:flex;align-items:center;gap:8px;font-weight:normal;">
-              <input type="checkbox" id="separate_returns" name="separate_returns" value="1" {% if is_staff_movement_admin %}checked{% endif %}>
-              {% if is_staff_movement_admin %}
+              <input type="checkbox" id="separate_returns" name="separate_returns" value="1" {% if can_edit_all %}checked{% endif %}>
+              {% if can_edit_all %}
                 Review / adjust each person's return time
               {% else %}
                 Some assistants returned separately (or are still out)
               {% endif %}
             </label>
             <small style="color:var(--color-text-muted);font-size:0.75rem;display:block;">
-              {% if is_staff_movement_admin %}
+              {% if can_edit_all %}
                 Existing times are shown below. Leave a field as-is to keep it unchanged, edit it to correct it,
                 or check "Still out" to clear it back to not-returned.
               {% else %}
@@ -722,7 +1272,7 @@
             </small>
           </div>
 
-          <div class="form-group full" id="separate-returns-group" {% if not is_staff_movement_admin %}hidden{% endif %}>
+          <div class="form-group full" id="separate-returns-group" {% if not can_edit_all %}hidden{% endif %}>
             {% for link in open_assistant_links %}
               <div class="assistant-time-row">
                 <span class="name">{{ link.employee.get_full_name|default:link.employee.username }}</span>
@@ -734,19 +1284,11 @@
                 </label>
               </div>
             {% endfor %}
-            <small style="color:var(--color-text-muted);font-size:0.75rem;">
-              {% if is_staff_movement_admin %}
-                For each person: leave the time as shown to keep it, change it to correct it, or check "Still out" to clear it.
-              {% else %}
-                For each person: leave the time blank to use your return time, enter their own time if different,
-                or check "Still out" if they haven't returned yet. When this section is open, one of these is required per person.
-              {% endif %}
-            </small>
           </div>
         {% endif %}
         {% endif %}
 
-        {% if not is_edit %}
+        {% if not is_edit or can_edit_all %}
           {# --- Section 4: Assist(s) --- #}
           <div class="form-group full">
             <div class="form-section">
@@ -764,11 +1306,12 @@
               <div id="assistant-list" class="assist-grid">
                 {% for emp in other_employees %}
                   <label class="assistant-option assist-chip" data-name="{{ emp.get_full_name|default:emp.username|lower }}">
-                    <input type="checkbox" name="assistants" value="{{ emp.id }}">
+                    <input type="checkbox" name="assistants" value="{{ emp.id }}" {% if emp.id in selected_assistant_ids %}checked{% endif %}>
                     <span>{{ emp.get_full_name|default:emp.username }}</span>
                   </label>
                 {% endfor %}
               </div>
+              <input type="hidden" name="assistants_present" value="1">
             </div>
           </div>
         {% endif %}
@@ -776,7 +1319,7 @@
 
       <div class="form-actions">
         <button type="submit" name="action_type" value="record_return" class="btn btn-primary">
-          {% if is_edit and is_staff_movement_admin and not movement.in_time %}Record Return & Mark Completed{% elif is_edit %}Save Changes{% else %}Log Movement{% endif %}
+          {% if is_edit and not movement.in_time %}Record Return &amp; Mark Completed{% elif is_edit %}Save Changes{% else %}Log Movement{% endif %}
         </button>
         {% if not is_edit %}
           <button type="reset" class="btn btn-outline" onclick="document.getElementById('date-bs').textContent='';">Clear Form</button>
@@ -819,7 +1362,7 @@
 
           <div style="display: flex; flex-direction: column; gap: 4px;">
             <label style="font-size: 0.75rem; color: var(--color-text-muted); font-weight: 600;">Client / Location</label>
-            <input type="text" name="client" list="existing-clients" value="{{ admin_filter_client }}" placeholder="Search client..." class="staff-search-input" style="max-width:160px;">
+            <input type="text" name="client" list="existing-clients" value="{{ admin_filter_client }}" placeholder="Type or select client..." class="staff-search-input" style="min-width: 180px; max-width: 240px; padding: 10px 14px; background: var(--input-bg); border: 1.5px solid var(--color-border); border-radius: var(--radius-sm); font-size: 0.88rem; color: var(--color-text); font-family: inherit;">
             <small class="filter-spacer" style="font-size:0.7rem;min-height:1.1em;">&nbsp;</small>
           </div>
 
@@ -861,7 +1404,6 @@
           {% elif admin_filter_date_obj %}
             Showing {{ admin_filter_date_bs }}
           {% endif %}
-          — {{ admin_movements|length }} record{{ admin_movements|length|pluralize }}
         </span>
       </div>
       <div class="table-responsive">
@@ -870,14 +1412,12 @@
             <tr>
               <th>Employee</th>
               <th>Date (AD / BS)</th>
-              <th>Client / Location</th>
+              <th>Client / Destination</th>
               <th>Assist(s)</th>
               <th>Out Time</th>
               <th>In Time</th>
-              <th>Purpose</th>
-              <th>Additional Notes</th>
-              <th>Problem / Solve Status</th>
-              <th>Completion Notes</th>
+              <th>Services</th>
+              <th>Work Description &amp; Department Notes</th>
               <th>Action</th>
             </tr>
           </thead>
@@ -897,31 +1437,53 @@
                   {{ m.date|date:"Y-m-d" }}
                   <span style="display:block;font-size:0.75rem;color:var(--color-primary);">{{ m.date_bs }}</span>
                 </td>
-                <td style="font-weight: 600;" class="clickable-cell" title="{{ m.client }}" data-full-text="{% if m.work_done_for %}Client: {{ m.client }}&#10;Work Done For: {{ m.work_done_for }}{% else %}{{ m.client }}{% endif %}" data-modal-title="Client & Contact Details">
+                <td style="font-weight: 600;">
                   {% if m.matching_stops %}
                     <div style="font-size:0.85rem;">
                       {% for s in m.matching_stops %}
-                        <div style="margin-bottom:3px;">
-                          <span style="font-weight:600;color:var(--color-text);">{% if m.matching_stops|length > 1 %}{{ forloop.counter }}. {% endif %}{{ s.client }}</span>
-                          {% if s.work_done_for %}<span style="display:block;font-size:0.75rem;color:var(--color-primary);font-weight:500;">For: {{ s.work_done_for }}</span>{% endif %}
+                        <div style="margin-bottom:4px;">
+                          <span style="font-weight:700;color:var(--color-text);">{% if m.matching_stops|length > 1 %}{{ forloop.counter }}. {% endif %}{{ s.client }}</span>
+                          {% if s.purpose_type %}
+                            <span class="badge" style="background:var(--color-primary-light);color:var(--color-primary);font-size:0.68rem;padding:1px 6px;border-radius:10px;margin-left:4px;">{{ s.get_purpose_type_display }}</span>
+                          {% endif %}
                         </div>
                       {% endfor %}
                     </div>
                   {% else %}
                     {{ m.client }}
-                    {% if m.work_done_for %}
-                      <span style="display:block;font-size:0.75rem;color:var(--color-primary);font-weight:500;">For: {{ m.work_done_for }}</span>
+                    {% if m.purpose_type %}
+                      <span class="badge" style="background:var(--color-primary-light);color:var(--color-primary);font-size:0.68rem;padding:1px 6px;border-radius:10px;margin-left:4px;">{{ m.get_purpose_type_display }}</span>
                     {% endif %}
                   {% endif %}
                 </td>
                 <td style="font-size:0.85rem;color:var(--color-text-muted);">{{ m.assistants_display }}</td>
-                <td><span class="badge pending">{{ m.out_time|time:"H:i" }}</span></td>
+                <td>
+                  {% if m.matching_stops %}
+                    {% for s in m.matching_stops %}
+                      <div style="margin-bottom:4px;">
+                        <span class="badge pending">{{ s.out_time|default:m.out_time|time:"H:i" }}</span>
+                      </div>
+                    {% endfor %}
+                  {% else %}
+                    <span class="badge pending">{{ m.out_time|time:"H:i" }}</span>
+                  {% endif %}
+                </td>
                 <td>
                   {% if m.is_cancelled %}
                     <span class="badge" style="background:#fff3cd;color:#856404;border:1px solid #ffc107;">Cancelled</span>
                     {% if m.cancellation_reason %}
                       <span class="clickable-cell" style="display:block;font-size:0.75rem;color:var(--color-text-muted);" title="{{ m.cancellation_reason }}" data-full-text="{{ m.cancellation_reason }}" data-modal-title="Cancellation Reason">{{ m.cancellation_reason|truncatechars:30 }}</span>
                     {% endif %}
+                  {% elif m.matching_stops %}
+                    {% for s in m.matching_stops %}
+                      <div style="margin-bottom:4px;">
+                        {% if s.in_time %}
+                          <span class="badge approved">{{ s.in_time|time:"H:i" }}</span>
+                        {% else %}
+                          <a href="{% url 'staff_movement_edit' m.id %}" class="badge rejected" style="text-decoration:none;cursor:pointer;" title="Click to mark return">Out</a>
+                        {% endif %}
+                      </div>
+                    {% endfor %}
                   {% elif m.uniform_in_time %}
                     <span class="badge approved">{{ m.uniform_in_time|time:"H:i" }}</span>
                   {% elif m.all_out %}
@@ -939,31 +1501,57 @@
                     {% endfor %}
                   {% endif %}
                 </td>
-                <td>{{ m.get_purpose_type_display|default:"—" }}</td>
-                <td class="clickable-cell" title="{{ m.filtered_purpose|default:m.purpose }}" data-full-text="{{ m.filtered_purpose|default:m.purpose }}" data-modal-title="Additional Notes">{{ m.filtered_purpose|default:m.purpose|default:"—"|truncatechars:50 }}</td>
                 <td>
-                  {% if m.purpose_type == "problem_solving" %}
-                    <div class="clickable-cell" title="{{ m.problem_description }}" data-full-text="{{ m.problem_description }}" data-modal-title="Problem Description">{{ m.problem_description|default:"—"|truncatechars:50 }}</div>
-                    {% if m.resolution_status %}
-                      <span class="badge {% if m.resolution_status == 'solved' %}approved{% else %}rejected{% endif %}" style="margin-top:5px;">{{ m.get_resolution_status_display }}</span>
-                    {% elif m.in_time %}
-                      <span class="badge pending" style="margin-top:5px;">Status missing</span>
-                    {% endif %}
-                  {% else %}
-                    <span style="color:var(--color-text-muted);">—</span>
-                  {% endif %}
-                </td>
-                <td class="clickable-cell" title="{{ m.filtered_completion_notes }}" data-full-text="{{ m.filtered_completion_notes }}" data-modal-title="Completion Notes">
-                  {% if admin_filter_client and m.matching_stops %}
+                  {% if m.matching_stops %}
                     {% for s in m.matching_stops %}
-                      {% if s.completion_notes %}
-                        <div>{% if m.matching_stops|length > 1 %}<strong>[{{ s.client }}]:</strong> {% endif %}{{ s.completion_notes }}</div>
-                      {% endif %}
-                    {% empty %}
-                      —
+                      <div style="margin-bottom:6px; {% if not forloop.last %}padding-bottom:4px; border-bottom:1px dashed var(--color-border-light);{% endif %}">
+                        {% if m.matching_stops|length > 1 %}
+                          <span class="stop-badge">Stop {{ forloop.counter }}</span>
+                        {% endif %}
+                        {% for svc in s.services %}
+                          <span class="service-tag">{{ svc }}</span>
+                        {% empty %}
+                          <span style="color:var(--color-text-muted); font-size:0.75rem;">—</span>
+                        {% endfor %}
+                      </div>
+                    {% endfor %}
+                  {% elif m.services %}
+                    {% for svc in m.services %}
+                      <span class="service-tag">{{ svc }}</span>
                     {% endfor %}
                   {% else %}
-                    {{ m.completion_notes|default:"—"|truncatechars:50 }}
+                    <span style="color:var(--color-text-muted); font-size:0.85rem;">—</span>
+                  {% endif %}
+                  {% if m.filtered_purpose %}
+                    <div style="font-size:0.78rem;color:var(--color-text-muted);margin-top:2px;">{{ m.filtered_purpose }}</div>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if m.matching_stops %}
+                    {% for s in m.matching_stops %}
+                      {% if s.department_works.all %}
+                        <div style="font-size:0.8rem;margin-bottom:6px;">
+                          {% if m.matching_stops|length > 1 %}<strong style="font-size:0.75rem;color:var(--color-text-muted);">{{ s.client }}:</strong><br>{% endif %}
+                          {% for dw in s.department_works.all %}
+                            <div style="margin-bottom:2px;">
+                              <strong>{{ dw.department }}</strong>: {{ dw.work_description|default:"—" }}
+                              {% if dw.work_done_for %}
+                                <span style="color:var(--color-primary);font-size:0.73rem;font-weight:600;display:inline-block;margin-left:3px;">(For: {{ dw.work_done_for }})</span>
+                              {% endif %}
+                            </div>
+                          {% endfor %}
+                        </div>
+                      {% else %}
+                        <div style="font-size:0.8rem;margin-bottom:4px;">
+                          {% if m.matching_stops|length > 1 %}<strong style="font-size:0.75rem;color:var(--color-text-muted);">{{ s.client }}:</strong><br>{% endif %}
+                          {% if s.work_done_for %}<div style="color:var(--color-primary);font-size:0.74rem;font-weight:600;">For: {{ s.work_done_for }}</div>{% endif %}
+                          {% if s.completion_notes %}<div>{{ s.completion_notes }}</div>{% endif %}
+                        </div>
+                      {% endif %}
+                    {% endfor %}
+                  {% else %}
+                    {% if m.work_done_for %}<div style="color:var(--color-primary);font-size:0.74rem;font-weight:600;">For: {{ m.work_done_for }}</div>{% endif %}
+                    {{ m.completion_notes|default:"—" }}
                   {% endif %}
                 </td>
                 <td>
@@ -981,7 +1569,7 @@
               </tr>
             {% empty %}
               <tr>
-                <td colspan="11" class="empty-state">No staff movements logged.</td>
+                <td colspan="9" class="empty-state">No staff movements logged.</td>
               </tr>
             {% endfor %}
           </tbody>
@@ -1069,14 +1657,12 @@
             <tr>
               <th>Date (AD / BS)</th>
               <th>Logged By</th>
-              <th>Client / Location</th>
+              <th>Client / Destination</th>
               <th>Assist(s)</th>
               <th>Out Time</th>
               <th>In Time</th>
-              <th>Purpose</th>
-              <th>Additional Notes</th>
-              <th>Problem / Solve Status</th>
-              <th>Completion Notes</th>
+              <th>Services</th>
+              <th>Work Description &amp; Department Notes</th>
               <th>Action</th>
             </tr>
           </thead>
@@ -1098,31 +1684,53 @@
                     <span class="badge" style="background:var(--color-primary-light);color:var(--color-primary);font-size:0.7rem;margin-left:4px;">Assisted</span>
                   {% endif %}
                 </td>
-                <td style="font-weight: 600;" class="clickable-cell" title="{{ m.client }}" data-full-text="{% if m.work_done_for %}Client: {{ m.client }}&#10;Work Done For: {{ m.work_done_for }}{% else %}{{ m.client }}{% endif %}" data-modal-title="Client & Contact Details">
-                  {% if m.has_multiple_stops %}
+                <td style="font-weight: 600;">
+                  {% if m.matching_stops %}
                     <div style="font-size:0.85rem;">
-                      {% for s in m.stops.all %}
-                        <div style="margin-bottom:3px;">
-                          <span style="font-weight:600;color:var(--color-text);">{{ s.order }}. {{ s.client }}</span>
-                          {% if s.work_done_for %}<span style="display:block;font-size:0.75rem;color:var(--color-primary);font-weight:500;">For: {{ s.work_done_for }}</span>{% endif %}
+                      {% for s in m.matching_stops %}
+                        <div style="margin-bottom:4px;">
+                          <span style="font-weight:700;color:var(--color-text);">{% if m.matching_stops|length > 1 %}{{ forloop.counter }}. {% endif %}{{ s.client }}</span>
+                          {% if s.purpose_type %}
+                            <span class="badge" style="background:var(--color-primary-light);color:var(--color-primary);font-size:0.68rem;padding:1px 6px;border-radius:10px;margin-left:4px;">{{ s.get_purpose_type_display }}</span>
+                          {% endif %}
                         </div>
                       {% endfor %}
                     </div>
                   {% else %}
                     {{ m.client }}
-                    {% if m.work_done_for %}
-                      <span style="display:block;font-size:0.75rem;color:var(--color-primary);font-weight:500;">For: {{ m.work_done_for }}</span>
+                    {% if m.purpose_type %}
+                      <span class="badge" style="background:var(--color-primary-light);color:var(--color-primary);font-size:0.68rem;padding:1px 6px;border-radius:10px;margin-left:4px;">{{ m.get_purpose_type_display }}</span>
                     {% endif %}
                   {% endif %}
                 </td>
                 <td style="font-size:0.85rem;color:var(--color-text-muted);">{{ m.assistants_display }}</td>
-                <td><span class="badge pending">{{ m.out_time|time:"H:i" }}</span></td>
+                <td>
+                  {% if m.matching_stops %}
+                    {% for s in m.matching_stops %}
+                      <div style="margin-bottom:4px;">
+                        <span class="badge pending">{{ s.out_time|default:m.out_time|time:"H:i" }}</span>
+                      </div>
+                    {% endfor %}
+                  {% else %}
+                    <span class="badge pending">{{ m.out_time|time:"H:i" }}</span>
+                  {% endif %}
+                </td>
                 <td>
                   {% if m.is_cancelled %}
                     <span class="badge" style="background:#fff3cd;color:#856404;border:1px solid #ffc107;">Cancelled</span>
                     {% if m.cancellation_reason %}
                       <span class="clickable-cell" style="display:block;font-size:0.75rem;color:var(--color-text-muted);" title="{{ m.cancellation_reason }}" data-full-text="{{ m.cancellation_reason }}" data-modal-title="Cancellation Reason">{{ m.cancellation_reason|truncatechars:30 }}</span>
                     {% endif %}
+                  {% elif m.matching_stops %}
+                    {% for s in m.matching_stops %}
+                      <div style="margin-bottom:4px;">
+                        {% if s.in_time %}
+                          <span class="badge approved">{{ s.in_time|time:"H:i" }}</span>
+                        {% else %}
+                          <span class="badge rejected">Out</span>
+                        {% endif %}
+                      </div>
+                    {% endfor %}
                   {% elif m.uniform_in_time %}
                     <span class="badge approved">{{ m.uniform_in_time|time:"H:i" }}</span>
                   {% elif m.is_primary_for_me %}
@@ -1139,21 +1747,59 @@
                     {% endif %}
                   {% endif %}
                 </td>
-                <td>{{ m.get_purpose_type_display|default:"—" }}</td>
-                <td class="clickable-cell" title="{{ m.filtered_purpose|default:m.purpose }}" data-full-text="{{ m.filtered_purpose|default:m.purpose }}" data-modal-title="Additional Notes">{{ m.filtered_purpose|default:m.purpose|default:"—"|truncatechars:40 }}</td>
                 <td>
-                  {% if m.purpose_type == "problem_solving" %}
-                    <div class="clickable-cell" title="{{ m.problem_description }}" data-full-text="{{ m.problem_description }}" data-modal-title="Problem Description">{{ m.problem_description|default:"—"|truncatechars:40 }}</div>
-                    {% if m.resolution_status %}
-                      <span class="badge {% if m.resolution_status == 'solved' %}approved{% else %}rejected{% endif %}" style="margin-top:5px;">{{ m.get_resolution_status_display }}</span>
-                    {% elif m.in_time or m.my_assistant_link.in_time %}
-                      <span class="badge pending" style="margin-top:5px;">Status missing</span>
-                    {% endif %}
+                  {% if m.matching_stops %}
+                    {% for s in m.matching_stops %}
+                      <div style="margin-bottom:6px; {% if not forloop.last %}padding-bottom:4px; border-bottom:1px dashed var(--color-border-light);{% endif %}">
+                        {% if m.matching_stops|length > 1 %}
+                          <span class="stop-badge">Stop {{ forloop.counter }}</span>
+                        {% endif %}
+                        {% for svc in s.services %}
+                          <span class="service-tag">{{ svc }}</span>
+                        {% empty %}
+                          <span style="color:var(--color-text-muted); font-size:0.75rem;">—</span>
+                        {% endfor %}
+                      </div>
+                    {% endfor %}
+                  {% elif m.services %}
+                    {% for svc in m.services %}
+                      <span class="service-tag">{{ svc }}</span>
+                    {% endfor %}
                   {% else %}
-                    <span style="color:var(--color-text-muted);">—</span>
+                    <span style="color:var(--color-text-muted); font-size:0.85rem;">—</span>
+                  {% endif %}
+                  {% if m.filtered_purpose %}
+                    <div style="font-size:0.78rem;color:var(--color-text-muted);margin-top:2px;">{{ m.filtered_purpose }}</div>
                   {% endif %}
                 </td>
-                <td class="clickable-cell" title="{{ m.completion_notes }}" data-full-text="{{ m.completion_notes }}" data-modal-title="Completion Notes">{{ m.completion_notes|default:"—"|truncatechars:40 }}</td>
+                <td>
+                  {% if m.matching_stops %}
+                    {% for s in m.matching_stops %}
+                      <div style="margin-bottom:6px; {% if not forloop.last %}padding-bottom:4px; border-bottom:1px dashed var(--color-border-light);{% endif %}">
+                        {% if m.matching_stops|length > 1 %}
+                          <span class="stop-badge">Stop {{ forloop.counter }}</span>
+                        {% endif %}
+                        {% if s.department_works.all %}
+                          {% for dw in s.department_works.all %}
+                            <div style="font-size:0.8rem; margin-bottom:2px; line-height:1.35;">
+                              <strong style="color:var(--color-text);">{{ dw.department }}</strong>: {{ dw.work_description|default:"—" }}
+                              {% if dw.work_done_for %}
+                                <span style="color:var(--color-primary);font-size:0.73rem;font-weight:600;display:inline-block;margin-left:3px;">(For: {{ dw.work_done_for }})</span>
+                              {% endif %}
+                            </div>
+                          {% endfor %}
+                        {% else %}
+                          {% if s.work_done_for %}<div style="color:var(--color-primary);font-size:0.74rem;font-weight:600;">For: {{ s.work_done_for }}</div>{% endif %}
+                          {% if s.completion_notes %}<div style="font-size:0.8rem;">{{ s.completion_notes }}</div>{% endif %}
+                          {% if not s.work_done_for and not s.completion_notes %}<span style="color:var(--color-text-muted); font-size:0.85rem;">—</span>{% endif %}
+                        {% endif %}
+                      </div>
+                    {% endfor %}
+                  {% else %}
+                    {% if m.work_done_for %}<div style="color:var(--color-primary);font-size:0.74rem;font-weight:600;">For: {{ m.work_done_for }}</div>{% endif %}
+                    {{ m.filtered_completion_notes|default:m.completion_notes|default:"—" }}
+                  {% endif %}
+                </td>
                 <td style="position:relative;">
                   {% if m.is_cancelled %}
                     <span style="color:var(--color-text-muted);">—</span>
@@ -1191,7 +1837,7 @@
               </tr>
             {% empty %}
               <tr>
-              <td colspan="11" class="empty-state">You haven't logged any movements yet.</td>
+              <td colspan="9" class="empty-state">You haven't logged any movements yet.</td>
               </tr>
             {% endfor %}
           </tbody>
@@ -1232,6 +1878,173 @@
 {% block extra_js %}
 <script>
   const BS_API = "{% url 'ad_to_bs_api' %}";
+
+  // Data lists from backend
+  const AMC_CLIENTS_LIST = [
+    {% for ac in amc_clients %}
+      "{{ ac|escapejs }}"{% if not forloop.last %},{% endif %}
+    {% endfor %}
+  ];
+
+  const PURPOSE_CHOICES_LIST = [
+    {% for code, label in purpose_choices %}
+      { code: "{{ code|escapejs }}", label: "{{ label|escapejs }}" }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+  ];
+
+  const SERVICE_REPAIR_SUPPORT_LIST = [
+    {% for svc in service_repair_support %}
+      "{{ svc|escapejs }}"{% if not forloop.last %},{% endif %}
+    {% endfor %}
+  ];
+
+  const SERVICE_SETUP_INSTALL_LIST = [
+    {% for svc in service_setup_install %}
+      "{{ svc|escapejs }}"{% if not forloop.last %},{% endif %}
+    {% endfor %}
+  ];
+
+  const DEPARTMENT_CHOICES_LIST = [
+    {% for dept in department_choices %}
+      "{{ dept|escapejs }}"{% if not forloop.last %},{% endif %}
+    {% endfor %}
+  ];
+
+  function getCurrentTimeHHMM() {
+    const now = new Date();
+    return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  }
+
+  // Set default current time on all out-time and in-time fields that are empty
+  function initTimeFields() {
+    const nowTime = getCurrentTimeHHMM();
+    document.querySelectorAll('.dest-out-time-input').forEach(input => {
+      if (!input.value) input.value = nowTime;
+    });
+    document.querySelectorAll('.return-in-time-input').forEach(input => {
+      if (!input.value) input.value = nowTime;
+    });
+  }
+  document.addEventListener('DOMContentLoaded', initTimeFields);
+  initTimeFields();
+
+  // Mobile-friendly client select / custom input handler
+  function handleClientSelectChange(sel) {
+    const wrap = sel.closest('.client-select-wrap');
+    if (!wrap) return;
+    const card = sel.closest('.dest-card');
+    const customInput = wrap.querySelector('.client-custom-input');
+    if (!customInput) return;
+    const isEdit = sel.name.startsWith('edit_') || customInput.name.startsWith('edit_');
+    const fieldName = isEdit ? 'edit_stop_client' : 'stop_client';
+    const purposeSelect = card ? card.querySelector('.purpose-type-select') : null;
+
+    if (sel.value === '__custom__') {
+      sel.name = '';
+      sel.required = false;
+      customInput.name = fieldName;
+      customInput.required = true;
+      customInput.style.display = 'block';
+      customInput.focus();
+      if (purposeSelect && purposeSelect.value === 'amc') {
+        purposeSelect.value = 'repair';
+      }
+    } else {
+      sel.name = fieldName;
+      sel.required = true;
+      customInput.name = '';
+      customInput.required = false;
+      customInput.style.display = 'none';
+      customInput.value = '';
+      if (purposeSelect && sel.value && AMC_CLIENTS_LIST.includes(sel.value)) {
+        purposeSelect.value = 'amc';
+      }
+    }
+  }
+
+  function getClientSelectHtml(fieldName, selectedValue = '') {
+    const isCustom = selectedValue && !AMC_CLIENTS_LIST.includes(selectedValue) && selectedValue !== '__custom__';
+    const amcOptions = AMC_CLIENTS_LIST.map(c => {
+      const isSel = (selectedValue === c) ? 'selected' : '';
+      return `<option value="${c}" ${isSel}>${c}</option>`;
+    }).join('');
+
+    const selName = isCustom ? '' : fieldName;
+    const selReq = isCustom ? '' : 'required';
+    const inputName = isCustom ? fieldName : '';
+    const inputReq = isCustom ? 'required' : '';
+    const inputDisp = isCustom ? 'block' : 'none';
+    const inputVal = isCustom ? selectedValue : '';
+
+    return `
+      <div class="client-select-wrap">
+        <select class="client-dropdown" name="${selName}" ${selReq} onchange="handleClientSelectChange(this)">
+          <option value="">— Select AMC Client / Location —</option>
+          <optgroup label="🏢 AMC Clients (17)">
+            ${amcOptions}
+          </optgroup>
+          <optgroup label="✨ Custom / Other">
+            <option value="__custom__" ${isCustom ? 'selected' : ''}>➕ Type Custom Location / Client...</option>
+          </optgroup>
+        </select>
+        <input type="text" class="client-custom-input" name="${inputName}" value="${inputVal}" ${inputReq} placeholder="Type company or client office name..." style="display:${inputDisp};margin-top:4px;">
+      </div>
+    `;
+  }
+
+  function getPurposeTypeSelectHtml(fieldName, selectedValue = 'amc') {
+    const options = PURPOSE_CHOICES_LIST.map(p => {
+      const isSel = (selectedValue === p.code) ? 'selected' : '';
+      return `<option value="${p.code}" ${isSel}>${p.label}</option>`;
+    }).join('');
+
+    return `
+      <select name="${fieldName}" class="purpose-type-select" style="width:100%;padding:9px 12px;border:1.5px solid var(--color-border);border-radius:var(--radius-sm);background:var(--input-bg);color:var(--color-text);font-family:inherit;font-size:0.88rem;">
+        ${options}
+      </select>
+    `;
+  }
+
+  function getServicePillsHtml(namePrefix, checkedList = []) {
+    const repairHtml = SERVICE_REPAIR_SUPPORT_LIST.map(svc => {
+      const isChecked = checkedList.includes(svc) ? 'checked' : '';
+      return `
+        <label class="service-pill">
+          <input type="checkbox" name="${namePrefix}" value="${svc}" ${isChecked}>
+          <span class="pill-check">✓</span>
+          <span>${svc}</span>
+        </label>
+      `;
+    }).join('');
+
+    const setupHtml = SERVICE_SETUP_INSTALL_LIST.map(svc => {
+      const isChecked = checkedList.includes(svc) ? 'checked' : '';
+      return `
+        <label class="service-pill">
+          <input type="checkbox" name="${namePrefix}" value="${svc}" ${isChecked}>
+          <span class="pill-check">✓</span>
+          <span>${svc}</span>
+        </label>
+      `;
+    }).join('');
+
+    return `
+      <div class="service-group-title">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+        Repair &amp; Support
+      </div>
+      <div class="service-pill-row">
+        ${repairHtml}
+      </div>
+      <div class="service-group-title">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        Setup &amp; Installation
+      </div>
+      <div class="service-pill-row">
+        ${setupHtml}
+      </div>
+    `;
+  }
 
   // ---- Who's Out in Field Today toggle ----
   function toggleFieldPanel() {
@@ -1299,15 +2112,25 @@
   }
 
   async function showBs(inputId, labelId) {
-    const val = document.getElementById(inputId).value;
+    const el = document.getElementById(inputId);
+    if (!el) return;
+    const val = el.value;
     const label = document.getElementById(labelId);
-    if (!val) { label.textContent = ''; return; }
+    const badge = (inputId === 'date') ? document.getElementById('date-bs-badge') : null;
+    if (!val) {
+      if (label) label.textContent = '';
+      if (badge) badge.textContent = '';
+      return;
+    }
     try {
       const res = await fetch(`${BS_API}?date=${val}`);
       const data = await res.json();
-      label.textContent = data.bs ? data.bs : '';
+      const bsText = data.bs || '';
+      if (label) label.textContent = bsText;
+      if (badge) badge.textContent = bsText;
     } catch (e) {
-      label.textContent = '';
+      if (label) label.textContent = '';
+      if (badge) badge.textContent = '';
     }
   }
 
@@ -1316,6 +2139,14 @@
     dateInput.addEventListener('change', () => showBs('date', 'date-bs'));
     showBs('date', 'date-bs');
   }
+
+  // Keep departure time live
+  setInterval(() => {
+    const outTimeInput = document.getElementById('out_time');
+    if (outTimeInput) {
+      outTimeInput.value = getCurrentTimeHHMM();
+    }
+  }, 10000);
 
   const filterDateFromInput = document.getElementById('filter-date-from');
   if (filterDateFromInput) {
@@ -1339,22 +2170,6 @@
   if (adminFilterDateToInput) {
     adminFilterDateToInput.addEventListener('change', () => showBs('admin-filter-date-to', 'admin-filter-date-to-bs'));
     showBs('admin-filter-date-to', 'admin-filter-date-to-bs');
-  }
-
-  const outTimeField = document.getElementById('out_time');
-  if (outTimeField) {
-    function updateOutTime() {
-      const now = new Date();
-      outTimeField.value = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    }
-    updateOutTime();
-    setInterval(updateOutTime, 15000);
-  }
-
-  const inTimeField = document.getElementById('in_time');
-  if (inTimeField && !inTimeField.value) {
-    const now = new Date();
-    inTimeField.value = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
   }
 
   const assistantSearch = document.getElementById('assistant-search');
@@ -1382,34 +2197,12 @@
   });
   updateAssistantCount();
 
-  const purposeType = document.getElementById('purpose_type');
-  const problemGroup = document.getElementById('problem-description-group');
-  const problemDescription = document.getElementById('problem_description');
-  const resolutionGroup = document.getElementById('resolution-status-group');
-  const resolutionStatus = document.getElementById('resolution_status');
-  const inTime = document.getElementById('in_time');
   const separateReturns = document.getElementById('separate_returns');
   const separateGroup = document.getElementById('separate-returns-group');
-  if (separateReturns) {
+  if (separateReturns && separateGroup) {
     separateReturns.addEventListener('change', () => {
       separateGroup.hidden = !separateReturns.checked;
     });
-  }
-
-  function updateProblemFields() {
-    if (!purposeType) return;
-    const isProblemVisit = purposeType.value === 'problem_solving';
-    const isReturning = Boolean(inTime && inTime.value);
-    problemGroup.hidden = !isProblemVisit;
-    if (resolutionGroup) resolutionGroup.hidden = !isProblemVisit;
-    problemDescription.required = isProblemVisit;
-    if (resolutionStatus) resolutionStatus.required = isProblemVisit && isReturning;
-  }
-
-  if (purposeType) {
-    purposeType.addEventListener('change', updateProblemFields);
-    if (inTime) inTime.addEventListener('change', updateProblemFields);
-    updateProblemFields();
   }
 
   // "Still out" checkbox: disable & clear the matching time input so the
@@ -1423,74 +2216,178 @@
     });
   });
 
-  function reindexDestinationBadges(listId, rowClass) {
+  // Re-index destination cards
+  function reindexDestinationCards(listId, cardClass) {
     const container = document.getElementById(listId);
     if (!container) return;
-    container.querySelectorAll("." + rowClass).forEach((row, idx) => {
-      const badge = row.querySelector(".dest-badge");
+    container.querySelectorAll("." + cardClass).forEach((card, idx) => {
+      card.dataset.stopIndex = idx;
+      const badge = card.querySelector(".dest-badge");
       if (badge) badge.textContent = idx + 1;
+      const titleSpan = card.querySelector(".dest-card-title");
+      if (titleSpan) {
+        titleSpan.innerHTML = `<span class="dest-badge">${idx + 1}</span> Destination #${idx + 1}`;
+      }
+      // Update name of service checkboxes
+      card.querySelectorAll("input[type='checkbox']").forEach(cb => {
+        if (listId === "destinations-list") {
+          cb.name = `stop_services_${idx}`;
+        } else if (listId === "edit-destinations-list") {
+          cb.name = `edit_stop_services_${idx}`;
+        }
+      });
     });
   }
 
+  // Add dynamic destination row on departure form
   function addDestinationRow() {
     const container = document.getElementById("destinations-list");
     if (!container) return;
-    const rowCount = container.querySelectorAll(".destination-row").length + 1;
-    const div = document.createElement("div");
-    div.className = "destination-row dest-row";
-    div.innerHTML = `
-      <span class="dest-badge">${rowCount}</span>
-      <div class="dest-field" style="flex:1.2;min-width:180px;">
-        <label>Client / Location *</label>
-        <input type="text" name="stop_client" list="existing-clients" placeholder="e.g. Nepal Telecom, PM Office" required>
+    const count = container.querySelectorAll(".destination-card").length;
+
+    const card = document.createElement("div");
+    card.className = "destination-card dest-card";
+    card.dataset.stopIndex = count;
+    card.innerHTML = `
+      <div class="dest-card-header">
+        <span class="dest-card-title">
+          <span class="dest-badge">${count + 1}</span>
+          Destination #${count + 1}
+        </span>
+        <button type="button" class="dest-remove-btn" onclick="removeDestinationCard(this)">✕ Remove</button>
       </div>
-      <div class="dest-field" style="flex:1.5;min-width:200px;">
-        <label>Notes / Remarks</label>
-        <input type="text" name="stop_purpose" placeholder="e.g. Laptop repair, Cheque pickup">
+      <div class="form-grid" style="gap:12px;margin-bottom:10px;">
+        <div class="form-group" style="flex:1.5;">
+          <label>Client / Location *</label>
+          ${getClientSelectHtml('stop_client', '')}
+        </div>
+        <div class="form-group" style="flex:1;min-width:160px;">
+          <label>Purpose Type *</label>
+          ${getPurposeTypeSelectHtml('stop_purpose_type', 'amc')}
+        </div>
       </div>
-      <button type="button" class="dest-remove-btn" onclick="removeDestinationRow(this)" title="Remove destination">✕</button>
+      ${getServicePillsHtml(`stop_services_${count}`)}
+      <div class="form-group" style="margin-top:6px;margin-bottom:0;">
+        <label style="font-size:0.75rem;">Specific Notes / Purpose Remarks</label>
+        <input type="text" name="stop_purpose" placeholder="e.g. 3rd floor accounts, contact Mr. Sharma..." style="font-size:0.84rem;">
+      </div>
     `;
-    container.appendChild(div);
+    container.appendChild(card);
   }
 
-  function removeDestinationRow(btn) {
-    const row = btn.closest(".destination-row");
+  function removeDestinationCard(btn) {
+    const card = btn.closest(".destination-card");
     const container = document.getElementById("destinations-list");
-    if (container && container.querySelectorAll(".destination-row").length > 1) {
-      row.remove();
-      reindexDestinationBadges("destinations-list", "destination-row");
+    if (container && container.querySelectorAll(".destination-card").length > 1) {
+      card.remove();
+      reindexDestinationCards("destinations-list", "destination-card");
     }
   }
 
+  // Add dynamic destination row in proxy logger manage stops
   function addEditDestinationRow() {
     const container = document.getElementById("edit-destinations-list");
     if (!container) return;
-    const rowCount = container.querySelectorAll(".edit-destination-row").length + 1;
-    const div = document.createElement("div");
-    div.className = "edit-destination-row dest-row";
-    div.innerHTML = `
-      <span class="dest-badge">${rowCount}</span>
-      <div class="dest-field" style="flex:1.2;min-width:180px;">
-        <label>Client / Location *</label>
-        <input type="text" name="edit_stop_client" list="existing-clients" placeholder="Client / Location *" required>
+    const count = container.querySelectorAll(".edit-destination-card").length;
+    const nowTime = getCurrentTimeHHMM();
+
+    const card = document.createElement("div");
+    card.className = "edit-destination-card dest-card";
+    card.dataset.stopIndex = count;
+    card.innerHTML = `
+      <div class="dest-card-header">
+        <span class="dest-card-title">
+          <span class="dest-badge">${count + 1}</span>
+          Destination #${count + 1}
+        </span>
+        <button type="button" class="dest-remove-btn" onclick="removeEditDestinationRow(this)">✕ Remove</button>
       </div>
-      <div class="dest-field" style="flex:1.5;min-width:200px;">
-        <label>Notes / Remarks</label>
-        <input type="text" name="edit_stop_purpose" placeholder="Additional Notes / Remarks (Optional)">
+      <div class="form-grid" style="gap:12px;margin-bottom:8px;">
+        <div class="form-group" style="flex:1.5;">
+          <label>Client / Location *</label>
+          ${getClientSelectHtml('edit_stop_client', '')}
+        </div>
+        <div class="form-group" style="flex:1;min-width:150px;">
+          <label>Purpose Type *</label>
+          ${getPurposeTypeSelectHtml('edit_stop_purpose_type', 'amc')}
+        </div>
+        <div class="form-group" style="flex:0.8;min-width:120px;">
+          <label>Departure Time (Out) *</label>
+          <input type="time" name="edit_stop_out_time" value="${nowTime}" required style="width:100%;">
+        </div>
+      </div>
+      ${getServicePillsHtml(`edit_stop_services_${count}`)}
+      <div class="form-group" style="margin-top:6px;margin-bottom:0;">
+        <label style="font-size:0.75rem;">Purpose / Notes</label>
+        <input type="text" name="edit_stop_purpose" placeholder="Additional notes...">
       </div>
       <input type="hidden" name="edit_stop_id" value="">
-      <button type="button" class="dest-remove-btn" onclick="removeEditDestinationRow(this)" title="Remove destination">✕</button>
     `;
-    container.appendChild(div);
+    container.appendChild(card);
   }
 
   function removeEditDestinationRow(btn) {
-    const row = btn.closest(".edit-destination-row");
+    const card = btn.closest(".edit-destination-card");
     const container = document.getElementById("edit-destinations-list");
-    if (container && container.querySelectorAll(".edit-destination-row").length > 1) {
-      row.remove();
-      reindexDestinationBadges("edit-destinations-list", "edit-destination-row");
+    if (container && container.querySelectorAll(".edit-destination-card").length > 1) {
+      card.remove();
+      reindexDestinationCards("edit-destinations-list", "edit-destination-card");
     }
+  }
+
+  // Handle Department select/custom toggle (same pattern as client dropdown)
+  function handleDeptSelectChange(sel) {
+    const wrap = sel.closest('.dept-select-wrap');
+    if (!wrap) return;
+    const customInput = wrap.querySelector('.dept-custom-input');
+    if (!customInput) return;
+    const fieldName = sel.name || customInput.name;
+
+    if (sel.value === '__custom__') {
+      sel.name = '';
+      customInput.name = fieldName;
+      customInput.style.display = 'block';
+      customInput.focus();
+    } else {
+      if (!sel.name) sel.name = customInput.name || fieldName;
+      customInput.name = '';
+      customInput.style.display = 'none';
+      customInput.value = '';
+    }
+  }
+
+  // Dynamic Department Repeater on Return Form
+  function addDepartmentRow(stopId) {
+    const container = document.getElementById(`dept-repeater-${stopId}`);
+    if (!container) return;
+
+    const deptOptions = DEPARTMENT_CHOICES_LIST.map(d => `<option value="${d}">${d}</option>`).join('');
+
+    const row = document.createElement("div");
+    row.className = "dept-card";
+    row.innerHTML = `
+      <div class="dept-field" style="flex:1.2;min-width:160px;">
+        <label>Department / Section</label>
+        <div class="dept-select-wrap">
+          <select class="dept-dropdown" name="dept_department_${stopId}[]" onchange="handleDeptSelectChange(this)">
+            <option value="">— Select Department —</option>
+            ${deptOptions}
+            <option value="__custom__">➕ Type Other...</option>
+          </select>
+          <input type="text" class="dept-custom-input" placeholder="Type department name..." style="display:none;margin-top:4px;">
+        </div>
+      </div>
+      <div class="dept-field" style="flex:1.2;min-width:160px;">
+        <label>Contact Person / Designation</label>
+        <input type="text" name="dept_work_done_for_${stopId}[]" placeholder="e.g. Mr. Sharma (Accountant)">
+      </div>
+      <div class="dept-field" style="flex:2;min-width:220px;">
+        <label>Work Description *</label>
+        <input type="text" name="dept_work_description_${stopId}[]" placeholder="e.g. Repaired network switch, solved printer jam" required>
+      </div>
+      <button type="button" class="dest-remove-btn" onclick="this.closest('.dept-card').remove()" style="margin-top:18px;">✕</button>
+    `;
+    container.appendChild(row);
   }
 
   // Toggle Log Movement form for proxy loggers

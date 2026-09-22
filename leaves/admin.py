@@ -4,7 +4,7 @@ from django.utils import timezone
 from .models import (
     LeaveType, LeaveRequest, LeaveBalance, PublicHoliday,
     AttendanceRequest, HolidayWorkRequest, StaffMovement, StaffMovementAssistant, StaffMovementStop,
-    BiometricDevice, AttendanceLog,
+    StaffMovementDepartmentWork, BiometricDevice, AttendanceLog,
 )
 
 
@@ -107,10 +107,17 @@ class HolidayWorkRequestAdmin(BaseDayRequestAdmin):
     pass
 
 
+class StaffMovementDepartmentWorkInline(admin.TabularInline):
+    model = StaffMovementDepartmentWork
+    extra = 0
+    fields = ("order", "department", "work_done_for", "work_description")
+    ordering = ("order", "id")
+
+
 class StaffMovementStopInline(admin.TabularInline):
     model = StaffMovementStop
     extra = 0
-    fields = ("order", "client", "purpose", "work_done_for", "completion_notes", "resolution_status")
+    fields = ("order", "client", "out_time", "in_time", "services", "purpose", "work_done_for", "completion_notes", )
     ordering = ("order", "id")
 
 
@@ -124,14 +131,14 @@ class StaffMovementAssistantInline(admin.TabularInline):
     model = StaffMovementAssistant
     extra = 0
     autocomplete_fields = ("employee",)
-    fields = ("employee", "in_time", "resolution_status", "completion_notes")
+    fields = ("employee", "in_time", "completion_notes")
 
 
 @admin.register(StaffMovement)
 class StaffMovementAdmin(admin.ModelAdmin):
-    list_display = ("employee", "date", "client", "purpose_type", "out_time", "in_time", "resolution_status", "created_at")
-    list_filter = ("date", "employee", "client", "purpose_type", "resolution_status")
-    search_fields = ("employee__username", "employee__first_name", "employee__last_name", "client", "purpose", "problem_description", "completion_notes")
+    list_display = ("employee", "date", "client", "purpose_type", "out_time", "in_time", "created_at")
+    list_filter = ("date", "employee", "client", "purpose_type", )
+    search_fields = ("employee__username", "employee__first_name", "employee__last_name", "client", "purpose", "completion_notes")
     date_hierarchy = "date"
     readonly_fields = ("created_at",)
     autocomplete_fields = ("employee", "logged_by")
@@ -140,10 +147,19 @@ class StaffMovementAdmin(admin.ModelAdmin):
 
 @admin.register(StaffMovementStop)
 class StaffMovementStopAdmin(admin.ModelAdmin):
-    list_display = ("movement", "order", "client", "purpose", "work_done_for", "resolution_status")
-    list_filter = ("client", "resolution_status", "movement__date")
+    list_display = ("movement", "order", "client", "out_time", "in_time", "purpose", "work_done_for", )
+    list_filter = ("client", "movement__date")
     search_fields = ("client", "purpose", "work_done_for", "completion_notes", "movement__employee__username")
     ordering = ("-movement__date", "order")
+    inlines = [StaffMovementDepartmentWorkInline]
+
+
+@admin.register(StaffMovementDepartmentWork)
+class StaffMovementDepartmentWorkAdmin(admin.ModelAdmin):
+    list_display = ("stop", "order", "department", "work_done_for", "work_description")
+    list_filter = ("department", "stop__client")
+    search_fields = ("department", "work_done_for", "work_description", "stop__client")
+    ordering = ("-stop__movement__date", "order")
 
 
 @admin.register(BiometricDevice)

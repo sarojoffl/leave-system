@@ -30,6 +30,7 @@ urlpatterns = [
     path("api/ad-to-bs/", views.ad_to_bs_api, name="ad_to_bs_api"),
     path("api/leave-stats/", views.employee_leave_stats_api, name="employee_leave_stats_api"),
     path("api/movement-stats/", views.movement_stats_api, name="movement_stats_api"),
+    path("api/attendance-stats/", views.attendance_reports_api, name="attendance_reports_api"),
 
     path("attendance/", views.my_attendance, name="my_attendance"),
     path("attendance/team/", views.team_attendance, name="team_attendance"),

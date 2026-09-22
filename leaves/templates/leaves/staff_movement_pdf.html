@@ -22,8 +22,8 @@
       line-height: 1.5;
     }
     @page {
-      size: A4 portrait;
-      margin: 15mm;
+      size: A4 landscape;
+      margin: 10mm;
     }
 
     /* Screen control bar */
@@ -110,9 +110,10 @@
     }
     th, td {
       border: 1px solid #d1d5db;
-      padding: 8px 10px;
+      padding: 6px 8px;
       text-align: left;
       vertical-align: top;
+      font-size: 11px;
     }
     th {
       background: #f3f4f6;
@@ -147,16 +148,71 @@
       color: #b45309;
     }
 
+    .service-tag {
+      display: inline-block;
+      padding: 1.5px 5px;
+      border-radius: 3px;
+      font-size: 9.5px;
+      font-weight: 600;
+      background: #e0f2fe;
+      color: #0369a1;
+      border: 1px solid #bae6fd;
+      margin: 1px 2px 1px 0;
+    }
+    .stop-badge {
+      display: inline-block;
+      padding: 1px 4.5px;
+      border-radius: 3px;
+      font-size: 8.5px;
+      font-weight: 700;
+      background: #f1f5f9;
+      color: #475569;
+      border: 1px solid #cbd5e1;
+      margin-bottom: 2px;
+    }
+    .dept-item {
+      display: block;
+      font-size: 10.5px;
+      font-weight: 600;
+      color: #1f2937;
+    }
+    .user-item {
+      display: block;
+      font-size: 10.5px;
+      font-weight: 600;
+      color: #0091b3;
+    }
+    .stop-cell-block {
+      margin-bottom: 5px;
+    }
+    .stop-cell-divider {
+      padding-bottom: 5px;
+      border-bottom: 1px dashed #e5e7eb;
+    }
+    .sub-work-item {
+      font-size: 10.5px;
+      line-height: 1.4;
+      margin-bottom: 3px;
+    }
+    .sub-work-item:last-child {
+      margin-bottom: 0;
+    }
+    .time-pill {
+      font-size: 9px;
+      color: #4b5563;
+      font-weight: 600;
+    }
+
     /* Signature Section */
     .signature-container {
       margin-top: 50px;
       display: flex;
-      justify-content: space-between;
+      justify-content: flex-end;
       page-break-inside: avoid;
     }
     .signature-box {
-      width: 240px;
-      text-align: center;
+      width: 260px;
+      text-align: left;
     }
     .signature-line {
       border-bottom: 1.5px solid #111827;
@@ -167,13 +223,28 @@
       font-size: 12px;
       font-weight: 700;
       text-transform: uppercase;
+      letter-spacing: 0.5px;
       color: #111827;
+      margin-bottom: 12px;
+      text-align: center;
     }
-    .signature-detail {
-      font-size: 11px;
-      color: #4b5563;
-      margin-top: 6px;
-      text-align: left;
+    .signature-field {
+      margin-bottom: 14px;
+    }
+    .signature-field:last-child {
+      margin-bottom: 0;
+    }
+    .signature-field-label {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      color: #6b7280;
+      margin-bottom: 4px;
+    }
+    .signature-field-line {
+      border-bottom: 1px solid #9ca3af;
+      height: 22px;
     }
   </style>
 </head>
@@ -234,20 +305,25 @@
   <table>
     <thead>
       <tr>
-        <th style="width: 30px;">#</th>
-        <th style="width: 85px;">Date (AD/BS)</th>
-        <th style="width: 120px;">Staff Member(s)</th>
-        <th style="width: 100px;">Client &amp; Contact</th>
-        <th style="width: 80px;">Out / In</th>
-        <th style="width: 90px;">Purpose</th>
-        <th>Job Completion Notes</th>
-        <th style="width: 70px;">Status</th>
+        <th style="width: 25px; text-align: center;">#</th>
+        <th style="width: 80px;">Date (AD/BS)</th>
+        <th style="width: 110px;">Staff Member(s)</th>
+        {% if not filter_client %}
+          <th style="width: 110px;">Client / Destination</th>
+        {% endif %}
+        <th style="width: 80px;">Timing (Out/In)</th>
+        <th style="width: 75px;">Purpose</th>
+        <th style="width: 130px;">Services</th>
+        <th style="width: 135px;">Department / Section</th>
+        <th style="width: 90px;">User</th>
+        <th>Work Description</th>
+        <th style="width: 65px; text-align: center;">Status</th>
       </tr>
     </thead>
     <tbody>
       {% for m in movements %}
         <tr>
-          <td>{{ forloop.counter }}</td>
+          <td style="text-align: center;">{{ forloop.counter }}</td>
           <td>
             {{ m.date|date:"Y-m-d" }}
             <br>
@@ -261,57 +337,154 @@
               </div>
             {% endif %}
           </td>
+          {% if not filter_client %}
+          <!-- Client & Destination (Only for All-Clients report) -->
           <td>
             {% if m.matching_stops %}
               {% for s in m.matching_stops %}
-                <div style="margin-bottom: 4px;">
-                  <strong>{{ s.order }}. {{ s.client }}</strong>
-                  {% if s.work_done_for %}
-                    <div style="color: #0091b3; font-size: 10px;">For: {{ s.work_done_for }}</div>
-                  {% endif %}
+                <div class="stop-cell-block {% if not forloop.last %}stop-cell-divider{% endif %}">
+                  <strong>{% if m.matching_stops|length > 1 %}{{ s.order }}. {% endif %}{{ s.client }}</strong>
                 </div>
               {% endfor %}
             {% else %}
               <strong>{{ m.client }}</strong>
-              {% if m.work_done_for %}
-                <div style="color: #0091b3; font-size: 10px; margin-top: 2px;">
-                  For: {{ m.work_done_for }}
-                </div>
-              {% endif %}
             {% endif %}
           </td>
+          {% endif %}
+          <!-- Stop-Specific Out / In Timing -->
           <td>
-            Out: {{ m.out_time|time:"H:i" }}
-            <br>
-            In: {{ m.in_time|time:"H:i"|default:"—" }}
-          </td>
-          <td>
-            {{ m.get_purpose_type_display|default:m.purpose_type|default:"—" }}
-          </td>
-          <td>
-            {% if m.problem_description %}
-              <div style="margin-bottom: 4px;"><strong>Problem:</strong> {{ m.problem_description }}</div>
-            {% endif %}
             {% if m.matching_stops %}
               {% for s in m.matching_stops %}
-                {% if s.purpose %}
-                  <div style="margin-bottom:2px;"><strong>{{ s.client }} (Note):</strong> {{ s.purpose }}</div>
-                {% endif %}
-                {% if s.completion_notes %}
-                  <div style="margin-bottom:4px;"><strong>{{ s.client }} (Return):</strong> {{ s.completion_notes }}</div>
-                {% endif %}
+                <div class="stop-cell-block {% if not forloop.last %}stop-cell-divider{% endif %}" style="font-size: 10.5px;">
+                  <div>Out: <strong>{{ s.out_time|default:m.out_time|time:"H:i" }}</strong></div>
+                  <div>In: <strong>{{ s.in_time|default:m.in_time|time:"H:i"|default:"—" }}</strong></div>
+                </div>
               {% endfor %}
             {% else %}
-              {{ m.completion_notes|default:m.filtered_purpose|default:m.purpose|default:"—" }}
+              <div style="font-size: 10.5px;">
+                <div>Out: <strong>{{ m.out_time|time:"H:i" }}</strong></div>
+                <div>In: <strong>{{ m.in_time|time:"H:i"|default:"—" }}</strong></div>
+              </div>
             {% endif %}
           </td>
+          <!-- Purpose Type -->
           <td>
+            {% if m.matching_stops %}
+              {% for s in m.matching_stops %}
+                <div class="stop-cell-block {% if not forloop.last %}stop-cell-divider{% endif %}" style="font-size: 10.5px;">
+                  {{ s.get_purpose_type_display|default:m.get_purpose_type_display|default:"—" }}
+                </div>
+              {% endfor %}
+            {% else %}
+              <div style="font-size: 10.5px;">
+                {{ m.get_purpose_type_display|default:m.purpose_type|default:"—" }}
+              </div>
+            {% endif %}
+          </td>
+          <!-- Services -->
+          <td>
+            {% if m.matching_stops %}
+              {% for s in m.matching_stops %}
+                <div class="stop-cell-block {% if not forloop.last %}stop-cell-divider{% endif %}">
+                  {% if not filter_client and m.matching_stops|length > 1 %}
+                    <span class="stop-badge">Stop {{ forloop.counter }}</span>
+                  {% endif %}
+                  {% if s.services %}
+                    <div>
+                      {% for svc in s.services %}
+                        <span class="service-tag">{{ svc }}</span>
+                      {% endfor %}
+                    </div>
+                  {% else %}
+                    <span style="color: #9ca3af;">—</span>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            {% else %}
+              <span style="color: #9ca3af;">—</span>
+            {% endif %}
+            {% if m.filtered_purpose %}
+              <div style="font-size: 10px; color: #6b7280; margin-top: 3px;">{{ m.filtered_purpose }}</div>
+            {% endif %}
+          </td>
+
+          <!-- Synchronized Department, User & Work Done Columns -->
+          <td colspan="3" style="padding: 0; vertical-align: top;">
+            <table style="width: 100%; border-collapse: collapse; margin: 0; border: none; table-layout: fixed;">
+              {% if m.matching_stops %}
+                {% for s in m.matching_stops %}
+                  {% if s.department_works.all %}
+                    {% for dw in s.department_works.all %}
+                      <tr style="{% if not forloop.last or not forloop.parentloop.last %}border-bottom: 1px dashed #e2e8f0;{% endif %}">
+                        <td style="width: 135px; padding: 5px 6px; vertical-align: top; border: none; border-right: 1px solid #f1f5f9;">
+                          {% if not filter_client and m.matching_stops|length > 1 and forloop.first %}
+                            <span class="stop-badge">Stop {{ forloop.parentloop.counter }}</span><br>
+                          {% endif %}
+                          <strong style="color: #1e293b;">{{ dw.department }}</strong>
+                        </td>
+                        <td style="width: 90px; padding: 5px 6px; vertical-align: top; border: none; border-right: 1px solid #f1f5f9;">
+                          {% if dw.work_done_for %}
+                            <strong style="color: #0284c7;">{{ dw.work_done_for }}</strong>
+                          {% else %}
+                            <span style="color: #94a3b8;">—</span>
+                          {% endif %}
+                        </td>
+                        <td style="padding: 5px 6px; vertical-align: top; border: none;">
+                          {{ dw.work_description|default:"—" }}
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  {% else %}
+                    <tr style="{% if not forloop.last %}border-bottom: 1px dashed #e2e8f0;{% endif %}">
+                      <td style="width: 135px; padding: 5px 6px; vertical-align: top; border: none; border-right: 1px solid #f1f5f9; color: #94a3b8;">
+                        {% if not filter_client and m.matching_stops|length > 1 %}
+                          <span class="stop-badge">Stop {{ forloop.counter }}</span><br>
+                        {% endif %}
+                        —
+                      </td>
+                      <td style="width: 90px; padding: 5px 6px; vertical-align: top; border: none; border-right: 1px solid #f1f5f9;">
+                        {% if s.work_done_for %}
+                          <strong style="color: #0284c7;">{{ s.work_done_for }}</strong>
+                        {% elif m.work_done_for %}
+                          <strong style="color: #0284c7;">{{ m.work_done_for }}</strong>
+                        {% else %}
+                          <span style="color: #94a3b8;">—</span>
+                        {% endif %}
+                      </td>
+                      <td style="padding: 5px 6px; vertical-align: top; border: none;">
+                        {{ s.completion_notes|default:s.purpose|default:m.completion_notes|default:m.purpose|default:"—" }}
+                      </td>
+                    </tr>
+                  {% endif %}
+                  {% if s.purpose and s.department_works.all %}
+                    <tr style="background: #fafafa; border-top: 1px dotted #f1f5f9; {% if not forloop.last %}border-bottom: 1px dashed #e2e8f0;{% endif %}">
+                      <td colspan="3" style="padding: 3px 6px; font-size: 9px; color: #64748b; border: none;">
+                        <em>Note: {{ s.purpose }}</em>
+                      </td>
+                    </tr>
+                  {% endif %}
+                {% endfor %}
+              {% else %}
+                <tr>
+                  <td style="width: 135px; padding: 5px 6px; vertical-align: top; border: none; border-right: 1px solid #f1f5f9; color: #94a3b8;">—</td>
+                  <td style="width: 90px; padding: 5px 6px; vertical-align: top; border: none; border-right: 1px solid #f1f5f9;">
+                    {% if m.work_done_for %}
+                      <strong style="color: #0284c7;">{{ m.work_done_for }}</strong>
+                    {% else %}
+                      <span style="color: #94a3b8;">—</span>
+                    {% endif %}
+                  </td>
+                  <td style="padding: 5px 6px; vertical-align: top; border: none;">
+                    {{ m.completion_notes|default:m.filtered_purpose|default:m.purpose|default:"—" }}
+                  </td>
+                </tr>
+              {% endif %}
+            </table>
+          </td>
+          <!-- Status -->
+          <td style="text-align: center;">
             {% if m.is_cancelled %}
               <span class="badge badge-not-solved">Cancelled</span>
-            {% elif m.resolution_status == 'solved' %}
-              <span class="badge badge-solved">Solved</span>
-            {% elif m.resolution_status == 'not_solved' %}
-              <span class="badge badge-not-solved">Not Solved</span>
             {% elif m.in_time %}
               <span class="badge badge-solved">Completed</span>
             {% else %}
@@ -321,7 +494,7 @@
         </tr>
       {% empty %}
         <tr>
-          <td colspan="8" style="text-align: center; padding: 20px; color: #6b7280;">No staff movement records found for the selected filter.</td>
+          <td colspan="{% if filter_client %}10{% else %}11{% endif %}" style="text-align: center; padding: 20px; color: #6b7280;">No staff movement records found for the selected filter.</td>
         </tr>
       {% endfor %}
     </tbody>
@@ -330,16 +503,15 @@
   <!-- Signature Section -->
   <div class="signature-container">
     <div class="signature-box">
-      <div class="signature-line"></div>
-      <div class="signature-title">Received By</div>
-      <div class="signature-detail">Name: ______________________</div>
-      <div class="signature-detail">Date: ______________________</div>
-    </div>
-    <div class="signature-box">
-      <div class="signature-line"></div>
-      <div class="signature-title">Prepared By</div>
-      <div class="signature-detail">Name: ______________________</div>
-      <div class="signature-detail">Date: ______________________</div>
+      <div class="signature-title">Submitted By</div>
+      <div class="signature-field">
+        <div class="signature-field-label">Company Name</div>
+        <div class="signature-field-line"></div>
+      </div>
+      <div class="signature-field">
+        <div class="signature-field-label">Authorized Signature &amp; Company Stamp</div>
+        <div class="signature-field-line"></div>
+      </div>
     </div>
   </div>
 

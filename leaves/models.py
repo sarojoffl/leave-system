@@ -175,17 +175,12 @@ from datetime import time as time_cls
 
 class StaffMovement(models.Model):
     PURPOSE_CHOICES = [
-        ("problem_solving", "Problem solving"),
         ("amc", "AMC Support"),
         ("repair", "Repair / Service"),
         ("goods_bill_delivery", "Goods / bill delivery"),
         ("goods_pickup", "Goods pickup"),
         ("document_delivery", "Document delivery"),
         ("bank", "Bank visit"),
-    ]
-    RESOLUTION_CHOICES = [
-        ("solved", "Solved"),
-        ("not_solved", "Not solved"),
     ]
 
     employee = models.ForeignKey(
@@ -207,8 +202,6 @@ class StaffMovement(models.Model):
     in_time = models.TimeField(null=True, blank=True)
     purpose_type = models.CharField(max_length=30, choices=PURPOSE_CHOICES, blank=True)
     purpose = models.TextField(blank=True)
-    problem_description = models.TextField(blank=True)
-    resolution_status = models.CharField(max_length=20, choices=RESOLUTION_CHOICES, blank=True)
     work_done_for = models.CharField(max_length=200, blank=True, help_text="Contact person or department at client site")
     completion_notes = models.TextField(blank=True)
     assistants = models.ManyToManyField(
@@ -315,20 +308,30 @@ class StaffMovement(models.Model):
         If structured StaffMovementStop records exist, returns those.
         Otherwise falls back to single client/location fields on the movement.
         """
-        stops_qs = list(self.stops.all())
+        stops_qs = list(self.stops.prefetch_related("department_works").all())
         if stops_qs:
             return [
                 {
                     "id": s.id,
                     "order": s.order,
                     "client": s.client,
+                    "out_time": s.out_time,
+                    "in_time": s.in_time,
+                    "services": s.services or [],
                     "work_done_for": s.work_done_for,
                     "purpose_type": s.purpose_type or self.purpose_type,
                     "purpose_type_display": s.get_purpose_type_display() if s.purpose_type else self.get_purpose_type_display(),
                     "purpose": s.purpose,
                     "completion_notes": s.completion_notes,
-                    "problem_description": s.problem_description,
-                    "resolution_status": s.resolution_status,
+                    "department_works": [
+                        {
+                            "id": dw.id,
+                            "department": dw.department,
+                            "work_done_for": dw.work_done_for,
+                            "work_description": dw.work_description,
+                        }
+                        for dw in s.department_works.all()
+                    ],
                 }
                 for s in stops_qs
             ]
@@ -337,13 +340,15 @@ class StaffMovement(models.Model):
                 "id": None,
                 "order": 1,
                 "client": self.client,
+                "out_time": self.out_time,
+                "in_time": self.in_time,
+                "services": [],
                 "work_done_for": self.work_done_for,
                 "purpose_type": self.purpose_type,
                 "purpose_type_display": self.get_purpose_type_display(),
                 "purpose": self.purpose,
                 "completion_notes": self.completion_notes,
-                "problem_description": self.problem_description,
-                "resolution_status": self.resolution_status,
+                "department_works": [],
             }
         ]
 
@@ -359,7 +364,6 @@ class StaffMovementAssistant(models.Model):
     movement = models.ForeignKey(StaffMovement, on_delete=models.CASCADE, related_name="assistant_links")
     employee = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="assistant_movement_links")
     in_time = models.TimeField(null=True, blank=True)
-    resolution_status = models.CharField(max_length=20, choices=StaffMovement.RESOLUTION_CHOICES, blank=True)
     completion_notes = models.TextField(blank=True)
 
     class Meta:
@@ -374,18 +378,36 @@ class StaffMovementStop(models.Model):
     movement = models.ForeignKey(StaffMovement, on_delete=models.CASCADE, related_name="stops")
     order = models.PositiveIntegerField(default=1)
     client = models.CharField(max_length=200)
+    out_time = models.TimeField(null=True, blank=True, help_text="Departure / Start time for this client stop")
+    in_time = models.TimeField(null=True, blank=True, help_text="Return / Finish time for this client stop")
+    services = models.JSONField(default=list, blank=True, help_text="List of service / repair checkboxes")
     purpose = models.TextField(blank=True, help_text="Additional notes / specific purpose for this stop")
     work_done_for = models.CharField(max_length=200, blank=True, help_text="Contact person or department at client site")
     purpose_type = models.CharField(max_length=30, choices=StaffMovement.PURPOSE_CHOICES, blank=True)
     completion_notes = models.TextField(blank=True, help_text="Completion notes for this specific client")
-    problem_description = models.TextField(blank=True)
-    resolution_status = models.CharField(max_length=20, choices=StaffMovement.RESOLUTION_CHOICES, blank=True)
 
     class Meta:
         ordering = ["order", "id"]
 
     def __str__(self):
         return f"Stop #{self.order}: {self.client} for movement #{self.movement_id}"
+
+
+class StaffMovementDepartmentWork(models.Model):
+    """Department/section level breakdown of work done at a client stop."""
+    stop = models.ForeignKey(StaffMovementStop, on_delete=models.CASCADE, related_name="department_works")
+    order = models.PositiveIntegerField(default=1)
+    department = models.CharField(max_length=150, help_text="Department / Section / Division / Position")
+    work_done_for = models.CharField(max_length=200, blank=True, help_text="Contact person / username at department")
+    work_description = models.TextField(blank=True, help_text="What work done ??")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["order", "id"]
+
+    def __str__(self):
+        return f"{self.department} - {self.work_done_for or 'General'} (Stop #{self.stop_id})"
+
 
 
 class BiometricDevice(models.Model):
