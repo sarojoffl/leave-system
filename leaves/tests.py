@@ -875,7 +875,7 @@ class StaffMovementTestCase(TestCase):
         out_time_obj = time(10, 0)
         movement = StaffMovement.objects.create(
             employee=self.employee,
-            date=date.today(),
+            date=date.today() - timedelta(days=1),
             client="Active Site",
             out_time=out_time_obj,
             purpose_type="repair",
@@ -945,7 +945,10 @@ class StaffMovementTestCase(TestCase):
     def test_record_return_without_department_succeeds(self):
         """Recording return with blank department succeeds without validation errors."""
         from leaves.models import StaffMovement, StaffMovementStop
-        out_time_obj = time(10, 0)
+        out_time_obj = (datetime.now() - timedelta(minutes=30)).time().replace(microsecond=0)
+        in_time_obj = (datetime.now() - timedelta(minutes=10)).time().replace(microsecond=0)
+        out_str = out_time_obj.strftime("%H:%M")
+        in_str = in_time_obj.strftime("%H:%M")
         movement = StaffMovement.objects.create(
             employee=self.employee,
             date=date.today(),
@@ -965,8 +968,8 @@ class StaffMovementTestCase(TestCase):
         self.client.force_login(self.employee)
         resp = self.client.post(reverse("staff_movement_edit", args=[movement.id]), {
             "action_type": "record_return",
-            f"stop_out_time_{stop.id}": "10:00",
-            f"stop_in_time_{stop.id}": "11:30",
+            f"stop_out_time_{stop.id}": out_str,
+            f"stop_in_time_{stop.id}": in_str,
             f"stop_work_done_for_{stop.id}": "Contact Person",
             f"stop_completion_notes_{stop.id}": "Routine inspection completed",
             f"dept_department_{stop.id}[]": [""],  # Left blank
@@ -976,7 +979,7 @@ class StaffMovementTestCase(TestCase):
         self.assertEqual(resp.status_code, 302)
         movement.refresh_from_db()
         stop.refresh_from_db()
-        self.assertEqual(movement.in_time, time(11, 30))
+        self.assertEqual(movement.in_time.strftime("%H:%M"), in_str)
         self.assertEqual(stop.department_works.first().department, "General")
 
     def test_manager_can_edit_destinations_and_assistants_on_completed_record(self):
@@ -986,7 +989,7 @@ class StaffMovementTestCase(TestCase):
         in_time_obj = time(12, 0)
         movement = StaffMovement.objects.create(
             employee=self.employee,
-            date=date.today(),
+            date=date.today() - timedelta(days=1),
             client="Old Hospital",
             out_time=out_time_obj,
             in_time=in_time_obj,

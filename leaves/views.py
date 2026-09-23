@@ -2083,6 +2083,11 @@ def staff_movement(request):
         client_terms_lower = [c.strip().lower() for c in filter_client.split(",") if c.strip()] if filter_client else []
         for m in movements_list:
             stops = list(m.stops.all())
+            # Backfill stop-level in_time from parent movement for legacy records
+            if m.in_time:
+                for s in stops:
+                    if s.in_time is None:
+                        s.in_time = m.in_time
             if client_terms_lower and stops:
                 m.matching_stops = [s for s in stops if any(term in s.client.lower() for term in client_terms_lower)]
                 matching_notes = [f"[{s.client}]: {s.completion_notes}" if len(m.matching_stops) > 1 else s.completion_notes for s in m.matching_stops if s.completion_notes]
@@ -2341,6 +2346,11 @@ def staff_movement(request):
             m.my_assistant_link = my_links.get(m.id)
             m.is_primary_for_me = request.user.id in (m.employee_id, m.logged_by_id)
             m.matching_stops = list(m.stops.all())
+            # Backfill stop-level in_time from parent movement for legacy records
+            if m.in_time:
+                for s in m.matching_stops:
+                    if s.in_time is None:
+                        s.in_time = m.in_time
             m.filtered_completion_notes = m.completion_notes or ""
             m.filtered_purpose = m.purpose or ""
             
@@ -2453,6 +2463,11 @@ def staff_movement(request):
             admin_terms_lower = [c.strip().lower() for c in admin_filter_client.split(",") if c.strip()] if admin_filter_client else []
             for m in admin_movements_list:
                 stops = list(m.stops.all())
+                # Backfill stop-level in_time from parent movement for legacy records
+                if m.in_time:
+                    for s in stops:
+                        if s.in_time is None:
+                            s.in_time = m.in_time
                 if admin_terms_lower and stops:
                     m.matching_stops = [s for s in stops if any(term in s.client.lower() for term in admin_terms_lower)]
                     matching_notes = [f"[{s.client}]: {s.completion_notes}" if len(m.matching_stops) > 1 else s.completion_notes for s in m.matching_stops if s.completion_notes]
@@ -3063,6 +3078,11 @@ def staff_movement_export_pdf(request):
     pdf_terms_lower = [c.strip().lower() for c in filter_client.split(",") if c.strip()] if filter_client else []
     for m in movements_list:
         stops = list(m.stops.all())
+        # Backfill stop-level in_time from parent movement for legacy records
+        if m.in_time:
+            for s in stops:
+                if s.in_time is None:
+                    s.in_time = m.in_time
         if pdf_terms_lower and stops:
             m.matching_stops = [s for s in stops if any(term in s.client.lower() for term in pdf_terms_lower)]
             matching_purposes = [f"[{s.client}]: {s.purpose}" if len(m.matching_stops) > 1 else s.purpose for s in m.matching_stops if s.purpose]
