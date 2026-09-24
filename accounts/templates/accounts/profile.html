@@ -1,0 +1,274 @@
+{% extends "base/base.html" %}
+
+{% block title %}My Profile — Global Link Technology{% endblock %}
+{% block page_title %}My Profile{% endblock %}
+
+{% block extra_css %}
+<style>
+  .profile-container {
+    max-width: 860px;
+    margin: 1rem auto 2.5rem;
+    padding: 0 0.5rem;
+  }
+
+  .profile-grid {
+    display: grid;
+    grid-template-columns: 290px 1fr;
+    gap: 1.5rem;
+    align-items: start;
+  }
+
+  .profile-summary-card {
+    text-align: center;
+    padding: 2rem 1.5rem 1.75rem;
+  }
+
+  .profile-avatar-wrap {
+    width: 76px;
+    height: 76px;
+    font-size: 1.85rem;
+    margin: 0 auto 1rem;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--color-primary-dark), var(--color-primary));
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    box-shadow: 0 4px 14px rgba(0, 145, 179, 0.25);
+  }
+
+  .profile-user-name {
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: var(--color-text);
+    margin-bottom: 0.2rem;
+    word-break: break-word;
+  }
+
+  .profile-user-handle {
+    font-size: 0.82rem;
+    color: var(--color-text-muted);
+    font-weight: 600;
+    margin-bottom: 0.85rem;
+  }
+
+  .profile-info-list {
+    border-top: 1px solid var(--color-border-light);
+    padding-top: 1rem;
+    text-align: left;
+    font-size: 0.85rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .profile-info-label {
+    color: var(--color-text-muted);
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+  }
+
+  .profile-info-val {
+    color: var(--color-text);
+    font-weight: 600;
+    font-size: 0.9rem;
+    word-break: break-word;
+  }
+
+  .profile-form-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    padding: 1.5rem;
+  }
+
+  .name-row-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .field-hint {
+    font-size: 0.76rem;
+    color: var(--color-text-muted);
+    margin-top: 4px;
+    line-height: 1.35;
+  }
+
+  .profile-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
+    margin-top: 0.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-border-light);
+  }
+
+  /* Responsive Media Queries */
+  @media (max-width: 768px) {
+    .profile-container {
+      margin: 0.5rem auto 1.5rem;
+      padding: 0;
+    }
+
+    .profile-grid {
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+
+    .profile-summary-card {
+      padding: 1.5rem 1.25rem;
+    }
+
+    .profile-form-grid {
+      padding: 1.25rem 1rem;
+    }
+
+    .profile-form-actions {
+      flex-direction: column-reverse;
+      gap: 8px;
+    }
+
+    .profile-form-actions .btn {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .name-row-grid {
+      grid-template-columns: 1fr;
+      gap: 0.85rem;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="profile-container">
+
+  <div class="profile-grid">
+    
+    <!-- User summary card -->
+    <div class="card profile-summary-card">
+      <div class="profile-avatar-wrap">
+        {{ user.initials }}
+      </div>
+      <h2 class="profile-user-name">{{ user.get_full_name|default:user.username }}</h2>
+      <p class="profile-user-handle">@{{ user.username }}</p>
+      
+      <div style="margin-bottom: 1.25rem;">
+        <span class="role-badge" style="display: inline-block; font-size: 0.76rem; padding: 0.3rem 0.85rem;">
+          {{ user.get_role_display }}
+        </span>
+      </div>
+
+      <div class="profile-info-list">
+        <div>
+          <span class="profile-info-label">Department</span>
+          <span class="profile-info-val">{{ user.department|default:"—" }}</span>
+        </div>
+        <div>
+          <span class="profile-info-label">Position</span>
+          <span class="profile-info-val">{{ user.position|default:"—" }}</span>
+        </div>
+        {% if user.device_user_id %}
+        <div>
+          <span class="profile-info-label">Device User ID</span>
+          <code class="profile-info-val" style="background:var(--overlay-2);padding:2px 6px;border-radius:4px;font-size:0.85rem;">{{ user.device_user_id }}</code>
+        </div>
+        {% endif %}
+      </div>
+
+      <div style="margin-top: 1.25rem; border-top: 1px solid var(--color-border-light); padding-top: 1rem;">
+        <a href="{% url 'change_password' %}" class="btn btn-outline btn-sm" style="width: 100%; justify-content: center; gap: 6px;">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Change Password
+        </a>
+      </div>
+    </div>
+
+    <!-- Edit Profile Form -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Edit Personal Details</span>
+      </div>
+
+      <form method="post" class="profile-form-grid" novalidate>
+        {% csrf_token %}
+
+        <div class="name-row-grid">
+          <div class="form-group">
+            <label for="first_name">First Name <span style="color:var(--color-danger);">*</span></label>
+            <input type="text" id="first_name" name="first_name" value="{{ form.first_name.value|default:'' }}" required autocomplete="given-name">
+            {% if form.first_name.errors %}
+              {% for error in form.first_name.errors %}
+                <p class="field-error" style="display: block; margin-top: 4px;">{{ error }}</p>
+              {% endfor %}
+            {% endif %}
+          </div>
+
+          <div class="form-group">
+            <label for="last_name">Last Name <span style="color:var(--color-danger);">*</span></label>
+            <input type="text" id="last_name" name="last_name" value="{{ form.last_name.value|default:'' }}" required autocomplete="family-name">
+            {% if form.last_name.errors %}
+              {% for error in form.last_name.errors %}
+                <p class="field-error" style="display: block; margin-top: 4px;">{{ error }}</p>
+              {% endfor %}
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="email">Email Address</label>
+          <input type="email" id="email" name="email" value="{{ form.email.value|default:'' }}" placeholder="name@example.com" autocomplete="email">
+          <p class="field-hint">
+            Used for official system notifications and automated password resets.
+          </p>
+          {% if form.email.errors %}
+            {% for error in form.email.errors %}
+              <p class="field-error" style="display: block; margin-top: 4px;">{{ error }}</p>
+            {% endfor %}
+          {% endif %}
+        </div>
+
+        <div class="form-group">
+          <label for="gender">Gender</label>
+          <select id="gender" name="gender">
+            <option value="" {% if not form.gender.value %}selected{% endif %}>Select Gender</option>
+            <option value="male" {% if form.gender.value == 'male' %}selected{% endif %}>Male</option>
+            <option value="female" {% if form.gender.value == 'female' %}selected{% endif %}>Female</option>
+            <option value="other" {% if form.gender.value == 'other' %}selected{% endif %}>Other</option>
+          </select>
+          {% if form.gender.errors %}
+            {% for error in form.gender.errors %}
+              <p class="field-error" style="display: block; margin-top: 4px;">{{ error }}</p>
+            {% endfor %}
+          {% endif %}
+        </div>
+
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" value="{{ user.username }}" readonly style="background: var(--input-bg); cursor: not-allowed; opacity: 0.7;">
+          <p class="field-hint">
+            Usernames can only be updated by a System Administrator.
+          </p>
+        </div>
+
+        <div class="profile-form-actions">
+          <a href="{% url 'dashboard' %}" class="btn btn-outline">Cancel</a>
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}

@@ -139,7 +139,7 @@
             </span>
           </span>
         </button>
-        <a href="{% url 'change_password' %}" title="Change Password" class="topbar-user-link">
+        <a href="{% url 'profile' %}" title="My Profile" class="topbar-user-link">
           <div class="avatar avatar-sm">{{ request.user.initials }}</div>
           <span class="topbar-user-name">{{ request.user.get_full_name|default:request.user.username }}</span>
         </a>

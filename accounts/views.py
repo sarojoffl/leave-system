@@ -105,6 +105,31 @@ def logout_view(request):
     return redirect("login")
 
 
+from django.contrib.auth import views as auth_views
+from django.urls import reverse_lazy
+from .forms import UserProfileForm, CustomPasswordResetForm
+
+
+@login_required
+def profile_view(request):
+    """View and update user's own profile (first_name, last_name, email, gender)."""
+    if request.method == "POST":
+        form = UserProfileForm(request.POST, instance=request.user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Your profile has been updated successfully.")
+            return redirect("profile")
+        else:
+            messages.error(request, "Please correct the errors below.")
+    else:
+        form = UserProfileForm(instance=request.user)
+
+    return render(request, "accounts/profile.html", {
+        "form": form,
+        "user": request.user,
+    })
+
+
 @login_required
 def change_password_view(request):
     if request.method == 'POST':
@@ -121,6 +146,28 @@ def change_password_view(request):
     else:
         form = PasswordChangeForm(request.user)
     return render(request, 'accounts/change_password.html', {'form': form})
+
+
+class CustomPasswordResetView(auth_views.PasswordResetView):
+    form_class = CustomPasswordResetForm
+    template_name = "accounts/password_reset_form.html"
+    email_template_name = "accounts/password_reset_email.txt"
+    html_email_template_name = "accounts/password_reset_email.html"
+    subject_template_name = "accounts/password_reset_subject.txt"
+    success_url = reverse_lazy("password_reset_done")
+
+
+class CustomPasswordResetDoneView(auth_views.PasswordResetDoneView):
+    template_name = "accounts/password_reset_done.html"
+
+
+class CustomPasswordResetConfirmView(auth_views.PasswordResetConfirmView):
+    template_name = "accounts/password_reset_confirm.html"
+    success_url = reverse_lazy("password_reset_complete")
+
+
+class CustomPasswordResetCompleteView(auth_views.PasswordResetCompleteView):
+    template_name = "accounts/password_reset_complete.html"
 
 
 # ---------------------------------------------------------------------------

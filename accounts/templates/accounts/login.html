@@ -475,7 +475,7 @@
       </div>
 
       <div class="forgot-row">
-        <span class="forgot-link" id="forgotPasswordLink">Forgot password?</span>
+        <a href="{% url 'password_reset' %}" class="forgot-link">Forgot password?</a>
       </div>
 
       <button type="submit" class="login-btn" id="loginBtn">
@@ -488,17 +488,6 @@
       Need access? Contact your <strong>administrator</strong>
     </div>
 
-  </div>
-
-  <div class="modal-overlay" id="forgotPasswordModal">
-    <div class="modal-box">
-      <div class="modal-icon">
-        <img src="https://globallinknepal.com/static/images/logo.webp" alt="Global Link Technology Pvt. Ltd. logo">
-      </div>
-      <h3>Forgot your password?</h3>
-      <p>Password resets aren't automated yet. Please reach out to <strong>your system administrator</strong> directly and they'll get you sorted.</p>
-      <button type="button" class="modal-close-btn" id="modalCloseBtn">Got it</button>
-    </div>
   </div>
 
   <script>
@@ -516,23 +505,6 @@
       pwInput.type = shown ? 'text' : 'password';
       eyeIcon.innerHTML = shown ? eyeClosed : eyeOpen;
       pwToggle.setAttribute('aria-label', shown ? 'Hide password' : 'Show password');
-    });
-
-    // Forgot password modal
-    const forgotLink   = document.getElementById('forgotPasswordLink');
-    const fpModal       = document.getElementById('forgotPasswordModal');
-    const fpModalClose  = document.getElementById('modalCloseBtn');
-
-    function openModal() { fpModal.classList.add('show'); }
-    function closeModal() { fpModal.classList.remove('show'); }
-
-    forgotLink.addEventListener('click', openModal);
-    fpModalClose.addEventListener('click', closeModal);
-    fpModal.addEventListener('click', (e) => {
-      if (e.target === fpModal) closeModal(); // click outside the box
-    });
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') closeModal();
     });
 
     // Live validation

@@ -393,7 +393,25 @@
     color: var(--color-text-muted);
   }
 
+  /* Desktop / Mobile Cell Visibility */
+  .desktop-only-cell {
+    display: flex !important;
+    flex-direction: column;
+    gap: 3px;
+    flex: 1;
+  }
+  .mobile-only-cell {
+    display: none !important;
+  }
+
   @media (max-width: 768px) {
+    .desktop-only-cell {
+      display: none !important;
+    }
+    .mobile-only-cell {
+      display: flex !important;
+    }
+
     .att-header-row {
       flex-direction: column;
       align-items: stretch;
@@ -405,7 +423,7 @@
     }
     .att-month-title {
       min-width: unset;
-      font-size: 1.1rem;
+      font-size: 1.05rem;
     }
     .att-view-toggle {
       width: 100%;
@@ -428,13 +446,13 @@
       font-size: 1.25rem;
     }
     .att-stat-label {
-      font-size: 0.68rem;
+      font-size: 0.7rem;
     }
     .att-stat-sub {
-      font-size: 0.65rem;
+      font-size: 0.68rem;
     }
 
-    /* Full 7-column calendar fit without sliding, with comfortable cell length */
+    /* Clean 7-column calendar that fits mobile width without sliding */
     .att-cal-scroll-wrapper {
       width: 100%;
       overflow: hidden;
@@ -449,39 +467,63 @@
       letter-spacing: 0;
     }
     .att-cal-cell {
-      min-height: 72px;
-      padding: 4px 3px;
+      min-height: 62px;
+      padding: 3px 2px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      gap: 2px;
     }
     .att-cal-date-row {
       margin-bottom: 2px;
       display: flex;
       justify-content: space-between;
       align-items: baseline;
+      padding: 0 2px;
     }
     .att-bs-num {
       font-size: 0.88rem;
       font-weight: 800;
+      line-height: 1;
     }
     .att-ad-num {
-      font-size: 0.55rem;
-      display: inline-block;
-      opacity: 0.85;
-    }
-    .att-badge {
       font-size: 0.52rem;
+      color: var(--color-text-muted);
+      line-height: 1;
+    }
+    
+    /* Mobile-only micro cell content */
+    .mobile-only-cell {
+      flex-direction: column;
+      align-items: center;
+      gap: 1px;
+      width: 100%;
+    }
+    .att-micro-badge {
+      font-size: 0.52rem;
+      font-weight: 700;
       padding: 1px 3px;
       border-radius: 3px;
       line-height: 1.15;
-      margin-bottom: 2px;
+      text-align: center;
+      width: 100%;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      display: block;
     }
-    .att-times-row {
+    .att-micro-time {
       font-size: 0.52rem;
+      font-weight: 700;
       line-height: 1.15;
+      color: var(--color-text-muted);
+      text-align: center;
+      white-space: nowrap;
     }
-    .att-duration-tag {
-      font-size: 0.52rem;
-      margin-top: 1px;
-    }
+    .att-micro-time.in { color: var(--color-success); }
+    .att-micro-time.out { color: var(--color-accent); }
+    .att-micro-time.warn { color: var(--color-warning); }
   }
 </style>
 {% endblock %}
@@ -581,10 +623,47 @@
                 <span class="att-ad-num">{{ day.ad_date|date:"M d" }}</span>
               </div>
 
-              <div class="att-cell-content">
+              <!-- Mobile-only compact cell view (Fits perfectly without scroll) -->
+              <div class="mobile-only-cell">
                 {% if day.summary %}
-                  <span class="att-badge badge-{{ day.summary.status }}">
-                    {{ day.summary.status_label }}
+                  <span class="att-micro-badge badge-{{ day.summary.status }}">
+                    {% if day.summary.status == 'present' %}Present
+                    {% elif day.summary.status == 'late' %}Late
+                    {% elif day.summary.status == 'on_leave' %}Leave
+                    {% elif day.summary.status == 'holiday' %}Holiday
+                    {% elif day.summary.status == 'holiday_work' %}Work
+                    {% elif day.summary.status == 'regularized' %}Reg
+                    {% elif day.summary.status == 'weekend' %}Off
+                    {% elif day.summary.status == 'absent' %}Absent
+                    {% elif day.summary.status == 'not_checked_in' %}—
+                    {% elif day.summary.status == 'upcoming' %}—
+                    {% else %}{{ day.summary.status_label }}
+                    {% endif %}
+                  </span>
+                  {% if day.summary.first_punch %}
+                    <span class="att-micro-time in" title="Check-in: {{ day.summary.first_punch.timestamp|date:'h:i A' }}">{{ day.summary.first_punch.timestamp|date:"h:i A" }}</span>
+                  {% elif day.summary.has_missing_in %}
+                    <span class="att-micro-time warn" title="Missing In">⚠️ In</span>
+                  {% endif %}
+                  {% if day.summary.last_punch and day.summary.last_punch != day.summary.first_punch %}
+                    <span class="att-micro-time out" title="Check-out: {{ day.summary.last_punch.timestamp|date:'h:i A' }}">{{ day.summary.last_punch.timestamp|date:"h:i A" }}</span>
+                  {% elif day.summary.has_missing_out %}
+                    <span class="att-micro-time warn" title="Missing Out">⚠️ Out</span>
+                  {% endif %}
+                {% endif %}
+              </div>
+
+              <!-- Desktop-only detailed cell view (Unchanged) -->
+              <div class="desktop-only-cell att-cell-content">
+                {% if day.summary %}
+                  <span class="att-badge badge-{{ day.summary.status }}" title="{{ day.summary.status_label }}">
+                    {% if day.summary.status == 'holiday' %}
+                      Holiday
+                    {% elif day.summary.status == 'on_leave' %}
+                      Leave
+                    {% else %}
+                      {{ day.summary.status_label }}
+                    {% endif %}
                   </span>
 
                   {% if day.summary.first_punch or day.summary.last_punch %}
@@ -609,9 +688,9 @@
                       </div>
                     {% endif %}
                   {% elif day.summary.leave_info %}
-                    <div class="att-times-row" style="color:var(--color-accent);font-weight:700;">{{ day.summary.leave_info }}</div>
+                    <div class="att-times-row" style="color:var(--color-accent);font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ day.summary.leave_info }}">{{ day.summary.leave_info }}</div>
                   {% elif day.summary.holiday_name %}
-                    <div class="att-times-row" style="color:var(--color-purple);font-weight:700;">{{ day.summary.holiday_name }}</div>
+                    <div class="att-times-row" style="color:var(--color-purple);font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ day.summary.holiday_name }}">{{ day.summary.holiday_name }}</div>
                   {% endif %}
                 {% endif %}
               </div>
